@@ -802,9 +802,16 @@ def emit(name, mb, material, coll, root, smooth=True):
         me.shade_smooth()
     me.materials.append(material)
     obj = bpy.data.objects.new(name, me)
+    obj["squid_part"] = name   # 同じ名前の物（魚の Eyes など）があると名前が Eyes.001 になるため、部位名は別に持つ
     coll.objects.link(obj)
     obj.parent = root
     return obj
+
+
+def squid_parts():
+    """イカのコレクション内の部位を {部位名: オブジェクト} で返す"""
+    coll = bpy.data.collections[SPECIES["name"]]
+    return {o["squid_part"]: o for o in coll.objects if "squid_part" in o}
 
 
 def frame_viewports():

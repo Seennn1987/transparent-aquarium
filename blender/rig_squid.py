@@ -104,6 +104,7 @@ def build_armature(coll, root, chains):
     data = bpy.data.armatures.new(PREFIX + "Rig")
     data.display_type = "STICK"
     rig = bpy.data.objects.new("Rig", data)
+    rig["squid_part"] = "Rig"
     rig.show_in_front = True
     coll.objects.link(rig)
     rig.parent = root
@@ -235,23 +236,25 @@ def weight_limbs(obj, chains):
 def rig_squid():
     coll = bpy.data.collections[SPECIES["name"]]
     root = bpy.data.objects[SPECIES["name"] + "_Root"]
-    chains = limb_chains(json.loads(bpy.data.objects["Arms"]["limb_lines"]))
+    parts = squid_parts()
+    chains = limb_chains(json.loads(parts["Arms"]["limb_lines"]))
     rig = build_armature(coll, root, chains)
 
     for name in HEAD_PARTS:
-        weight_rigid(bpy.data.objects[name], "Head")
+        weight_rigid(parts[name], "Head")
     for name in MANTLE_PARTS:
-        weight_mantle(bpy.data.objects[name])
-    weight_fins(bpy.data.objects["Fins"])
+        weight_mantle(parts[name])
+    weight_fins(parts["Fins"])
     for name in LIMB_PARTS:
-        weight_limbs(bpy.data.objects[name], chains)
+        weight_limbs(parts[name], chains)
 
     rigged = HEAD_PARTS + MANTLE_PARTS + LIMB_PARTS + ("Fins",)
-    missing = [o.name for o in coll.objects if o.type == "MESH" and o.name not in rigged]
+    missing = [name for name, o in parts.items() if o.type == "MESH" and name not in rigged]
     if missing:
         raise RuntimeError(f"骨組みに追従しない部位があります: {missing}")
     for name in rigged:
-        attach(bpy.data.objects[name], rig)
+        attach(parts[name], rig)
+    rig.hide_set(True)   # 骨の線が半透明の体に重なって見づらいため隠す（隠しても体は骨に従って動く）
     print(f"[{SPECIES['name']}] 骨組み完了: 骨 {len(rig.data.bones)} 本")
     return rig
 
