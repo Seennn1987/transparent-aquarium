@@ -11,13 +11,13 @@ Blender 5.2 LTS で動作確認済み。
 体の中身を「光を吸う物質」で満たしているので、光が組織を通る距離が長い所ほど色が濃い。
   - 胴（外套膜）は筋肉の壁でできた中空の筒: 壁を斜めに見通す輪郭が濃く、中央は明るく抜ける
   - エンペラは付け根が厚く、包丁の刃のように縁へ向かって薄くなり、縁はほぼ透明に消える
-  - 眼は金色がかった半透明の球で、中に小さな暗い水晶体が見える
+  - 眼は金色がかった半透明の球で、縁ほど濃い金色の輪がぼんやり透ける（黒い核はない）
   - 胴の中央は、中の黄色い消化腺と青緑の壁が重なって黄緑に見える
 
 表現しているもの:
   外套膜（中空）・菱形のエンペラ・頭・漏斗
   8本の腕と2本の触腕（触腕の先は吸盤の並ぶ触腕掌）・腕の吸盤と角質環
-  半透明の眼と水晶体・口球と顎板（カラストンビ）
+  半透明の眼・口球と顎板（カラストンビ）
   体内: 軟甲（背中の芯）・消化腺・盲嚢・生殖巣・墨汁嚢と直腸・鰓
 
 座標系: X=前後（+X が外套の後端、-X が腕の先）、Z=背腹（+Z が背）、Y=左右。
@@ -26,6 +26,7 @@ Blender 5.2 LTS で動作確認済み。
 
 import bpy
 import bmesh
+import json
 import math
 import random
 from mathutils import Vector, Matrix, Euler
@@ -162,7 +163,12 @@ class MeshBuilder:
     def __init__(self):
         self.verts = []
         self.faces = []
-        self.thickness = []   # 頂点ごとの厚み（0〜1）。使う部位だけ verts と同じ数を入れる
+        self.attrs = {}       # 頂点ごとの値（名前→値の列）。使う部位だけ verts と同じ数を入れる
+
+    def mark(self, name, value):
+        """前回 mark した所から今までに追加した頂点すべてに、同じ値を付ける（どの腕の頂点か等）"""
+        values = self.attrs.setdefault(name, [])
+        values.extend([value] * (len(self.verts) - len(values)))
 
     def tube(self, pts, radii, sides=8, closed=False):
         pts = [Vector(p) for p in pts]
@@ -542,8 +548,13 @@ def build_fins(fin_mb):
             bot.append(row_b)
             thick.append(thick_row)
         fin_mb.sheet(top, bot)
+        # sheet() は上面の格子→下面の格子の順に頂点を並べる
         flat = [t for row in thick for t in row]
-        fin_mb.thickness.extend(flat + flat)   # sheet() は上面の格子→下面の格子の順に頂点を並べる
+        grid_q = [i / nu for i in range(nu + 1) for _ in range(nv + 1)]
+        grid_v = [j / nv for _ in range(nu + 1) for j in range(nv + 1)]
+        fin_mb.attrs.setdefault("thickness", []).extend(flat + flat)
+        fin_mb.attrs.setdefault("fin_q", []).extend(grid_q + grid_q)   # 前端0 → 後端1
+        fin_mb.attrs.setdefault("fin_v", []).extend(grid_v + grid_v)   # 付け根0 → 縁1
 
 
 def build_head(head_mb, body_mb):
@@ -608,7 +619,15 @@ def add_suckers(body_mb, ring_mb, pts, radii, oral0, s_from, s_to, rows, size=0.
         row += 1
 
 
-def build_arms(body_mb, ring_mb, rng):
+def record_limb(lines, body_mb, ring_mb, name, pts, e):
+    """腕1本分の頂点に番号を付け、中心線を骨組み用に残す"""
+    limb_id = len(lines)
+    body_mb.mark("limb_id", float(limb_id))
+    ring_mb.mark("limb_id", float(limb_id))
+    lines.append({"name": name, "pts": [tuple(p) for p in pts], "radial": tuple(e)})
+
+
+def build_arms(body_mb, ring_mb, rng, lines):
     ring_r = 0.042
     for name, ang, length, r0, spread, curl in ARMS:
         for side in (1, -1):
@@ -628,9 +647,10 @@ def build_arms(body_mb, ring_mb, rng):
             radii = taper(len(pts), r0, 0.0025, 0.85)
             body_mb.tube(pts, radii, 14)
             add_suckers(body_mb, ring_mb, pts, radii, -e, 0.12, 0.93, 2)
+            record_limb(lines, body_mb, ring_mb, f"Arm{name}{'L' if side > 0 else 'R'}", pts, e)
 
 
-def build_tentacles(body_mb, ring_mb):
+def build_tentacles(body_mb, ring_mb, lines):
     for side in (1, -1):
         phi = math.radians(TENTACLE_ANGLE) * side
         e = Vector((0, math.sin(phi), math.cos(phi)))
@@ -660,6 +680,7 @@ def build_tentacles(body_mb, ring_mb):
             radii.append(r)
         body_mb.tube(pts, radii, 14)
         add_suckers(body_mb, ring_mb, pts, radii, -e, 0.73, 0.97, SPECIES["club_sucker_rows"], size=0.26)
+        record_limb(lines, body_mb, ring_mb, f"Tentacle{'L' if side > 0 else 'R'}", pts, e)
 
 
 def build_mouth(buccal_mb, beak_mb):
@@ -767,10 +788,10 @@ def configure_lightbox():
 def emit(name, mb, material, coll, root, smooth=True):
     me = bpy.data.meshes.new(PREFIX + name)
     me.from_pydata([tuple(v) for v in mb.verts], [], mb.faces)
-    if mb.thickness:
-        if len(mb.thickness) != len(mb.verts):
-            raise ValueError(f"{name}: 厚みの数 {len(mb.thickness)} が頂点数 {len(mb.verts)} と一致しません")
-        me.attributes.new("thickness", "FLOAT", "POINT").data.foreach_set("value", mb.thickness)
+    for attr_name, values in mb.attrs.items():
+        if len(values) != len(mb.verts):
+            raise ValueError(f"{name}: {attr_name} の数 {len(values)} が頂点数 {len(mb.verts)} と一致しません")
+        me.attributes.new(attr_name, "FLOAT", "POINT").data.foreach_set("value", values)
     bm = bmesh.new()
     bm.from_mesh(me)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
@@ -838,10 +859,11 @@ def main():
     build_eyes(eyes)
     emit("Eyes", eyes, mats["eye"], coll, root)
 
-    arms, rings = MeshBuilder(), MeshBuilder()
-    build_arms(arms, rings, rng)
-    build_tentacles(arms, rings)
-    emit("Arms", arms, mats["arm"], coll, root)
+    arms, rings, limb_lines = MeshBuilder(), MeshBuilder(), []
+    build_arms(arms, rings, rng, limb_lines)
+    build_tentacles(arms, rings, limb_lines)
+    arms_obj = emit("Arms", arms, mats["arm"], coll, root)
+    arms_obj["limb_lines"] = json.dumps(limb_lines)   # 骨組み（rig_squid.py）が腕の中心線として使う
     emit("SuckerRings", rings, mats["sucker"], coll, root)
 
     buccal, beak = MeshBuilder(), MeshBuilder()
