@@ -6,7 +6,7 @@ Blender 5.2 LTS で動作確認済み。
   blender --background --factory-startup --python export_squid_gltf.py -- <出力 .glb のパス>
 
 animate_squid.py（形 → 骨組み → 動き）を実行してから書き出す。書き出す内容:
-  - 部位ごとのメッシュ（名前は squid_part）と骨組み 98 本
+  - 部位ごとのメッシュ（部位名は extras の squid_part）と骨組み 98 本
   - 動き 4 つ: SQ_Hover / SQ_SwimForward / SQ_SwimBackward / SQ_Jet（その場で動く版。体全体の移動は水槽側で行う）
   - 単位は ML=1（ルートの拡大を 1 に戻して書き出す）。水槽側で好きな大きさに拡大する
 
@@ -152,6 +152,15 @@ def prepare_scene():
 
     parts = squid_parts()
     rig = parts["Rig"]
+    # glTF の皮膚は骨組みの子である必要がある。骨組みも部位もルート直下の原点にあるので、付け替えても形は動かない
+    if rig.matrix_local != Matrix.Identity(4):
+        raise RuntimeError("骨組みがルートの原点にないため、部位を骨組みの子に付け替えられません")
+    for obj in parts.values():
+        if obj.type == "MESH":
+            if obj.matrix_local != Matrix.Identity(4):
+                raise RuntimeError(f"{obj.name} がルートの原点にないため、骨組みの子に付け替えられません")
+            obj.parent = rig
+            obj.matrix_parent_inverse = Matrix.Identity(4)
     rig.animation_data.action = bpy.data.actions[PREFIX + "Hover"]
     rig.hide_set(False)
     scene.frame_set(1)
@@ -168,6 +177,7 @@ def export(path):
         export_vertex_color_name="SQ_Tint",
         export_all_vertex_colors=False,
         export_attributes=True,
+        export_extras=True,   # squid_part を書き出す（骨の Head と部位の Head は名前がぶつかり、読み込み側で改名される）
         export_skins=True,
         export_def_bones=False,
         export_animations=True,

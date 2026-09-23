@@ -6,6 +6,7 @@ import { createEnvironment, createParticles } from "./environment.js";
 import { createPlants } from "./plants.js";
 import { createFishSchool } from "./fish.js";
 import { createFood } from "./food.js";
+import { createSquid } from "./squid.js";
 import { randomGenerator } from "./math.js";
 import { waterTime } from "./water.js";
 import { createFrameLoop } from "../../shared/frame-loop.js";
@@ -170,6 +171,7 @@ async function start() {
     })
     : { update() {} };
   const particles = createParticles(scene, { thickets: plants.thickets });
+  const squid = await createSquid(scene, { obstacles });
 
   const { target, post, postScene, postCamera } = createComposite(camera, settings);
 
@@ -298,6 +300,8 @@ async function start() {
   // Mesh transforms are static. Fish/food use instance matrices, foliage and particles
   // move in vertex shaders. Avoid recomposing every unchanged object matrix per frame.
   scene.traverse((object) => { object.updateMatrix(); object.matrixAutoUpdate = false; });
+  // Except the squid: its body moves as a whole and its bones are posed by the clips.
+  squid.object.traverse((object) => { object.matrixAutoUpdate = true; });
   scene.updateMatrixWorld(true);
   let time = 0, lastShadowTime = -Infinity, renderedFrames = 0, shadowFrames = 0;
   let ready = false;
@@ -314,6 +318,7 @@ async function start() {
       waterTime.value = time;
       food.update(step, time);
       fish.update(step, time, pointer);
+      squid.update(step, time, pointer);
     }
     if (pointer && now - lastPointerTime > 60)
       pointer.velocity.multiplyScalar(Math.exp(-dt * 12));
@@ -348,6 +353,11 @@ async function start() {
     renderedFrames, shadowFrames, simulationTime: time,
     drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
     plants: { ...plants.stats }, loop: loop.state,
+    squid: {
+      mode: squid.mode(),
+      position: squid.pilot.state.position.toArray(),
+      screen: squid.pilot.state.position.clone().project(camera).toArray(),
+    },
   });
   // Diagnostics are opt-in: no timing queries, synchronization or arrays in normal use.
   if (query.get("diagnostics") === "1") {
