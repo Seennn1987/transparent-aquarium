@@ -46,7 +46,7 @@ def setup_shot(mode):
     rig.hide_render = True
     cam = preview_camera(scene)
     if mode == "wide":
-        _, root_ch, _ = sample(DEMO_DURATION, demo_state, limb_bone_counts(rig))
+        _, root_ch, _ = sample(DEMO_DURATION, demo_state, limb_info(rig))
         xs = root_ch[("", "location", 0)]
         ml = SPECIES["mantle_length"]
         x0, x1 = min(xs) - 1.35 * ml, max(xs) + 1.05 * ml   # 触腕の先〜尾の先まで入れる
