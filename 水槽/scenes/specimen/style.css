@@ -1,0 +1,31 @@
+@import url("../../ui/scene.css");
+
+:root {
+  color-scheme: light;
+  --background: #f2f2f0;
+  --surface: #ffffff;
+  --surface-hover: #e8e8e4;
+  --text: #2a2a28;
+  --text-muted: #6a6a64;
+  --border: #c8c8c0;
+  --focus: #3a5a4a;
+  --scrim: #ffffffcc;
+}
+
+#habitat {
+  height: 100dvh;
+}
+
+.chrome a,
+.scene-nav span,
+.home-link {
+  text-shadow: none;
+}
+
+#loading {
+  background: var(--background);
+}
+
+#loading p {
+  color: var(--text-muted);
+}
