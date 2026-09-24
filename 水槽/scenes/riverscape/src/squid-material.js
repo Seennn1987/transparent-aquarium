@@ -4,8 +4,8 @@ import * as THREE from "three";
 // in alcian blue absorbs red and a little green, so whatever is behind the animal shows
 // through tinted, and the tint deepens with the length of tissue the ray crosses. Blender
 // renders that as volume absorption; here each surface multiplies what is already drawn
-// by exp(-(1 - tint) * absorption * path). A second, additive pass adds what the tissue
-// sends back toward the eye (see surfaceMaterial).
+// by exp(-(1 - tint) * absorption * path). Before that, the lightbox the specimen stood
+// on is added behind it (see backlightMaterial); after it, the wet sheen.
 //
 // Per vertex, blender/export_squid_gltf.py bakes the transmitted colour (RGB) with a
 // density factor (A), and `_depth` in mantle lengths:
@@ -15,25 +15,41 @@ import * as THREE from "three";
 //     mantle's walls and the fins darken where the eye grazes them, as in the specimen.
 // Absorption is in 1/m of the real animal (Blender's values), whatever size it is drawn.
 const REAL_MANTLE_LENGTH = 0.1;
-// sheen: strength of the wet reflection. glow: strength of the scattered lamp light.
+// Blender shows the specimen through its Standard view, because a filmic view washes
+// bright transmitted colour out toward white; the tank's ACES does the same, so the stain
+// is deepened until the tank shows the colours of renders/blender_side_ref.png.
+const ACES_STAIN = 2.5;
+const ABSORBANCE_SCALE = REAL_MANTLE_LENGTH * ACES_STAIN;
+// layers: for the parts that make the outline, how many of their surfaces a sight line
+//   crosses, for judging how much tissue is there. The hollow mantle has a near and a far
+//   wall, each with an outer and an inner face; a fin is a single sheet; a solid part is
+//   entered once and left once. The other parts lie within that outline (the viscera in
+//   the mantle, the eyes and mouth in the head, the suckers on the arms), which already
+//   brings the lightbox behind them.
+// sheen: strength of the wet reflection. Absorption values are generate_squid.py's.
 export const SQUID_TISSUE = {
-  Mantle: { mode: "film", absorption: 460, sheen: 1, glow: 0.45 },
-  Fins: { mode: "film", absorption: 460, sheen: 1, glow: 0.5 },
-  Funnel: { mode: "solid", absorption: 460, sheen: 1, glow: 0.45 },
-  Head: { mode: "solid", absorption: 250, sheen: 1, glow: 0.45 },
-  Arms: { mode: "solid", absorption: 550, sheen: 1, glow: 0.5 },
-  Eyes: { mode: "solid", absorption: 110, sheen: 0.6, glow: 0.8 },
-  BuccalMass: { mode: "solid", absorption: 260, sheen: 0, glow: 0.7 },
-  Beak: { mode: "solid", absorption: 3000, sheen: 0.5, glow: 0 },
-  DigestiveGland: { mode: "solid", absorption: 250, sheen: 0, glow: 0.7 },
-  Caecum: { mode: "solid", absorption: 180, sheen: 0, glow: 0.7 },
-  Gonad: { mode: "solid", absorption: 150, sheen: 0, glow: 0.7 },
-  InkSac: { mode: "solid", absorption: 800, sheen: 0, glow: 0 },
-  Gladius: { mode: "film", absorption: 400, sheen: 0, glow: 0.5 },
-  Gills: { mode: "solid", absorption: 800, sheen: 0, glow: 0.6 },
-  SuckerRings: { mode: "solid", absorption: 6000, sheen: 0.4, glow: 0.6 },
+  Mantle: { mode: "film", absorption: 460, layers: 4, sheen: 1 },
+  Fins: { mode: "film", absorption: 460, layers: 2, sheen: 1 },
+  Funnel: { mode: "solid", absorption: 460, layers: 2, sheen: 1 },
+  Head: { mode: "solid", absorption: 250, layers: 2, sheen: 1 },
+  Arms: { mode: "solid", absorption: 550, layers: 2, sheen: 1 },
+  Eyes: { mode: "solid", absorption: 110, sheen: 0.6 },
+  BuccalMass: { mode: "solid", absorption: 260, sheen: 0 },
+  Beak: { mode: "solid", absorption: 3000, sheen: 0.5 },
+  DigestiveGland: { mode: "solid", absorption: 250, sheen: 0 },
+  Caecum: { mode: "solid", absorption: 180, sheen: 0 },
+  Gonad: { mode: "solid", absorption: 150, sheen: 0 },
+  InkSac: { mode: "solid", absorption: 800, sheen: 0 },
+  Gladius: { mode: "film", absorption: 400, sheen: 0 },
+  Gills: { mode: "solid", absorption: 800, sheen: 0 },
+  SuckerRings: { mode: "solid", absorption: 6000, sheen: 0.4 },
 };
-// Multiplying passes all go before anything added, so the order among parts never matters.
+// Brightness of the lightbox brought behind the squid.
+const LIGHTBOX = 1.5;
+// The lightbox is added once per pixel, the absorbing passes then take out what the whole
+// animal absorbs, and the sheen goes on top; within each stage the order never matters.
+export const MARK_ORDER = 8;
+export const BACKLIGHT_ORDER = 9;
 export const ABSORB_ORDER = 10;
 export const SURFACE_ORDER = 11;
 
@@ -75,7 +91,7 @@ void main() {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
   // A film seen edge-on is limited by the part's own size, not by 1/cos.
   float path = mix(vDepth * c, vDepth / max(c, .12), film);
-  vec3 transmit = exp(-(1. - vTint.rgb) * absorption * vTint.a * ${REAL_MANTLE_LENGTH} * path);
+  vec3 transmit = exp(-(1. - vTint.rgb) * absorption * vTint.a * ${ABSORBANCE_SCALE} * path);
   #if defined(USE_FOG) && defined(FOG_EXP2)
     // Water between the squid and the eye hides it the same way it hides everything else.
     float fogFactor = 1. - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
@@ -103,43 +119,96 @@ function absorbMaterial({ mode, absorption }) {
   });
 }
 
-// What the squid gives back, added over the tinted water: the wet sheen, and the lamp's
-// light scattered by the tissue. On the lightbox the tint alone draws the animal, but a
-// blue-green filter over green planting barely shows, and in a dark tank a cleared animal
-// is seen by that scattered light, brightest where the eye looks through the most tissue.
-function surfaceMaterial({ mode, absorption, sheen, glow }) {
+// On the lightbox the specimen is drawn by the lightbox's light after the whole animal
+// has absorbed it: red is taken again at every wall and organ it crosses, so the thick
+// mantle is a deep blue-green and the viscera show through it in their own colours. Over
+// dark green planting that light is missing, and a blue-green filter alone barely shows,
+// so the lightbox is brought into the tank behind the squid: added here, then absorbed
+// by the ordinary absorbing passes exactly as in Blender. It is unlit, as a lightbox is;
+// the tank's overhead lamp would bleach the colour toward white.
+//
+// Every surface in a sight line would add it again, and the sum soon saturates to white,
+// so it is added once per pixel: the mark pass clears the target's alpha under the squid,
+// the first surface there adds its light and restores the alpha, and the rest add nothing.
+// Nothing else in the scene reads the target's alpha. Where the tissue is thin and clear
+// the lightbox fades, so the water behind the squid stays visible through it.
+const passOnce = {
+  transparent: true,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+  blending: THREE.CustomBlending,
+  blendEquation: THREE.AddEquation,
+  blendEquationAlpha: THREE.AddEquation,
+};
+
+function markMaterial() {
+  return new THREE.ShaderMaterial({
+    ...passOnce,
+    vertexShader: absorbVertex,
+    fragmentShader: "void main() { gl_FragColor = vec4(0.); }",
+    blendSrc: THREE.ZeroFactor,
+    blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.ZeroFactor,
+    blendDstAlpha: THREE.ZeroFactor,
+  });
+}
+
+const backlightFragment = `
+#include <common>
+#include <fog_pars_fragment>
+uniform float absorption;
+uniform float film;
+uniform float layers;
+varying vec4 vTint;
+varying float vDepth;
+varying vec3 vViewNormal;
+varying vec3 vViewPosition;
+void main() {
+  float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
+  float path = layers * mix(vDepth * c, vDepth / max(c, .12), film);
+  vec3 through = exp(-(1. - vTint.rgb) * absorption * vTint.a * ${ABSORBANCE_SCALE} * path);
+  // The stain shows first in the red it takes, so thin arms keep their cyan.
+  float density = 1. - min(min(through.r, through.g), through.b);
+  float light = ${LIGHTBOX.toFixed(3)} * density;
+  #if defined(USE_FOG) && defined(FOG_EXP2)
+    light *= exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+  #endif
+  gl_FragColor = vec4(vec3(light), 1.);
+}`;
+
+function backlightMaterial({ mode, absorption, layers }) {
+  return new THREE.ShaderMaterial({
+    ...passOnce,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+      absorption: { value: absorption },
+      film: { value: mode === "film" ? 1 : 0 },
+      layers: { value: layers },
+    }]),
+    vertexShader: absorbVertex,
+    fragmentShader: backlightFragment,
+    fog: true,
+    blendSrc: THREE.OneMinusDstAlphaFactor,
+    blendDst: THREE.OneFactor,
+    // Set, not summed: a float target does not clamp, and an alpha past 1 would subtract.
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.ZeroFactor,
+  });
+}
+
+// The wet sheen, added last. As in Blender it is faint face-on and lies along the outline.
+function surfaceMaterial({ sheen }) {
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
+    color: 0x000000,
     roughness: 0.12,
     ior: 1.38,
-    clearcoat: 0.6 * sheen,
-    clearcoatRoughness: 0.04,
-    envMapIntensity: sheen,
-    specularIntensity: sheen,
+    envMapIntensity: 0.12 * sheen,
+    specularIntensity: 0.12 * sheen,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.absorption = { value: absorption };
-    shader.uniforms.film = { value: mode === "film" ? 1 : 0 };
-    shader.uniforms.glow = { value: glow };
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>
-        attribute vec4 tint;attribute float tissueDepth;varying vec4 vTint;varying float vDepth;`)
-      .replace("#include <begin_vertex>", `#include <begin_vertex>
-        vTint = tint;vDepth = tissueDepth;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>
-        uniform float absorption;uniform float film;uniform float glow;varying vec4 vTint;varying float vDepth;`)
-      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
-        {
-          float c = abs(dot(normal, normalize(vViewPosition)));
-          float path = mix(vDepth * c, vDepth / max(c, .12), film);
-          // The share of light the crossed tissue takes out is the share it can scatter.
-          vec3 taken = 1. - exp(-(1. - vTint.rgb) * absorption * vTint.a * ${REAL_MANTLE_LENGTH} * path);
-          diffuseColor.rgb = vTint.rgb * glow * max(max(taken.r, taken.g), taken.b);
-        }`)
       // Standard fog would add the fog colour on top of the scene; added light fades instead.
       .replace("#include <fog_fragment>", `#if defined(USE_FOG) && defined(FOG_EXP2)
           gl_FragColor.rgb *= exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
@@ -148,7 +217,19 @@ function surfaceMaterial({ mode, absorption, sheen, glow }) {
   return material;
 }
 
-/** Replaces each part's mesh with an absorbing pass and, where it has one, a sheen pass. */
+function addPass(mesh, name, material, renderOrder) {
+  const pass = new THREE.SkinnedMesh(mesh.geometry, material);
+  pass.name = name;
+  pass.renderOrder = renderOrder;
+  pass.frustumCulled = false;
+  pass.position.copy(mesh.position);
+  pass.quaternion.copy(mesh.quaternion);
+  pass.scale.copy(mesh.scale);
+  pass.bind(mesh.skeleton, mesh.bindMatrix);
+  mesh.parent.add(pass);
+}
+
+/** Draws each part in stages: the lightbox behind it, its absorption, then its sheen. */
 export function applySquidTissue(model) {
   // Parts are found by their squid_part mark: the loader renames a mesh whose name a bone
   // already uses (the head is both).
@@ -173,16 +254,10 @@ export function applySquidTissue(model) {
     mesh.material = absorbMaterial(tissue);
     mesh.renderOrder = ABSORB_ORDER;
     mesh.frustumCulled = false;
-    if (tissue.sheen > 0 || tissue.glow > 0) {
-      const surface = new THREE.SkinnedMesh(geometry, surfaceMaterial(tissue));
-      surface.name = `${part}Surface`;
-      surface.renderOrder = SURFACE_ORDER;
-      surface.frustumCulled = false;
-      surface.position.copy(mesh.position);
-      surface.quaternion.copy(mesh.quaternion);
-      surface.scale.copy(mesh.scale);
-      surface.bind(mesh.skeleton, mesh.bindMatrix);
-      mesh.parent.add(surface);
+    if (tissue.layers) {
+      addPass(mesh, `${part}Mark`, markMaterial(), MARK_ORDER);
+      addPass(mesh, `${part}Backlight`, backlightMaterial(tissue), BACKLIGHT_ORDER);
     }
+    if (tissue.sheen > 0) addPass(mesh, `${part}Surface`, surfaceMaterial(tissue), SURFACE_ORDER);
   }
 }
