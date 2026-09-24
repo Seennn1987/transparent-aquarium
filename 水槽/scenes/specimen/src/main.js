@@ -104,7 +104,7 @@ async function start() {
   const envMap = createStudioEnvironment(renderer);
   scene.environment = envMap;
   scene.environmentIntensity = 0.6;
-  const jar = await createJar({ envMap });
+  const jar = await createJar({ envMap, lens: LENS });
   scene.add(jar.root);
   scene.add(createStudioFloor(23.5, {
     jarRadius: jar.dims.bodyRadius,
@@ -113,11 +113,29 @@ async function start() {
     liquidBottom: jar.liquidBounds.min.y,
     liquidTop: jar.liquidBounds.max.y,
   }));
+  // The specimen is only ever seen through the liquid, so it has a scene of its own, drawn
+  // over white into the image the jar's optics look up.
   const specimen = await createSpecimen({ envMap, liquidBounds: jar.liquidBounds });
-  scene.add(specimen.object);
+  const specimenScene = new THREE.Scene();
+  specimenScene.background = new THREE.Color(1, 1, 1);
+  specimenScene.add(specimen.object);
+
+  // Background mips stand in for the lens blur of what is seen far behind the glass.
+  const backgroundImage = new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.HalfFloatType,
+    generateMipmaps: true,
+    minFilter: THREE.LinearMipmapLinearFilter,
+  });
+  let specimenImage = null;
+  function createSpecimenImage() {
+    specimenImage?.dispose();
+    specimenImage = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: profile === "eco" ? 0 : 4 });
+    jar.optics.setImages(backgroundImage.texture, specimenImage.texture);
+  }
+  createSpecimenImage();
 
   let post = createSpecimenPost(camera, profile);
-  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, floor: FLOOR_LOOK, get post() { return post; } };
+  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, optics: jar.optics, floor: FLOOR_LOOK, get post() { return post; } };
 
   const orbit = createOrbit(camera, canvas, {
     target: CAMERA.target.clone(),
@@ -139,6 +157,9 @@ async function start() {
     const h = Math.round(height * scale);
     renderer.setDrawingBufferSize(w, h, 1);
     post.target.setSize(w, h);
+    backgroundImage.setSize(w, h);
+    specimenImage.setSize(w, h);
+    jar.optics.setSize(w, h);
     post.post.uniforms.size.value.set(w, h);
     loop?.invalidate();
   }
@@ -154,6 +175,7 @@ async function start() {
     post.target.dispose();
     post.post.dispose();
     post = createSpecimenPost(camera, profile);
+    createSpecimenImage();
     resize();
     loop?.setRate(frameRate(profile, requestedRate, onBattery));
     loop?.invalidate();
@@ -176,7 +198,16 @@ async function start() {
     // Autofocus on the specimen, as a photographer would.
     specimen.object.getWorldPosition(focusPoint);
     LENS.focus.value = camera.position.distanceTo(focusPoint);
+    jar.optics.setSpecimen(focusPoint);
     post.post.uniforms.frame.value = frame++ % 997;
+
+    jar.root.visible = false;
+    renderer.setRenderTarget(backgroundImage);
+    renderer.render(scene, camera);
+    jar.root.visible = true;
+    renderer.setRenderTarget(specimenImage);
+    renderer.render(specimenScene, camera);
+
     renderer.setRenderTarget(post.target);
     renderer.render(scene, camera);
     renderer.setRenderTarget(null);

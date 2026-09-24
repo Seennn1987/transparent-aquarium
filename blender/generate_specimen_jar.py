@@ -43,6 +43,8 @@ DOME_SHELL = 0.04
 NECK_R = 0.06
 NECK_H = 0.05
 KNOB_R = 0.17
+KNOB_CENTRE_Z = DOME_TOP_Z + NECK_H + math.sqrt(KNOB_R ** 2 - NECK_R ** 2)
+LID_LIFT = 0.003
 
 # 液
 LIQUID_TOP = RIM_Z - PLUG_DEPTH - 0.03
@@ -92,7 +94,7 @@ def lid_profile():
     """つまみの頂点 → 首 → ドームの外面 → 鍔 → 栓 → 栓の内側 → ドームの内面 → 内側の頂点。"""
     inner_r = BODY_R - WALL
     neck_top = DOME_TOP_Z + NECK_H
-    centre = neck_top + math.sqrt(KNOB_R ** 2 - NECK_R ** 2)
+    centre = KNOB_CENTRE_Z
     pts = [(0.0, centre + KNOB_R)]
     start = math.atan2(neck_top - centre, NECK_R)
     pts += arc(0.0, centre, KNOB_R, math.pi / 2, start, 22)[1:]
@@ -188,8 +190,10 @@ def build():
         check_profile(name, pts)
     objects = {name: revolve(name, pts) for name, pts in profiles.items()}
     # 鍔の下面が口の平らな縁と同じ高さにならないよう、蓋をわずかに浮かせる
-    objects["Jar_Lid"].location.z = 0.003
+    objects["Jar_Lid"].location.z = LID_LIFT
     glass = objects["Jar_Glass"]
+    glass["jar_knob_centre"] = KNOB_CENTRE_Z + LID_LIFT
+    glass["jar_knob_radius"] = KNOB_R
     glass["jar_body_radius"] = BODY_R
     glass["jar_inner_radius"] = BODY_R - WALL
     glass["jar_foot_radius"] = FOOT_R

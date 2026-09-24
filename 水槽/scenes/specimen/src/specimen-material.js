@@ -5,36 +5,22 @@ import { SQUID_TISSUE } from "../../riverscape/src/squid-material.js";
 // already drawn behind it by exp(-(1 - tint) * absorption * path), as Blender's volume
 // absorption does, with no light added and no tank-specific stain boost.
 //
-// The squid is blended, so the liquid's transmission image never contains it. The lens the
-// liquid column forms is applied to the squid directly instead: around the jar's axis, its
-// vertices are spread sideways in view space, the way a filled cylinder magnifies what is
-// inside it across its axis but not along it.
+// It is drawn on its own over white, so the image holds how much light each point lets
+// through (plus its sheen); jar-optics.js looks it up where the bent rays cross it.
 const REAL_MANTLE_LENGTH = 0.1;
 
 export const specimenLook = {
   // Mantle red/green ≈ 0.56 in the studio, inside the 0.5–0.65 target (1.0 gives 0.46).
   stain: { value: 0.65 },
-  lens: { value: 1.3 },
-  jarAxis: { value: new THREE.Vector2(0, 0) },
   sheen: { value: 1 },
 };
 
 export const ABSORB_ORDER = 10;
 export const SURFACE_ORDER = 11;
 
-const LENS_UNIFORMS = "uniform float uLens;\nuniform vec2 uJarAxis;";
-const LENS_VERTEX = `
-  {
-    vec4 lensWorld = modelMatrix * vec4(transformed, 1.0);
-    vec4 lensAxis = viewMatrix * vec4(uJarAxis.x, lensWorld.y, uJarAxis.y, 1.0);
-    mvPosition.x = lensAxis.x + (mvPosition.x - lensAxis.x) * uLens;
-    gl_Position = projectionMatrix * mvPosition;
-  }`;
-
 const absorbVertex = `
 #include <common>
 #include <skinning_pars_vertex>
-${LENS_UNIFORMS}
 attribute vec4 tint;
 attribute float tissueDepth;
 varying vec4 vTint;
@@ -49,7 +35,6 @@ void main() {
   #include <begin_vertex>
   #include <skinning_vertex>
   #include <project_vertex>
-  ${LENS_VERTEX}
   vTint = tint;
   vDepth = tissueDepth;
   vViewNormal = transformedNormal;
@@ -77,8 +62,6 @@ function absorbMaterial({ mode, absorption }) {
       absorption: { value: absorption },
       film: { value: mode === "film" ? 1 : 0 },
       stain: specimenLook.stain,
-      uLens: specimenLook.lens,
-      uJarAxis: specimenLook.jarAxis,
     },
     vertexShader: absorbVertex,
     fragmentShader: absorbFragment,
@@ -106,12 +89,7 @@ function surfaceMaterial({ sheen }, envMap) {
     blending: THREE.AdditiveBlending,
   });
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uLens = specimenLook.lens;
-    shader.uniforms.uJarAxis = specimenLook.jarAxis;
     shader.uniforms.uSheen = specimenLook.sheen;
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>\n${LENS_UNIFORMS}`)
-      .replace("#include <project_vertex>", `#include <project_vertex>\n${LENS_VERTEX}`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform float uSheen;")
       .replace("#include <opaque_fragment>", "outgoingLight *= uSheen;\n#include <opaque_fragment>");

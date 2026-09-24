@@ -6,7 +6,7 @@ export const STUDIO_BACKGROUND = "#f2f2f0";
 // falls back to the right, beside it where the camera sees it. A second, dimmer softbox
 // behind-left only rims the glass.
 export const KEY_DIRECTION = new THREE.Vector3(-0.55, 0.72, 0.42).normalize();
-const RIM_DIRECTION = new THREE.Vector3(-0.55, 0.5, -0.67).normalize();
+export const RIM_DIRECTION = new THREE.Vector3(-0.55, 0.5, -0.67).normalize();
 
 /**
  * The softbox room the glass reflects, baked to a PMREM. It matches the visible lighting:
