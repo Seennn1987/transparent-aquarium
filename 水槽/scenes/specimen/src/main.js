@@ -52,7 +52,7 @@ window.habitatPower = (battery) => {
 };
 
 // Product-shot framing: a long lens from slightly above the jar's middle.
-const CAMERA = { fov: 20, position: new THREE.Vector3(2.9, 2.9, 10.1), target: new THREE.Vector3(0, 1.2, 0) };
+const CAMERA = { fov: 20, position: new THREE.Vector3(3.1, 3.2, 11.0), target: new THREE.Vector3(0, 1.4, 0) };
 
 async function start() {
   const renderer = new THREE.WebGLRenderer({
@@ -107,7 +107,8 @@ async function start() {
   const jar = await createJar({ envMap });
   scene.add(jar.root);
   scene.add(createStudioFloor(23.5, {
-    jarRadius: jar.bounds.max.x,
+    jarRadius: jar.dims.bodyRadius,
+    footRadius: jar.dims.footRadius,
     glassTop: jar.bounds.max.y,
     liquidBottom: jar.liquidBounds.min.y,
     liquidTop: jar.liquidBounds.max.y,

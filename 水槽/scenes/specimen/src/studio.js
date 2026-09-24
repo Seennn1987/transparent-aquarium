@@ -96,7 +96,7 @@ export const FLOOR_LOOK = {
   contact: { value: 0.4 },
 };
 
-export function createStudioFloor(radius, { jarRadius, glassTop, liquidBottom, liquidTop }) {
+export function createStudioFloor(radius, { jarRadius, footRadius, glassTop, liquidBottom, liquidTop }) {
   const toLight = new THREE.Vector2(KEY_DIRECTION.x, KEY_DIRECTION.z);
   const tanElevation = KEY_DIRECTION.y / toLight.length();
   const shadowDirection = toLight.clone().normalize().negate();
@@ -108,6 +108,7 @@ export function createStudioFloor(radius, { jarRadius, glassTop, liquidBottom, l
       shadowDir: { value: shadowDirection },
       tanElevation: { value: tanElevation },
       jarRadius: { value: jarRadius },
+      footRadius: { value: footRadius },
       glassTop: { value: glassTop },
       liquidBottom: { value: liquidBottom },
       liquidTop: { value: liquidTop },
@@ -125,7 +126,7 @@ export function createStudioFloor(radius, { jarRadius, glassTop, liquidBottom, l
     fragmentShader: `
       uniform vec3 nearColor, farColor, causticTint;
       uniform vec2 shadowDir;
-      uniform float tanElevation, jarRadius, glassTop, liquidBottom, liquidTop;
+      uniform float tanElevation, jarRadius, footRadius, glassTop, liquidBottom, liquidTop;
       uniform float shadowStrength, causticStrength, contactStrength;
       varying vec3 vWorld;
       void main() {
@@ -153,8 +154,8 @@ export function createStudioFloor(radius, { jarRadius, glassTop, liquidBottom, l
         color += causticTint * nearColor * line * span * causticStrength;
 
         // Under and around the foot: the glass base and the contact with the table.
-        float ring = exp(-max(r - jarRadius, 0.) / .07) * step(jarRadius * .7, r);
-        color *= 1. - contactStrength * (r < jarRadius ? .35 : ring);
+        float ring = exp(-max(r - footRadius, 0.) / .07) * step(footRadius * .7, r);
+        color *= 1. - contactStrength * (r < footRadius ? .35 : ring);
         gl_FragColor = vec4(color, 1.);
       }`,
   });

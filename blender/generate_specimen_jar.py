@@ -1,10 +1,14 @@
-"""透明標本ケース（SPECIMEN-JAR-001）のガラス瓶・蓋・保存液を生成して .glb に書き出す。
+"""透明標本ケース（SPECIMEN-JAR-001/002）のガラス瓶・蓋・保存液を生成して .glb に書き出す。
 
 使い方:
   blender --background --python generate_specimen_jar.py -- <出力 .glb のパス>
 
-形は断面（半径, 高さ）を Z 軸まわりに回した回転体。単位はメートル相当で、
-床が z=0。ブラウザ側では部位名（Jar_Glass / Jar_Lid / Jar_Liquid / Jar_Meniscus）で材質を付ける。
+形は参考の鳥の透明標本の瓶に合わせた回転体（断面を Z 軸まわりに回す）。単位はメートル相当で床が z=0。
+  台座: 胴より広い厚い2段の円盤 → 内側へ反る首 → 玉縁 → 胴
+  胴:   真っすぐな円筒（高さは直径の約1.6倍）。底は厚い無垢のガラス
+  蓋:   口に差し込む栓 → 胴より少し張り出した丸縁の鍔 → 中空のドーム → 首 → 玉のつまみ
+ブラウザ側は部位名（Jar_Glass / Jar_Lid / Jar_Liquid / Jar_Meniscus）で材質を付け、
+Jar_Glass の jar_* の値（寸法）を影や屈折の計算に使う。
 """
 
 import math
@@ -14,28 +18,36 @@ import sys
 import bmesh
 import bpy
 
-SEGMENTS = 128
+SEGMENTS = 160
 
 # 胴
-OUTER_R = 0.62
-WALL = 0.035
-BASE = 0.14          # 底の厚み（参考画像の厚いガラス底）
-BODY_H = 2.30
-LIP_H = 0.05         # 口の少し厚い縁
-CORNER = 0.05        # 底の外周の丸み
+BODY_R = 0.62
+WALL = 0.045
+RIM_Z = 2.40          # 口の上端
+FLOOR_Z = 0.26        # 内側の底（その下は無垢の厚いガラス）
+
+# 台座
+FOOT_R = 0.73         # 胴の約1.18倍
+FOOT_DISC = 0.075     # 一番下の円盤の厚み
+FOOT_STEP = 0.045     # 2段目の厚み
+BEAD_Z = 0.33         # 胴との境目の玉縁の高さ
+BEAD_R = BODY_R + 0.018
 
 # 蓋
-LID_R = OUTER_R + 0.02
-LID_T = 0.07
-LID_PLUG = 0.10      # 口に差し込む栓の深さ
-KNOB_NECK_R = 0.07
-KNOB_NECK_H = 0.10
-KNOB_R = 0.15
+PLUG_DEPTH = 0.10
+PLUG_WALL = 0.035
+FLANGE_R = BODY_R + 0.035
+FLANGE_T = 0.06
+DOME_TOP_Z = RIM_Z + 0.36
+DOME_SHELL = 0.04
+NECK_R = 0.06
+NECK_H = 0.05
+KNOB_R = 0.17
 
 # 液
-FILL = 0.90          # 内側の高さに対する液の割合
-LIQUID_GAP = 0.004   # 内壁との隙間（面の重なりのちらつき防止）
-MENISCUS = 0.018     # 壁際の液面の盛り上がり
+LIQUID_TOP = RIM_Z - PLUG_DEPTH - 0.03
+LIQUID_GAP = 0.004
+MENISCUS = 0.018
 
 
 def arc(cx, cz, r, a0, a1, steps):
@@ -43,57 +55,98 @@ def arc(cx, cz, r, a0, a1, steps):
              cz + r * math.sin(a0 + (a1 - a0) * i / steps)) for i in range(steps + 1)]
 
 
+def cove(p0, p1, steps):
+    """p0 から p1 へ、最初に内側へ大きく入ってから上へ伸びる凹の曲線（台座の反り）。"""
+    (r0, z0), (r1, z1) = p0, p1
+    return [(r0 + (r1 - r0) * math.sin(i / steps * math.pi / 2), z0 + (z1 - z0) * i / steps)
+            for i in range(1, steps + 1)]
+
+
 def jar_profile():
-    """外側の底中心 → 外壁 → 口 → 内壁 → 内底中心 の順の断面。"""
-    inner_r = OUTER_R - WALL
+    inner_r = BODY_R - WALL
     pts = [(0.0, 0.0)]
-    pts += arc(OUTER_R - CORNER, CORNER, CORNER, -math.pi / 2, 0, 8)
-    pts += [(OUTER_R, BODY_H - LIP_H), (OUTER_R + 0.006, BODY_H - LIP_H * 0.5)]
-    pts += arc(OUTER_R - 0.012, BODY_H - 0.012, 0.012 + 0.006, 0, math.pi / 2, 5)
-    pts += arc(inner_r + 0.012, BODY_H - 0.012, 0.012, math.pi / 2, math.pi, 5)
-    pts += [(inner_r, BASE + 0.03)]
-    pts += arc(inner_r - 0.03, BASE + 0.03, 0.03, 0, -math.pi / 2, 6)
-    pts += [(0.0, BASE)]
+    # 一番下の円盤（角は丸く）
+    pts += arc(FOOT_R - 0.025, 0.025, 0.025, -math.pi / 2, 0, 6)
+    pts += arc(FOOT_R - 0.02, FOOT_DISC - 0.02, 0.02, 0, math.pi / 2, 5)
+    # 2段目
+    step_r = FOOT_R - 0.045
+    pts += [(step_r + 0.01, FOOT_DISC)]
+    pts += arc(step_r - 0.015, FOOT_DISC + 0.015, 0.025, -math.pi / 4, math.pi / 2, 5)
+    top_step = FOOT_DISC + FOOT_STEP
+    # 内側へ反りながら胴へ向かう首（凹の曲線）
+    pts += cove((step_r - 0.015, top_step - 0.005), (BODY_R - 0.004, BEAD_Z - 0.02), 14)
+    # 玉縁
+    pts += arc(BEAD_R - 0.018, BEAD_Z, 0.018, -math.pi / 2, math.pi / 2, 8)
+    pts += [(BODY_R, BEAD_Z + 0.03)]
+    # 胴 → 口（すり合わせの平らな縁）
+    pts += [(BODY_R, RIM_Z - 0.03)]
+    pts += arc(BODY_R - 0.012, RIM_Z - 0.012, 0.012, 0, math.pi / 2, 5)
+    pts += arc(inner_r + 0.01, RIM_Z - 0.01, 0.01, math.pi / 2, math.pi, 4)
+    # 内壁 → 厚い底
+    pts += arc(inner_r - 0.05, FLOOR_Z + 0.05, 0.05, 0, -math.pi / 2, 8)
+    pts += [(0.0, FLOOR_Z)]
     return pts
 
 
 def lid_profile():
-    """栓の下面中心 → 栓の側面 → 鍔 → 上面 → 首 → つまみの球 → 頂点。"""
-    inner_r = OUTER_R - WALL
-    z0 = BODY_H - LID_PLUG
+    """つまみの頂点 → 首 → ドームの外面 → 鍔 → 栓 → 栓の内側 → ドームの内面 → 内側の頂点。"""
+    inner_r = BODY_R - WALL
+    neck_top = DOME_TOP_Z + NECK_H
+    centre = neck_top + math.sqrt(KNOB_R ** 2 - NECK_R ** 2)
+    pts = [(0.0, centre + KNOB_R)]
+    start = math.atan2(neck_top - centre, NECK_R)
+    pts += arc(0.0, centre, KNOB_R, math.pi / 2, start, 22)[1:]
+    pts += [(NECK_R, DOME_TOP_Z + 0.01)]
+    # ドームの外面: 首の周りは平らに近く、鍔へ向かって肩が落ちる
+    flange_top = RIM_Z + FLANGE_T
+    r0, r1 = NECK_R + 0.02, FLANGE_R - 0.03
+    for i in range(1, 19):
+        t = i / 18
+        drop = (1 - math.cos(t * math.pi / 2)) ** 1.6
+        pts.append((r0 + (r1 - r0) * t, DOME_TOP_Z - (DOME_TOP_Z - flange_top) * drop))
+    # 丸く巻いた鍔の縁
+    pts += arc(FLANGE_R - 0.03, RIM_Z + FLANGE_T / 2, FLANGE_T / 2, math.pi / 2, -math.pi / 2, 8)[1:]
+    # 鍔の下面 → 栓
     plug_r = inner_r - 0.006
-    top = BODY_H + LID_T
-    pts = [(0.0, z0), (plug_r - 0.015, z0)]
-    pts += arc(plug_r - 0.015, z0 + 0.015, 0.015, -math.pi / 2, 0, 4)
-    pts += [(plug_r, BODY_H + 0.002)]
-    pts += [(LID_R - 0.02, BODY_H + 0.002)]
-    pts += arc(LID_R - 0.02, BODY_H + 0.022, 0.02, -math.pi / 2, 0, 4)
-    pts += arc(LID_R - 0.025, top - 0.025, 0.025, 0, math.pi / 2, 5)
-    pts += [(KNOB_NECK_R + 0.04, top)]
-    pts += arc(KNOB_NECK_R + 0.04, top + 0.04, 0.04, -math.pi / 2, -math.pi, 5)
-    neck_top = top + KNOB_NECK_H
-    pts += [(KNOB_NECK_R, neck_top - 0.02)]
-    center_z = neck_top + math.sqrt(max(KNOB_R ** 2 - KNOB_NECK_R ** 2, 0.0))
-    start = math.atan2(neck_top - center_z, KNOB_NECK_R)
-    pts += arc(0.0, center_z, KNOB_R, start, math.pi / 2, 20)
-    pts[-1] = (0.0, center_z + KNOB_R)
+    pts += [(plug_r + 0.01, RIM_Z + 0.002)]
+    pts += [(plug_r, RIM_Z - 0.01)]
+    pts += [(plug_r, RIM_Z - PLUG_DEPTH + 0.012)]
+    pts += arc(plug_r - 0.012, RIM_Z - PLUG_DEPTH + 0.012, 0.012, 0, -math.pi / 2, 4)[1:]
+    pts += [(plug_r - PLUG_WALL, RIM_Z - PLUG_DEPTH)]
+    # 栓の内側を上がり、ドームの内面へ
+    pts += [(plug_r - PLUG_WALL, RIM_Z + FLANGE_T - DOME_SHELL)]
+    shell_top = DOME_TOP_Z - DOME_SHELL
+    inner_dome = []
+    for i in range(1, 17):
+        t = i / 16
+        r = (plug_r - PLUG_WALL) * (1 - t)
+        z = (RIM_Z + FLANGE_T - DOME_SHELL) + (shell_top - (RIM_Z + FLANGE_T - DOME_SHELL)) * math.sin(t * math.pi / 2) ** 0.6
+        inner_dome.append((r, z))
+    pts += inner_dome
+    pts[-1] = (0.0, shell_top)
     return pts
 
 
 def liquid_profile():
-    inner_r = OUTER_R - WALL - LIQUID_GAP
-    bottom = BASE + LIQUID_GAP
-    surface = BASE + (BODY_H - BASE) * FILL
+    inner_r = BODY_R - WALL - LIQUID_GAP
+    bottom = FLOOR_Z + LIQUID_GAP
     pts = [(0.0, bottom)]
-    pts += arc(inner_r - 0.03, bottom + 0.03, 0.03, -math.pi / 2, 0, 6)
-    pts += [(inner_r, surface + MENISCUS)]
-    # 壁際だけ持ち上がる液面（毛細管現象のふち）
+    pts += arc(inner_r - 0.05, bottom + 0.05, 0.05, -math.pi / 2, 0, 8)
+    pts += [(inner_r, LIQUID_TOP + MENISCUS)]
     for i in range(1, 9):
         t = i / 8
-        r = inner_r - 0.06 * t
-        pts.append((r, surface + MENISCUS * (1 - t) ** 2.2))
-    pts += [(0.0, surface)]
-    return pts, surface
+        pts.append((inner_r - 0.06 * t, LIQUID_TOP + MENISCUS * (1 - t) ** 2.2))
+    pts += [(0.0, LIQUID_TOP)]
+    return pts
+
+
+def meniscus_profile():
+    inner_r = BODY_R - WALL - LIQUID_GAP * 0.5
+    pts = [(inner_r - 0.07, LIQUID_TOP + 0.0005)]
+    for i in range(1, 9):
+        t = i / 8
+        pts.append((inner_r - 0.07 * (1 - t), LIQUID_TOP + MENISCUS * t ** 2.2 + 0.0015))
+    return pts
 
 
 def revolve(name, profile):
@@ -115,24 +168,34 @@ def revolve(name, profile):
     return obj
 
 
-def meniscus_ring(surface):
-    """液面と壁の境目に光る細い輪（参考画像の液面の線）。"""
-    inner_r = OUTER_R - WALL - LIQUID_GAP * 0.5
-    pts = [(inner_r - 0.07, surface + 0.0005)]
-    for i in range(1, 9):
-        t = i / 8
-        pts.append((inner_r - 0.07 * (1 - t), surface + MENISCUS * t ** 2.2 + 0.0015))
-    return revolve("Jar_Meniscus", pts)
+def check_profile(name, pts):
+    for (r0, z0), (r1, z1) in zip(pts, pts[1:]):
+        if math.hypot(r1 - r0, z1 - z0) < 1e-5:
+            raise RuntimeError(f"{name}: 同じ位置の点が連続しています ({r0:.4f}, {z0:.4f})")
+    if any(r < -1e-9 for r, _ in pts):
+        raise RuntimeError(f"{name}: 半径が負の点があります")
 
 
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    revolve("Jar_Glass", jar_profile())
-    revolve("Jar_Lid", lid_profile())
-    _, surface = liquid_profile()
-    revolve("Jar_Liquid", liquid_profile()[0])
-    meniscus_ring(surface)
-    return surface
+    profiles = {
+        "Jar_Glass": jar_profile(),
+        "Jar_Lid": lid_profile(),
+        "Jar_Liquid": liquid_profile(),
+        "Jar_Meniscus": meniscus_profile(),
+    }
+    for name, pts in profiles.items():
+        check_profile(name, pts)
+    objects = {name: revolve(name, pts) for name, pts in profiles.items()}
+    # 鍔の下面が口の平らな縁と同じ高さにならないよう、蓋をわずかに浮かせる
+    objects["Jar_Lid"].location.z = 0.003
+    glass = objects["Jar_Glass"]
+    glass["jar_body_radius"] = BODY_R
+    glass["jar_inner_radius"] = BODY_R - WALL
+    glass["jar_foot_radius"] = FOOT_R
+    glass["jar_rim_height"] = RIM_Z
+    glass["jar_floor_height"] = FLOOR_Z
+    glass["jar_liquid_top"] = LIQUID_TOP
 
 
 def export(path):
@@ -155,11 +218,12 @@ def main():
         raise ValueError("使い方: -- <出力 .glb のパス>")
     path = os.path.abspath(argv[0])
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    surface = build()
+    build()
     export(path)
-    tris = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == "MESH")
+    faces = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == "MESH")
+    top = max(v.co.z for o in bpy.data.objects if o.type == "MESH" for v in o.data.vertices)
     print(f"[SpecimenJar] 書き出し完了: {path} ({os.path.getsize(path) / 1e6:.2f} MB), "
-          f"面 {tris}, 液面の高さ {surface:.3f}")
+          f"面 {faces}, 全高 {top:.3f}, 液 {FLOOR_Z:.2f}〜{LIQUID_TOP:.2f}")
 
 
 main()

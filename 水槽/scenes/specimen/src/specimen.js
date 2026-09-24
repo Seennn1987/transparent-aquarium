@@ -9,7 +9,7 @@ const SQUID_URL = new URL("../../riverscape/assets/squid.glb", import.meta.url).
 
 // Displayed the way preserved squid usually stand in a jar: mantle up, arms hanging down.
 export const SPECIMEN_POSE = {
-  mantleLength: 0.7,
+  mantleLength: 0.72,
   clearance: 0.12,
 };
 

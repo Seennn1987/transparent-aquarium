@@ -164,6 +164,18 @@ export async function createJar({ envMap }) {
   depthProxy.matrixAutoUpdate = false;
   parts.Jar_Liquid.parent.add(depthProxy);
 
+  const extras = parts.Jar_Glass.userData;
+  const dims = {
+    bodyRadius: extras.jar_body_radius,
+    innerRadius: extras.jar_inner_radius,
+    footRadius: extras.jar_foot_radius,
+    rimHeight: extras.jar_rim_height,
+    floorHeight: extras.jar_floor_height,
+    liquidTop: extras.jar_liquid_top,
+  };
+  const unknown = Object.entries(dims).filter(([, value]) => !Number.isFinite(value)).map(([key]) => key);
+  if (unknown.length) throw new Error(`jar.glb に寸法がありません: ${unknown.join(", ")}（generate_specimen_jar.py で書き出し直してください）`);
+
   const bounds = new THREE.Box3().setFromObject(root);
-  return { root, parts, bounds, liquidBounds };
+  return { root, parts, bounds, liquidBounds, dims };
 }
