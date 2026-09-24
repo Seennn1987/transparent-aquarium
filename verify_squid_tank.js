@@ -1,4 +1,4 @@
-// イカ水槽遊泳 自動検証スニペット（SQUID-TANK-001）
+// イカ水槽遊泳 自動検証スニペット（SQUID-TANK-001 / 色: SQUID-TANK-002）
 // 使い方: http://127.0.0.1:8080/scenes/riverscape/ を開き、イカが映ったらブラウザのコンソールに貼り付けて実行（操作不要・約30秒）
 // 期待結果: すべての検証項目で「✅ 成功」と表示される
 
@@ -64,6 +64,8 @@
     const reachable = q.position[2] > -1.2;
     ok('検証6: 手を素早く近づけるとジェット噴射で逃げる', jetted || !reachable, `噴射 ${jetted} / 移動 ${escaped.toFixed(1)}`);
     ok('検証7: ジェット噴射でも水槽の外に出ない', jetOutside === null, jetOutside ?? '');
+    // 噴射は約4.5秒続くので、終わるまで最大6秒待ってから判定する
+    for (let i = 0; i < 30 && jetted && stats().squid.mode === 'jet'; i++) await wait(200);
     ok('検証8: 噴射の後はホバリングに戻る', !jetted || stats().squid.mode !== 'jet', stats().squid.mode);
 
     // 5. 一時停止するとイカも止まる
@@ -78,7 +80,36 @@
     // 6. 既存の操作が使える
     ok('検証10: エサ・一時停止・画質のボタンが使える',
       ['#pause', '#feed', '#quality'].every((id) => !document.querySelector(id).disabled));
-    ok('検証11: 検証の最後までエラー表示なし', document.querySelector('#error').hidden);
+
+    // 7. イカの色が透明標本の青緑（SQUID-TANK-002）: イカのまわりの画面の色を数える
+    const grab = () => new Promise((res) => requestAnimationFrame(() => {
+      const s = stats().squid;
+      const W = canvas.width, H = canvas.height;
+      const cx = (s.screen[0] + 1) / 2 * W, cy = (1 - s.screen[1]) / 2 * H, R = Math.round(W * 0.09);
+      const box = document.createElement('canvas');
+      box.width = box.height = 2 * R;
+      const g = box.getContext('2d');
+      g.drawImage(canvas, cx - R, cy - R, 2 * R, 2 * R, 0, 0, 2 * R, 2 * R);
+      const d = g.getImageData(0, 0, 2 * R, 2 * R).data;
+      let stained = 0, white = 0, sr = 0, sg = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const [r, gr, b] = [d[i], d[i + 1], d[i + 2]];
+        if (gr - r > 45 && b - r > 25 && b > 100) { stained++; sr += r; sg += gr; }
+        if (Math.min(r, gr, b) > 150 && Math.max(r, gr, b) - Math.min(r, gr, b) < 45) white++;
+      }
+      res({ stained, white, rg: stained ? sr / sg : 1 });
+    }));
+    let best = { stained: 0, white: 0, rg: 1 };
+    for (let k = 0; k < 6; k++) {
+      const c = await grab();
+      if (c.stained > best.stained) best = c;
+      await wait(500);
+    }
+    ok('検証11: イカが白ではなく透明標本の青緑に見える',
+      // 奥にいるときは小さく映るので、画素数は少なめでも良い
+      best.stained > 200 && best.stained > best.white && best.rg < 0.65,
+      `青緑 ${best.stained}画素 / 白 ${best.white}画素 / 赤÷緑 ${best.rg.toFixed(2)}`);
+    ok('検証12: 検証の最後までエラー表示なし', document.querySelector('#error').hidden);
   } catch (e) {
     console.error('❌ 検証中に例外が発生', e);
     failed++;
