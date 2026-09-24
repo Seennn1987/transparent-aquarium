@@ -150,6 +150,20 @@ export async function createJar({ envMap }) {
     mesh.receiveShadow = false;
   }
 
+  // Glass, liquid and specimen are blended and leave no depth, so the depth of field would
+  // blur the whole jar as if it were the far wall. Drawn last, depth only, the liquid's
+  // outline gives the jar its distance without hiding anything drawn before it.
+  const depthProxy = new THREE.Mesh(
+    parts.Jar_Liquid.geometry,
+    // Transparent only to be sorted after the blended layers; it writes no colour.
+    new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true }),
+  );
+  depthProxy.name = "jar-depth";
+  depthProxy.renderOrder = 100;
+  depthProxy.matrix.copy(parts.Jar_Liquid.matrix);
+  depthProxy.matrixAutoUpdate = false;
+  parts.Jar_Liquid.parent.add(depthProxy);
+
   const bounds = new THREE.Box3().setFromObject(root);
   return { root, parts, bounds, liquidBounds };
 }

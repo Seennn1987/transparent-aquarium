@@ -68,8 +68,7 @@ void main() {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
   float path = mix(vDepth * c, vDepth / max(c, .12), film);
   vec3 transmit = exp(-(1. - vTint.rgb) * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * path);
-  // The canvas holds sRGB values, so the linear transmittance is encoded before it multiplies.
-  gl_FragColor = vec4(pow(transmit, vec3(1. / 2.2)), 1.);
+  gl_FragColor = vec4(transmit, 1.);
 }`;
 
 function absorbMaterial({ mode, absorption }) {

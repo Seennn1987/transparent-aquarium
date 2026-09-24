@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import { installControls, reportSceneError, preferredQuality } from "../../shared/controls.js";
 import { createFrameLoop } from "../../shared/frame-loop.js";
-import { frameRate, qualityName } from "../../shared/render-policy.js";
+import { frameRate, qualityName, renderScale } from "../../shared/render-policy.js";
 import { createOrbit } from "./orbit.js";
 import { createJar } from "./jar.js";
 import { createSpecimen } from "./specimen.js";
 import { specimenLook } from "./specimen-material.js";
+import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
   STUDIO_BACKGROUND,
   createStudioEnvironment,
@@ -49,24 +50,30 @@ window.habitatPower = (battery) => {
   updateControls();
 };
 
+// Product-shot framing: a long lens from slightly above the jar's middle.
+const CAMERA = { fov: 20, position: new THREE.Vector3(2.6, 2.4, 8.9), target: new THREE.Vector3(0, 1.3, 0) };
+
 async function start() {
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    antialias: false,
     alpha: false,
-    powerPreference: "default",
+    powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  if (!renderer.capabilities.isWebGL2) throw new Error("WebGL2 が使えないため標本ケースを表示できません");
+  renderer.setPixelRatio(1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.NoToneMapping;
+  // Applied once, in the final pass: the scene itself is rendered linear.
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(STUDIO_BACKGROUND);
 
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 40);
-  camera.position.set(1.8, 2.1, 5.6);
+  const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.1, 40);
+  camera.position.copy(CAMERA.position);
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d4cc, 0.45));
 
@@ -102,12 +109,14 @@ async function start() {
   scene.add(createContactShadow(1.1));
   const specimen = await createSpecimen({ envMap, liquidBounds: jar.liquidBounds });
   scene.add(specimen.object);
-  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook };
+
+  let post = createSpecimenPost(camera, profile);
+  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, get post() { return post; } };
 
   const orbit = createOrbit(camera, canvas, {
-    target: new THREE.Vector3(0, 1.25, 0),
-    minDistance: 2.2,
-    maxDistance: 11,
+    target: CAMERA.target.clone(),
+    minDistance: 3.6,
+    maxDistance: 16,
     onChange() {
       loop?.invalidate();
     },
@@ -116,9 +125,15 @@ async function start() {
   function resize() {
     const width = Math.max(1, habitat.clientWidth);
     const height = Math.max(1, habitat.clientHeight);
+    const scale = renderScale(profile, devicePixelRatio, onBattery);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    const w = Math.round(width * scale);
+    const h = Math.round(height * scale);
+    renderer.setDrawingBufferSize(w, h, 1);
+    post.target.setSize(w, h);
+    post.post.uniforms.size.value.set(w, h);
     loop?.invalidate();
   }
   resize();
@@ -126,13 +141,14 @@ async function start() {
 
   function setQuality(name) {
     profile = qualityName(name);
-    const ratio =
-      profile === "eco" ? 1 : Math.min(devicePixelRatio, profile === "detail" ? 2 : 1.5);
-    renderer.setPixelRatio(ratio);
     const mapSize = profile === "eco" ? 512 : profile === "detail" ? 2048 : 1024;
     key.shadow.mapSize.set(mapSize, mapSize);
     key.shadow.map?.dispose();
     key.shadow.map = null;
+    post.target.dispose();
+    post.post.dispose();
+    post = createSpecimenPost(camera, profile);
+    resize();
     loop?.setRate(frameRate(profile, requestedRate, onBattery));
     loop?.invalidate();
   }
@@ -147,9 +163,18 @@ async function start() {
     setQuality,
   });
 
+  const focusPoint = new THREE.Vector3();
+  let frame = 0;
   loop = createFrameLoop((dt) => {
     specimen.update(dt);
+    // Autofocus on the specimen, as a photographer would.
+    specimen.object.getWorldPosition(focusPoint);
+    LENS.focus.value = camera.position.distanceTo(focusPoint);
+    post.post.uniforms.frame.value = frame++ % 997;
+    renderer.setRenderTarget(post.target);
     renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(post.postScene, post.postCamera);
   }, {
     fps: frameRate(profile, requestedRate, onBattery),
     paused,
