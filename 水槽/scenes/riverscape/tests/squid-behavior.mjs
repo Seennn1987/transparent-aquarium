@@ -93,4 +93,36 @@ assert.ok(jetRun > 5 && jetRun < 7, `jet carries ${jetRun.toFixed(2)} ML`);
   assert.equal(pilot.state.mode, "hover", "a resting hand at a distance does not startle it");
 }
 
+// Wherever it is when the hand comes, and from whichever side: the pointer moves on the
+// front glass, so an escape is usually aimed back toward the grass and must stop short
+// of it and of the side glass.
+{
+  let jets = 0;
+  for (const x of [SWIM_ZONE.minX, 0, SWIM_ZONE.maxX])
+    for (const y of [SWIM_ZONE.minY, SWIM_ZONE.maxY])
+      for (const z of [SWIM_ZONE.minZ, SWIM_ZONE.maxZ]) {
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          const start = new THREE.Vector3(x, y, z);
+          const pilot = createSquidPilot({ obstacles: [], start });
+          const from = new THREE.Vector3(x - 2 * Math.cos(a), y - 2 * Math.sin(a), 2.6);
+          const pointer = { position: from, velocity: start.clone().sub(from).setLength(8) };
+          pilot.update(STEP, pointer);
+          // A squid at the back is further from the glass than the hand can startle.
+          const inRange = from.distanceTo(start) <= 4.0;
+          assert.equal(pilot.state.mode, inRange ? "jet" : "hover", `rush ${k} at ${start.toArray()}`);
+          if (!inRange) continue;
+          jets++;
+          for (let t = 0; t < JET_DURATION + 2; t += STEP) {
+            const state = pilot.update(STEP, null);
+            assert.ok(inside(JET_ZONE, state.position, -0.3),
+              `jet from ${start.toArray()} (hand ${k}) left its water at ${state.position.toArray()}`);
+            assert.ok(bodyInsideTank(state),
+              `jet from ${start.toArray()} (hand ${k}) put the body through the glass at ${state.position.toArray()}`);
+          }
+        }
+      }
+  assert.ok(jets >= 48, `only ${jets} rushes were within reach`);
+}
+
 console.log("squid behavior: ok");

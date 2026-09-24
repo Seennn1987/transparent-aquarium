@@ -32,6 +32,8 @@ const SWIM_GIVE_UP = 40;
 const TURN_RATE = { hover: 0.26, swim: 0.7, back: 0, jet: 5.2 };
 const MAX_PITCH = 0.3;
 const OBSTACLE_CLEARANCE = 1.3;
+// Distance over which it comes to a stop at the edge of its water.
+const EDGE_BRAKE = 1.0;
 // A hand coming fast at the glass startles it; one merely resting nearby does not.
 const STARTLE = { range: 4.0, approach: 3.0, close: 1.4, cooldown: 3.0 };
 
@@ -227,15 +229,15 @@ export function createSquidPilot({ obstacles = [], seed = 40117, start } = {}) {
     state.pitch += (pitchGoal - state.pitch) * Math.min(1, dt / 1.2);
     headingOf(state.yaw, state.pitch, heading);
     desired.copy(course ?? heading).multiplyScalar(speedAlong);
-    state.velocity.lerp(desired, Math.min(1, dt / response));
-    // Outside its water it brakes against the glass rather than passing through.
+    // Nearing the edge of its water it slows to a stop against it, as a squid brakes with
+    // its fins and arms, so even a full jet never carries it into the glass or the grass.
     const box = state.mode === "jet" ? JET_ZONE : SWIM_ZONE;
     for (const axis of ["x", "y", "z"]) {
       const min = box[`min${axis.toUpperCase()}`], max = box[`max${axis.toUpperCase()}`];
-      const next = state.position[axis] + state.velocity[axis] * dt;
-      if ((next < min && state.velocity[axis] < 0) || (next > max && state.velocity[axis] > 0))
-        state.velocity[axis] *= Math.exp(-dt * 12);
+      const room = desired[axis] < 0 ? state.position[axis] - min : max - state.position[axis];
+      desired[axis] *= THREE.MathUtils.clamp(room / EDGE_BRAKE, 0, 1);
     }
+    state.velocity.lerp(desired, Math.min(1, dt / response));
     state.position.addScaledVector(state.velocity, dt);
     return state;
   }
