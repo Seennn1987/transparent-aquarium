@@ -9,10 +9,11 @@ import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
   STUDIO_BACKGROUND,
+  KEY_DIRECTION,
+  FLOOR_LOOK,
   createStudioEnvironment,
   createBackdrop,
   createStudioFloor,
-  createContactShadow,
 } from "./studio.js";
 
 const canvas = document.querySelector("#scene");
@@ -51,7 +52,7 @@ window.habitatPower = (battery) => {
 };
 
 // Product-shot framing: a long lens from slightly above the jar's middle.
-const CAMERA = { fov: 20, position: new THREE.Vector3(2.6, 2.4, 8.9), target: new THREE.Vector3(0, 1.3, 0) };
+const CAMERA = { fov: 20, position: new THREE.Vector3(2.9, 2.9, 10.1), target: new THREE.Vector3(0, 1.2, 0) };
 
 async function start() {
   const renderer = new THREE.WebGLRenderer({
@@ -78,7 +79,7 @@ async function start() {
   scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d4cc, 0.45));
 
   const key = new THREE.DirectionalLight(0xfffaf4, 0.9);
-  key.position.set(3.2, 6.5, 2.8);
+  key.position.copy(KEY_DIRECTION).multiplyScalar(10);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, {
@@ -99,19 +100,23 @@ async function start() {
 
   // Scene fog must stay off: it veils transmissive glass. The floor fades into the backdrop itself.
   scene.add(createBackdrop(24));
-  scene.add(createStudioFloor(23.5));
 
   const envMap = createStudioEnvironment(renderer);
   scene.environment = envMap;
   scene.environmentIntensity = 0.6;
   const jar = await createJar({ envMap });
   scene.add(jar.root);
-  scene.add(createContactShadow(1.1));
+  scene.add(createStudioFloor(23.5, {
+    jarRadius: jar.bounds.max.x,
+    glassTop: jar.bounds.max.y,
+    liquidBottom: jar.liquidBounds.min.y,
+    liquidTop: jar.liquidBounds.max.y,
+  }));
   const specimen = await createSpecimen({ envMap, liquidBounds: jar.liquidBounds });
   scene.add(specimen.object);
 
   let post = createSpecimenPost(camera, profile);
-  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, get post() { return post; } };
+  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, floor: FLOOR_LOOK, get post() { return post; } };
 
   const orbit = createOrbit(camera, canvas, {
     target: CAMERA.target.clone(),
