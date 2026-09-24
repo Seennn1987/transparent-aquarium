@@ -45,13 +45,15 @@ const COMMON = /* glsl */ `
   // Bends d through a surface whose normal n faces the incoming ray, eta = n1 / n2, and
   // keeps the part of the light the surface lets through. False: reflected completely.
   bool bend(inout vec3 d, vec3 n, float eta, inout vec3 carry) {
-    float ci = -dot(n, d);
+    // Rounding can push the cosine past 1 at grazing angles; pow() of a negative is NaN,
+    // which the depth of field would spread into a black blot.
+    float ci = clamp(-dot(n, d), 0., 1.);
     float k = 1. - eta * eta * (1. - ci * ci);
     if (k < 0.) return false;
-    float ct = sqrt(k);
+    float ct = min(sqrt(k), 1.);
     float r0 = (1. - eta) / (1. + eta);
     r0 *= r0;
-    carry *= 1. - (r0 + (1. - r0) * pow(1. - (eta > 1. ? ct : ci), 5.));
+    carry *= 1. - (r0 + (1. - r0) * pow(max(1. - (eta > 1. ? ct : ci), 0.), 5.));
     d = normalize(eta * d + (eta * ci - ct) * n);
     return true;
   }
@@ -229,19 +231,22 @@ const KNOB_FRAGMENT = /* glsl */ `
     float b = dot(oc, d);
     float h = b * b - (dot(oc, oc) - uRadius * uRadius);
     if (h < 0.) discard;
-    vec3 p = o + d * (-b - sqrt(h));
+    vec3 p = o + d * (-b - sqrt(max(h, 0.)));
     vec3 carry = vec3(1.);
-    bend(d, normalize(p - uCentre), 1. / uGlassIor, carry);
+    vec3 incoming = d;
+    vec3 face = normalize(p - uCentre);
+    bend(d, face, 1. / uGlassIor, carry);
+    vec3 light = (1. - carry) * behind(p, reflect(incoming, face));
     float t = -2. * dot(p - uCentre, d);
     carry *= exp(-uGlassAbsorb * t);
     p += d * t;
     vec3 n = -normalize(p - uCentre);
     vec3 inside = d;
     if (!bend(d, n, uGlassIor, carry)) {
-      gl_FragColor = vec4(carry * mirrored(p, reflect(inside, n)), 1.);
+      gl_FragColor = vec4(light + carry * mirrored(p, reflect(inside, n)), 1.);
       return;
     }
-    gl_FragColor = vec4(carry * behind(p, d), 1.);
+    gl_FragColor = vec4(light + carry * behind(p, d), 1.);
   }
 `;
 
