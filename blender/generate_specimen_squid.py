@@ -7,7 +7,8 @@ Blender 5.2 LTS で動作確認済み。
 
 水槽のイカ（generate_squid.py → rig_squid.py → animate_squid.py → export_squid_gltf.py）を
 ファイルは変えずに読み込み、寄りで見る標本に必要な形だけを差し替えて書き出す。水槽の squid.glb は変わらない。
-  - 眼: 水晶体（眼の中の玉）と、染まった眼の軟骨の濃い青の三日月形の輪（部位 EyeRings）
+  - 眼: 淡い壁だけの空洞（水晶体は透明標本では溶けて残らない）。内側の奥に薄い網膜（部位 Retina）。
+    染まった眼の軟骨の濃い青の三日月形の輪（部位 EyeRings）
   - エンペラ: 縁を薄く波打たせ、縁の濃い縁取りの位置を _rim（縁1 → 付け根0）として焼き込む
   - 軟甲: 中央の軸を細い線として見える太さ・色の別部位に（部位 Rachis）
   - 内臓: 消化腺・盲嚢・生殖巣を、くびれと凹凸のある形に
@@ -43,33 +44,74 @@ exec(stage("generate_squid.py", ["\nmain()\n"]), globals())
 # ------------------------------------------------------------------
 # 形の差し替え（寸法は generate_squid.py と同じ ML=1 単位）
 # ------------------------------------------------------------------
-LENS_RADIUS = 0.45 * EYE_RADIUS
-EYE_RING_THICKNESS = 0.008            # 三日月の一番太い所の半径
-EYE_RING_TILT = math.radians(18)      # 水晶体を外側・腹側へ少しずらす
-COLOR_EYE_RING = (0.08, 0.40, 0.81, 1.0)
+# 光軸: ほぼ左右。瓶では背中がこちらを向くので、開口が少し背側を向く（空色の背側写真に合わせる）
+EYE_OPENING_TILT = math.radians(34)
+EYE_RING_THICKNESS = 0.014            # 三日月の一番太い所の半径
+COLOR_EYE_RING = (0.05, 0.42, 0.86, 1.0)
+COLOR_EYE_WALL = (0.80, 0.92, 0.88, 1.0)      # 淡い壁。金色の水晶体にはしない
+COLOR_RETINA = (0.16, 0.20, 0.26, 1.0)        # 残った色素。ほぼ黒に近い青灰
+COLOR_BUCCAL_FADED = (0.86, 0.82, 0.70, 1.0)  # 口球は濁った残り染めで、鮮やかな金ではない
+COLOR_BEAK_FADED = (0.40, 0.34, 0.28, 1.0)    # 嘴は茶色く褪せる。真っ黒のままにしない
 COLOR_RACHIS = (0.55, 0.55, 0.25, 1.0)
 RACHIS_RADIUS = 0.003
+RETINA_RADIUS = 0.24 * EYE_RADIUS     # 開口から暗い点に見える大きさ。眼いっぱいにしない
+RETINA_DEPTH = 0.24 * EYE_RADIUS
+RETINA_WALL = 0.0045
+EYE_WALL = 0.007                      # 中空の壁の厚さ。実体の水晶体にはしない
 FIN_RIM_FROM = 0.8                    # 付け根0 → 縁1 のうち、縁取りが始まる位置
 
 
-def build_eyes(eye_mb, ring_mb=None):
-    ex, ey, ez = EYE_CENTER
+def eye_frame(side):
+    """眼の中心と、開口が向く向き（法線）＋輪の面の二つの軸"""
+    c = Vector((EYE_CENTER[0], side * EYE_CENTER[1], EYE_CENTER[2]))
+    facing = Vector((-0.18, side * math.cos(EYE_OPENING_TILT), math.sin(EYE_OPENING_TILT))).normalized()
+    along = Vector((1, 0, 0))
+    if abs(facing.dot(along)) > 0.85:
+        along = Vector((0, 0, 1))
+    along = (along - facing * facing.dot(along)).normalized()
+    up = facing.cross(along)
+    return c, facing, along, up
+
+
+def build_retina(mb, c, facing, along, up):
+    """眼の奥の内面に貼る薄いカップ（正面から暗い点に見える。中心に浮く黒球にはしない）"""
+    n_seg, n_ring = 18, 8
+    rim_plane = c - facing * (0.28 * EYE_RADIUS)
+    top, bot = [], []
+    for i in range(n_ring + 1):
+        t = i / n_ring
+        a = t * (math.pi * 0.48)
+        rad = max(RETINA_RADIUS * math.cos(a), 0.002)
+        back = math.sin(a) * RETINA_DEPTH
+        row_t, row_b = [], []
+        for j in range(n_seg + 1):
+            ph = 2 * math.pi * j / n_seg
+            radial = (along * math.sin(ph) + up * math.cos(ph)) * rad
+            p = rim_plane + radial - facing * back
+            row_t.append(p + facing * (RETINA_WALL * 0.5))
+            row_b.append(p - facing * (RETINA_WALL * 0.5))
+        top.append(row_t)
+        bot.append(row_b)
+    mb.sheet(top, bot)
+
+
+def build_eyes(eye_mb, ring_mb=None, retina_mb=None):
     for side in (1, -1):
-        c = Vector((ex, side * ey, ez))
-        facing = Vector((0, side * math.cos(EYE_RING_TILT), -math.sin(EYE_RING_TILT)))
-        along, up = Vector((1, 0, 0)), Vector((0, 0, 1))
+        c, facing, along, up = eye_frame(side)
         eye_mb.ellipsoid(c, EYE_RADIUS, EYE_RADIUS * 0.9, EYE_RADIUS * 0.92, seg=28, rings=16)
-        eye_mb.ellipsoid(c + facing * (0.35 * EYE_RADIUS), LENS_RADIUS, LENS_RADIUS, LENS_RADIUS, seg=18, rings=10)
+        if retina_mb is not None:
+            build_retina(retina_mb, c, facing, along, up)
         if ring_mb is None:
             continue
         n = 28
         pts, radii = [], []
+        lateral = Vector((0, side, 0))
         for i in range(n):
             a = 2 * math.pi * i / n
-            # In the plane facing the viewer from the back (along × up), so the stain
-            # reads as a ring around the eye, thicker toward the outside.
-            pts.append(c + (along * math.sin(a) + up * math.cos(a)) * EYE_RADIUS * 1.01)
-            radii.append(0.0028 + EYE_RING_THICKNESS * max(-math.cos(a), 0.0) ** 1.2)
+            offset = along * math.sin(a) + up * math.cos(a)
+            pts.append(c + facing * (0.22 * EYE_RADIUS) + offset * (EYE_RADIUS * 0.92))
+            outer = max(offset.dot(lateral), 0.0)
+            radii.append(0.0010 + EYE_RING_THICKNESS * outer ** 1.4)
         ring_mb.tube(pts, radii, 10, closed=True)
         ring_mb.attrs.setdefault("radius", []).extend(r for r in radii for _ in range(10))
 
@@ -190,13 +232,15 @@ def build_viscera(mats_mb):
 
 
 def build_specimen_extras():
-    """main() が作らない部位（眼の輪・軟甲の軸）を足す。軸は build_viscera の中で作る"""
+    """main() が作らない部位（眼の輪・網膜・軟甲の軸）を足す。軸は build_viscera の中で作る"""
     coll = bpy.data.collections[SPECIES["name"]]
     root = bpy.data.objects[SPECIES["name"] + "_Root"]
-    rings = MeshBuilder()
-    build_eyes(MeshBuilder(), rings)
+    rings, retina = MeshBuilder(), MeshBuilder()
+    build_eyes(MeshBuilder(), rings, retina)
     ring_mat = make_glossy_material("EyeRing", COLOR_EYE_RING, roughness=0.3, alpha=0.6, coat=0.3)
     emit("EyeRings", rings, ring_mat, coll, root)
+    retina_mat = make_glossy_material("Retina", COLOR_RETINA, roughness=0.5, alpha=0.75, coat=0.05)
+    emit("Retina", retina, retina_mat, coll, root)
 
 
 _build_viscera = build_viscera
@@ -216,7 +260,7 @@ main()
 build_specimen_extras()
 
 exec(stage("rig_squid.py", [chained("generate_squid.py"), "\nrig_squid()\n"]), globals())
-HEAD_PARTS = HEAD_PARTS + ("EyeRings",)
+HEAD_PARTS = HEAD_PARTS + ("EyeRings", "Retina")
 MANTLE_PARTS = MANTLE_PARTS + ("Rachis",)
 rig_squid()
 
@@ -224,6 +268,7 @@ exec(stage("animate_squid.py", [chained("rig_squid.py")]), globals())
 
 exec(stage("export_squid_gltf.py", [chained("animate_squid.py"), "\nmain_export()\n"]), globals())
 ORGAN_DEPTH["Rachis"] = RACHIS_RADIUS
+ORGAN_DEPTH["Retina"] = RETINA_WALL
 _tint_of, _depth_values, _bake_attributes = tint_of, depth_values, bake_attributes
 
 
@@ -232,12 +277,22 @@ def tint_of(name, co):
         return tuple(COLOR_EYE_RING[:3])
     if name == "Rachis":
         return tuple(COLOR_RACHIS[:3])
+    if name == "Eyes":
+        return tuple(COLOR_EYE_WALL[:3])
+    if name == "Retina":
+        return tuple(COLOR_RETINA[:3])
+    if name == "BuccalMass":
+        return tuple(COLOR_BUCCAL_FADED[:3])
+    if name == "Beak":
+        return tuple(COLOR_BEAK_FADED[:3])
     return _tint_of(name, co)
 
 
 def depth_values(name, me, limb_lines):
     if name == "EyeRings":
         return [a.value for a in me.attributes["radius"].data]
+    if name == "Eyes":
+        return [EYE_WALL / 2] * len(me.vertices)
     return _depth_values(name, me, limb_lines)
 
 

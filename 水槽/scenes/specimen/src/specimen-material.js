@@ -22,11 +22,16 @@ const STAINED_PARTS = new Set(["Mantle", "Fins", "Funnel", "Head", "Arms"]);
 // settings give them, the fins (a thin sheet, deepened face-on below) less.
 const PART_STAIN = { Arms: 1.2, Fins: 0.23 };
 // The specimen squid (blender/generate_specimen_squid.py) adds the stained cartilage ring
-// of each eye and the gladius's midrib as parts of their own.
+// of each eye, the retina cup, and the gladius's midrib as parts of their own. Eyes / mouth
+// override the tank: no lens ball, pale wall, faded buccal and beak leftover stain.
 const SPECIMEN_TISSUE = {
   ...SQUID_TISSUE,
-  EyeRings: { mode: "solid", absorption: 900, sheen: 0.35 },
+  EyeRings: { mode: "solid", absorption: 1400, sheen: 0.22 },
   Rachis: { mode: "solid", absorption: 4100, sheen: 0 },
+  Eyes: { mode: "film", absorption: 280, sheen: 0.15 },
+  Retina: { mode: "solid", absorption: 1700, sheen: 0 },
+  BuccalMass: { mode: "solid", absorption: 140, sheen: 0 },
+  Beak: { mode: "solid", absorption: 900, sheen: 0.25 },
 };
 // Where the chromatophores' remnants show: on the back, the head and the arms.
 const PART_SPOTS = { Mantle: 1, Head: 1, Arms: 0.8, Fins: 0.4, Funnel: 0.5 };
@@ -301,7 +306,7 @@ export function applySpecimenTissue(model, { envMap }) {
     mesh.material = absorbMaterial(tissue, part);
     mesh.renderOrder = ABSORB_ORDER;
     mesh.frustumCulled = false;
-    if (STAINED_PARTS.has(part) && part !== "Arms") addPass(mesh, `${part}Milk`, milkMaterial(tissue, part), SURFACE_ORDER);
+    if ((STAINED_PARTS.has(part) && part !== "Arms") || part === "Eyes") addPass(mesh, `${part}Milk`, milkMaterial(tissue, part), SURFACE_ORDER);
     if (tissue.sheen > 0) addPass(mesh, `${part}Surface`, surfaceMaterial(tissue, envMap), SURFACE_ORDER);
   }
 }
