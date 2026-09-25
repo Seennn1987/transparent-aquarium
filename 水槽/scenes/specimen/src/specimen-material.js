@@ -40,16 +40,29 @@ export const specimenLook = {
 export const ABSORB_ORDER = 10;
 export const SURFACE_ORDER = 11;
 
+// With multisampling a pixel centre can fall outside a thin triangle (arm tips, fin edges)
+// and plain varyings are extrapolated past their range: a negative absorbance multiplies
+// the light by thousands, a normal through zero turns NaN, and the arms flash white.
+// Every tissue varying is sampled inside its triangle (centroid).
+function centroidVaryings(shader) {
+  for (const stage of ["vertex", "fragment"]) {
+    const key = `${stage}Shader`;
+    shader[key] = shader[key]
+      .replace(`#include <normal_pars_${stage}>`, THREE.ShaderChunk[`normal_pars_${stage}`].replaceAll("varying", "centroid varying"))
+      .replaceAll("\nvarying vec3 vViewPosition;", "\ncentroid varying vec3 vViewPosition;");
+  }
+}
+
 const tissueVertex = `
 #include <common>
 #include <skinning_pars_vertex>
 attribute vec4 tint;
 attribute float tissueDepth;
-varying vec4 vTint;
-varying float vDepth;
-varying float vDorsal;
-varying vec3 vViewNormal;
-varying vec3 vViewPosition;
+centroid varying vec4 vTint;
+centroid varying float vDepth;
+centroid varying float vDorsal;
+centroid varying vec3 vViewNormal;
+centroid varying vec3 vViewPosition;
 void main() {
   #include <skinbase_vertex>
   #include <beginnormal_vertex>
@@ -78,11 +91,11 @@ uniform float dorsal;
 uniform float gold;
 uniform float face;
 uniform float rim;
-varying vec4 vTint;
-varying float vDepth;
-varying float vDorsal;
-varying vec3 vViewNormal;
-varying vec3 vViewPosition;
+centroid varying vec4 vTint;
+centroid varying float vDepth;
+centroid varying float vDorsal;
+centroid varying vec3 vViewNormal;
+centroid varying vec3 vViewPosition;
 vec3 absorbance() {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
   float sheet = vDepth * (face + rim * (1. / max(c, .12) - 1.));
@@ -95,7 +108,7 @@ vec3 absorbance() {
   vec3 stainColour = vec3(${BODY_ABSORBANCE.map((v) => v.toFixed(3)).join(", ")}) * skyWeights;
   a = mix(a, stainColour, (1. - blue) * stained * sky * (1. - gold));
   a *= 1. + dorsal * vDorsal * stained;
-  return a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * path;
+  return max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * path, 0.);
 }`;
 
 const absorbFragment = `
@@ -175,6 +188,7 @@ function surfaceMaterial({ sheen }, envMap) {
     blending: THREE.AdditiveBlending,
   });
   material.onBeforeCompile = (shader) => {
+    centroidVaryings(shader);
     shader.uniforms.uSheen = specimenLook.sheen;
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform float uSheen;")
