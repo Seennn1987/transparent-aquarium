@@ -59,6 +59,7 @@ export async function createSpecimen({ envMap, liquidBounds, facing }) {
     object: pivot,
     model,
     mixer,
+    hoverAction: action,
     motion,
     bounds: new THREE.Box3().setFromObject(pivot, true),
     update(dt) {

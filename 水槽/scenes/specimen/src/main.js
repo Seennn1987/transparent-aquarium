@@ -15,6 +15,7 @@ import {
   createBackdrop,
   createStudioFloor,
 } from "./studio.js";
+import { installTunePanel } from "./tune-panel.js";
 
 const canvas = document.querySelector("#scene");
 const habitat = document.querySelector("#habitat");
@@ -194,6 +195,14 @@ async function start() {
     quality: () => profile,
     setQuality,
   });
+
+  const tune = installTunePanel({
+    habitat,
+    renderer,
+    specimen,
+    onChange() { loop?.invalidate(); },
+  });
+  window.specimenDebug.tune = tune;
 
   const focusPoint = new THREE.Vector3();
   let frame = 0;

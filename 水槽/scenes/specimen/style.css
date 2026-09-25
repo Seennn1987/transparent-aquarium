@@ -29,3 +29,80 @@
 #loading p {
   color: var(--text-muted);
 }
+
+#tune {
+  position: fixed;
+  z-index: 3;
+  top: var(--space-6);
+  right: var(--space-8);
+  width: min(280px, calc(100vw - var(--space-16)));
+  max-height: calc(100dvh - var(--space-12));
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--scrim);
+  border: var(--stroke) solid var(--border);
+  font-size: var(--text-small);
+}
+
+#tune h2,
+#tune h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-style: normal;
+}
+
+#tune h3 {
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+}
+
+.tune-note {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+
+#tune label {
+  display: grid;
+  grid-template-columns: 7.5em 1fr 2.4em;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-1) 0;
+}
+
+#tune input[type="range"] {
+  width: 100%;
+  accent-color: var(--focus);
+}
+
+.tune-value {
+  text-align: right;
+  color: var(--text-muted);
+}
+
+#tune button {
+  margin-top: var(--space-4);
+  min-height: var(--control-height);
+  width: 100%;
+  border: var(--stroke) solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+#tune button:hover {
+  background: var(--surface-hover);
+}
+
+.clean #tune {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  #tune {
+    top: auto;
+    bottom: 88px;
+    right: var(--space-4);
+    max-height: 40dvh;
+  }
+}
