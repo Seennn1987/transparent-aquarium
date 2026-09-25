@@ -6,25 +6,48 @@ import { SQUID_TISSUE } from "../../riverscape/src/squid-material.js";
 // absorption does, with no light added and no tank-specific stain boost.
 //
 // It is drawn on its own over white, so the image holds how much light each point lets
-// through (plus its sheen); jar-optics.js looks it up where the bent rays cross it.
+// through (plus its sheen and milkiness); jar-optics.js looks it up where the bent rays
+// cross it.
 const REAL_MANTLE_LENGTH = 0.1;
 
+// The tank's squid is baked blue-green. Measured on the reference photos (white lightbox),
+// the stained tissue absorbs red : green : blue ≈ 1 : 0.24 : 0.08, a sky blue; the baked
+// tint absorbs 1 : 0.18 : 0.15. These weights turn one into the other on the stained body
+// only; the golden head and the organs keep their colours.
+const SKY_WEIGHTS = new THREE.Vector3(1, 1.36, 0.4);
+// 1 − the body tint baked by blender/generate_squid.py (BODY_TINT_STOPS).
+const BODY_ABSORBANCE = [0.65, 0.115, 0.1];
+const STAINED_PARTS = new Set(["Mantle", "Fins", "Funnel", "Head", "Arms"]);
+// Measured against the reference: the arms take the stain more deeply than the tank's
+// settings give them, the fins (a thin sheet, deepened face-on below) less.
+const PART_STAIN = { Arms: 1.2, Fins: 0.23 };
+
+// Targets, light let through (red/green/blue) on the white-lightbox reference: fin
+// 0.58/0.86/0.98, arms 0.05–0.8 red with blue ≈ 1.5× green, mantle red 0–0.19.
 export const specimenLook = {
-  // Mantle red/green ≈ 0.56 in the studio, inside the 0.5–0.65 target (1.0 gives 0.46).
-  stain: { value: 0.65 },
+  stain: { value: 0.9 },
+  sky: { value: 1 },              // 0: the tank's blue-green, 1: the specimen's sky blue
+  dorsal: { value: 0.45 },        // extra stain on the back
+  gold: { value: 0.4 },           // how much of the tank's golden head survives the stain
+  // Thin sheets (mantle, fins): how deep face-on, and how much more along the outline.
+  face: { value: 1.8 },
+  rim: { value: 0.7 },
+  milk: { value: 0.16 },          // light scattered back by thick tissue
+  milkColor: { value: new THREE.Color("#e6f3fa") },
   sheen: { value: 1 },
 };
 
 export const ABSORB_ORDER = 10;
 export const SURFACE_ORDER = 11;
 
-const absorbVertex = `
+const tissueVertex = `
 #include <common>
 #include <skinning_pars_vertex>
 attribute vec4 tint;
 attribute float tissueDepth;
 varying vec4 vTint;
 varying float vDepth;
+varying float vDorsal;
 varying vec3 vViewNormal;
 varying vec3 vViewPosition;
 void main() {
@@ -37,33 +60,80 @@ void main() {
   #include <project_vertex>
   vTint = tint;
   vDepth = tissueDepth;
+  // The model's +Y is the animal's back.
+  vDorsal = smoothstep(-.2, .8, normalize(objectNormal).y);
   vViewNormal = transformedNormal;
   vViewPosition = mvPosition.xyz;
 }`;
 
-const absorbFragment = `
+// Absorbance along the view ray through this surface, shared by both tissue passes.
+const tissueAbsorbance = `
 uniform float absorption;
 uniform float film;
+uniform float stained;
+uniform float partStain;
 uniform float stain;
+uniform float sky;
+uniform float dorsal;
+uniform float gold;
+uniform float face;
+uniform float rim;
 varying vec4 vTint;
 varying float vDepth;
+varying float vDorsal;
 varying vec3 vViewNormal;
 varying vec3 vViewPosition;
-void main() {
+vec3 absorbance() {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
-  float path = mix(vDepth * c, vDepth / max(c, .12), film);
-  vec3 transmit = exp(-(1. - vTint.rgb) * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * path);
-  gl_FragColor = vec4(transmit, 1.);
+  float sheet = vDepth * (face + rim * (1. / max(c, .12) - 1.));
+  float path = mix(vDepth * c, sheet, film);
+  vec3 a = 1. - vTint.rgb;
+  vec3 skyWeights = vec3(${SKY_WEIGHTS.toArray().map((v) => v.toFixed(3)).join(", ")});
+  float blue = stained * smoothstep(.7, .85, vTint.b);
+  a *= mix(vec3(1.), skyWeights, blue * sky);
+  // Golden stained tissue (the head) is taken most of the way to the stain's own colour.
+  vec3 stainColour = vec3(${BODY_ABSORBANCE.map((v) => v.toFixed(3)).join(", ")}) * skyWeights;
+  a = mix(a, stainColour, (1. - blue) * stained * sky * (1. - gold));
+  a *= 1. + dorsal * vDorsal * stained;
+  return a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * path;
 }`;
 
-function absorbMaterial({ mode, absorption }) {
+const absorbFragment = `
+${tissueAbsorbance}
+void main() {
+  gl_FragColor = vec4(exp(-absorbance()), 1.);
+}`;
+
+// Preserved tissue is not glass-clear: its thick parts send some light back milky, which
+// also veils the organs behind them.
+const milkFragment = `
+${tissueAbsorbance}
+uniform float milk;
+uniform vec3 milkColor;
+void main() {
+  float density = dot(absorbance(), vec3(1. / 3.));
+  gl_FragColor = vec4(milkColor * milk * (1. - exp(-density * .8)), 1.);
+}`;
+
+function tissueUniforms({ mode, absorption }, part) {
+  return {
+    absorption: { value: absorption },
+    film: { value: mode === "film" ? 1 : 0 },
+    stained: { value: STAINED_PARTS.has(part) ? 1 : 0 },
+    partStain: { value: PART_STAIN[part] ?? 1 },
+    stain: specimenLook.stain,
+    sky: specimenLook.sky,
+    dorsal: specimenLook.dorsal,
+    gold: specimenLook.gold,
+    face: specimenLook.face,
+    rim: specimenLook.rim,
+  };
+}
+
+function absorbMaterial(tissue, part) {
   return new THREE.ShaderMaterial({
-    uniforms: {
-      absorption: { value: absorption },
-      film: { value: mode === "film" ? 1 : 0 },
-      stain: specimenLook.stain,
-    },
-    vertexShader: absorbVertex,
+    uniforms: tissueUniforms(tissue, part),
+    vertexShader: tissueVertex,
     fragmentShader: absorbFragment,
     transparent: true,
     depthWrite: false,
@@ -72,6 +142,22 @@ function absorbMaterial({ mode, absorption }) {
     blendEquation: THREE.AddEquation,
     blendSrc: THREE.ZeroFactor,
     blendDst: THREE.SrcColorFactor,
+  });
+}
+
+function milkMaterial(tissue, part) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...tissueUniforms(tissue, part),
+      milk: specimenLook.milk,
+      milkColor: specimenLook.milkColor,
+    },
+    vertexShader: tissueVertex,
+    fragmentShader: milkFragment,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
   });
 }
 
@@ -110,7 +196,7 @@ function addPass(mesh, name, material, renderOrder) {
   mesh.parent.add(pass);
 }
 
-/** Absorption plus sheen for every part; the white studio behind it supplies the light. */
+/** Absorption, milkiness and sheen for every part; the white studio supplies the light. */
 export function applySpecimenTissue(model, { envMap }) {
   const meshes = [];
   model.traverse((object) => { if (object.isSkinnedMesh) meshes.push(object); });
@@ -130,9 +216,10 @@ export function applySpecimenTissue(model, { envMap }) {
     geometry.setAttribute("tissueDepth", depth);
     geometry.deleteAttribute("color");
     geometry.deleteAttribute("_depth");
-    mesh.material = absorbMaterial(tissue);
+    mesh.material = absorbMaterial(tissue, part);
     mesh.renderOrder = ABSORB_ORDER;
     mesh.frustumCulled = false;
+    if (STAINED_PARTS.has(part)) addPass(mesh, `${part}Milk`, milkMaterial(tissue, part), SURFACE_ORDER);
     if (tissue.sheen > 0) addPass(mesh, `${part}Surface`, surfaceMaterial(tissue, envMap), SURFACE_ORDER);
   }
 }

@@ -115,7 +115,11 @@ async function start() {
   }));
   // The specimen is only ever seen through the liquid, so it has a scene of its own, drawn
   // over white into the image the jar's optics look up.
-  const specimen = await createSpecimen({ envMap, liquidBounds: jar.liquidBounds });
+  const specimen = await createSpecimen({
+    envMap,
+    liquidBounds: jar.liquidBounds,
+    facing: CAMERA.position.clone().sub(CAMERA.target).setY(0).normalize(),
+  });
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);
   specimenScene.add(specimen.object);
@@ -135,7 +139,7 @@ async function start() {
   createSpecimenImage();
 
   let post = createSpecimenPost(camera, profile);
-  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, optics: jar.optics, floor: FLOOR_LOOK, get post() { return post; } };
+  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, optics: jar.optics, floor: FLOOR_LOOK, get post() { return post; }, get specimenImage() { return specimenImage; } };
 
   const orbit = createOrbit(camera, canvas, {
     target: CAMERA.target.clone(),

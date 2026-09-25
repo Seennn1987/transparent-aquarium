@@ -13,11 +13,14 @@ export const SPECIMEN_POSE = {
   clearance: 0.12,
 };
 
-export async function createSpecimen({ envMap, liquidBounds }) {
+/** `facing`: horizontal direction the animal's back is turned to (toward the viewer). */
+export async function createSpecimen({ envMap, liquidBounds, facing }) {
   const gltf = await new GLTFLoader().loadAsync(SQUID_URL);
   const model = gltf.scene;
   applySpecimenTissue(model, { envMap });
-  model.rotation.z = Math.PI / 2;
+  // Mantle up turns the model's back (+Y) to -X; the yaw then turns it to `facing`.
+  const yaw = Math.atan2(facing.z, -facing.x);
+  model.rotation.set(0, yaw, Math.PI / 2, "YXZ");
 
   const body = new THREE.Group();
   body.name = "Specimen";
