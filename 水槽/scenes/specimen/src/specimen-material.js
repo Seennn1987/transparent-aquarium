@@ -21,6 +21,17 @@ const STAINED_PARTS = new Set(["Mantle", "Fins", "Funnel", "Head", "Arms"]);
 // Measured against the reference: the arms take the stain more deeply than the tank's
 // settings give them, the fins (a thin sheet, deepened face-on below) less.
 const PART_STAIN = { Arms: 1.2, Fins: 0.23 };
+// The specimen squid (blender/generate_specimen_squid.py) adds the stained cartilage ring
+// of each eye and the gladius's midrib as parts of their own.
+const SPECIMEN_TISSUE = {
+  ...SQUID_TISSUE,
+  EyeRings: { mode: "solid", absorption: 900, sheen: 0.35 },
+  Rachis: { mode: "solid", absorption: 4100, sheen: 0 },
+};
+// Where the chromatophores' remnants show: on the back, the head and the arms.
+const PART_SPOTS = { Mantle: 1, Head: 1, Arms: 0.8, Fins: 0.4, Funnel: 0.5 };
+// Spacing of the remnant dots in mantle lengths (3 mm on a 10 cm squid).
+const SPOT_CELL = 0.03;
 
 // Targets, light let through (red/green/blue) on the white-lightbox reference: fin
 // 0.58/0.86/0.98, arms 0.05–0.8 red with blue ≈ 1.5× green, mantle red 0–0.19.
@@ -32,9 +43,12 @@ export const specimenLook = {
   // Thin sheets (mantle, fins): how deep face-on, and how much more along the outline.
   face: { value: 1.8 },
   rim: { value: 0.7 },
+  finRim: { value: 1.8 },         // extra stain toward the fin's outer edge
+  spots: { value: 0.5 },          // chromatophore remnants
   milk: { value: 0.16 },          // light scattered back by thick tissue
   milkColor: { value: new THREE.Color("#e6f3fa") },
   sheen: { value: 1 },
+  wrinkles: { value: 0.6 },       // unevenness of the sheen
 };
 
 export const ABSORB_ORDER = 10;
@@ -58,12 +72,18 @@ const tissueVertex = `
 #include <skinning_pars_vertex>
 attribute vec4 tint;
 attribute float tissueDepth;
+attribute float tissueRim;
 centroid varying vec4 vTint;
 centroid varying float vDepth;
 centroid varying float vDorsal;
+centroid varying float vRim;
+centroid varying vec3 vRest;
 centroid varying vec3 vViewNormal;
 centroid varying vec3 vViewPosition;
 void main() {
+  // The pattern is fixed to the body at rest, so it moves with the tissue.
+  vRest = position;
+  vRim = tissueRim;
   #include <skinbase_vertex>
   #include <beginnormal_vertex>
   #include <skinnormal_vertex>
@@ -91,11 +111,37 @@ uniform float dorsal;
 uniform float gold;
 uniform float face;
 uniform float rim;
+uniform float finRim;
+uniform float spots;
+uniform float spotted;
 centroid varying vec4 vTint;
 centroid varying float vDepth;
 centroid varying float vDorsal;
+centroid varying float vRim;
+centroid varying vec3 vRest;
 centroid varying vec3 vViewNormal;
 centroid varying vec3 vViewPosition;
+vec3 hash3(vec3 p) {
+  p = fract(p * vec3(.1031, .1030, .0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
+}
+// Scattered dots of uneven size and strength, about half the cells holding one.
+float spotField(vec3 p) {
+  vec3 q = p / ${SPOT_CELL.toFixed(3)};
+  vec3 i = floor(q), f = fract(q);
+  float s = 0.;
+  for (int x = -1; x <= 1; x++)
+    for (int y = -1; y <= 1; y++)
+      for (int z = -1; z <= 1; z++) {
+        vec3 o = vec3(x, y, z);
+        vec3 h = hash3(i + o + 71.);
+        if (h.z > .5) continue;
+        float r = .16 + .2 * fract(h.x * 7.13);
+        s = max(s, smoothstep(r, r * .35, length(o + h - f)) * (.4 + h.y));
+      }
+  return s;
+}
 vec3 absorbance() {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
   float sheet = vDepth * (face + rim * (1. / max(c, .12) - 1.));
@@ -107,13 +153,19 @@ vec3 absorbance() {
   // Golden stained tissue (the head) is taken most of the way to the stain's own colour.
   vec3 stainColour = vec3(${BODY_ABSORBANCE.map((v) => v.toFixed(3)).join(", ")}) * skyWeights;
   a = mix(a, stainColour, (1. - blue) * stained * sky * (1. - gold));
-  a *= 1. + dorsal * vDorsal * stained;
-  return max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * path, 0.);
+  a *= (1. + dorsal * vDorsal * stained) * (1. + finRim * vRim);
+  a = max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * path, 0.);
+  // The remnants are brownish: they take more blue than red.
+  float dots = spotted * mix(.25, 1., vDorsal) * vTint.a * spotField(vRest);
+  return a + dots * spots * vec3(.35, .6, .9);
 }`;
 
 const absorbFragment = `
 ${tissueAbsorbance}
 void main() {
+  // Arm roots are faded to nothing inside the head so the cut is hidden. Drawing them
+  // still multiplies by white and adds sheen, which flashes at the junction as they move.
+  if (vTint.a < .12) discard;
   gl_FragColor = vec4(exp(-absorbance()), 1.);
 }`;
 
@@ -124,6 +176,7 @@ ${tissueAbsorbance}
 uniform float milk;
 uniform vec3 milkColor;
 void main() {
+  if (vTint.a < .12) discard;
   float density = dot(absorbance(), vec3(1. / 3.));
   gl_FragColor = vec4(milkColor * milk * (1. - exp(-density * .8)), 1.);
 }`;
@@ -140,6 +193,9 @@ function tissueUniforms({ mode, absorption }, part) {
     gold: specimenLook.gold,
     face: specimenLook.face,
     rim: specimenLook.rim,
+    finRim: specimenLook.finRim,
+    spots: specimenLook.spots,
+    spotted: { value: PART_SPOTS[part] ?? 0 },
   };
 }
 
@@ -190,9 +246,18 @@ function surfaceMaterial({ sheen }, envMap) {
   material.onBeforeCompile = (shader) => {
     centroidVaryings(shader);
     shader.uniforms.uSheen = specimenLook.sheen;
+    shader.uniforms.uWrinkles = specimenLook.wrinkles;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute vec4 tint;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRest = position;\nvFade = tint.a;");
+    // Fine creases of the preserved skin break the highlight into uneven streaks.
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform float uSheen;")
-      .replace("#include <opaque_fragment>", "outgoingLight *= uSheen;\n#include <opaque_fragment>");
+      .replace("#include <common>", "#include <common>\nuniform float uSheen;\nuniform float uWrinkles;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;")
+      .replace("#include <opaque_fragment>", `
+if (vFade < .12) discard;
+float crease = sin(dot(vRest, vec3(160., 41., 67.)) + 3. * sin(vRest.x * 55. + vRest.z * 38.));
+outgoingLight *= uSheen * vFade * (1. + uWrinkles * crease * .5);
+#include <opaque_fragment>`);
   };
   material.customProgramCacheKey = () => "specimen-squid-sheen";
   return material;
@@ -215,25 +280,28 @@ export function applySpecimenTissue(model, { envMap }) {
   const meshes = [];
   model.traverse((object) => { if (object.isSkinnedMesh) meshes.push(object); });
   const names = new Set(meshes.map((mesh) => mesh.userData.squid_part));
-  const missing = Object.keys(SQUID_TISSUE).filter((name) => !names.has(name));
-  if (missing.length) throw new Error(`squid.glb に部位がありません: ${missing.join(", ")}`);
+  const missing = Object.keys(SPECIMEN_TISSUE).filter((name) => !names.has(name));
+  if (missing.length) throw new Error(`specimen_squid.glb に部位がありません: ${missing.join(", ")}`);
   for (const mesh of meshes) {
     const part = mesh.userData.squid_part;
-    const tissue = SQUID_TISSUE[part];
-    if (!tissue) throw new Error(`squid.glb の部位 ${part ?? mesh.name} に組織の設定がありません`);
+    const tissue = SPECIMEN_TISSUE[part];
+    if (!tissue) throw new Error(`specimen_squid.glb の部位 ${part ?? mesh.name} に組織の設定がありません`);
     const geometry = mesh.geometry;
     const tint = geometry.getAttribute("color");
     const depth = geometry.getAttribute("_depth");
-    if (!tint || tint.itemSize !== 4 || !depth)
-      throw new Error(`squid.glb の部位 ${part} に色または厚みの焼き込みがありません`);
+    const rim = geometry.getAttribute("_rim");
+    if (!tint || tint.itemSize !== 4 || !depth || !rim)
+      throw new Error(`specimen_squid.glb の部位 ${part} に色・厚み・縁の焼き込みがありません`);
     geometry.setAttribute("tint", tint);
     geometry.setAttribute("tissueDepth", depth);
+    geometry.setAttribute("tissueRim", rim);
     geometry.deleteAttribute("color");
     geometry.deleteAttribute("_depth");
+    geometry.deleteAttribute("_rim");
     mesh.material = absorbMaterial(tissue, part);
     mesh.renderOrder = ABSORB_ORDER;
     mesh.frustumCulled = false;
-    if (STAINED_PARTS.has(part)) addPass(mesh, `${part}Milk`, milkMaterial(tissue, part), SURFACE_ORDER);
+    if (STAINED_PARTS.has(part) && part !== "Arms") addPass(mesh, `${part}Milk`, milkMaterial(tissue, part), SURFACE_ORDER);
     if (tissue.sheen > 0) addPass(mesh, `${part}Surface`, surfaceMaterial(tissue, envMap), SURFACE_ORDER);
   }
 }

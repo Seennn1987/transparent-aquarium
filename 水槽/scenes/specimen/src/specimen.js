@@ -3,9 +3,9 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applySpecimenTissue } from "./specimen-material.js";
 import { createSpecimenMotion, MOTION } from "./specimen-motion.js";
 
-// The tank's squid asset, read only. In the file the arms point along -X and the mantle
-// tip along +X, about one mantle length from the head.
-const SQUID_URL = new URL("../../riverscape/assets/squid.glb", import.meta.url).href;
+// The tank's squid reshaped for close viewing (blender/generate_specimen_squid.py). In the
+// file the arms point along -X and the mantle tip along +X, about one mantle length from the head.
+const SQUID_URL = new URL("../assets/specimen_squid.glb", import.meta.url).href;
 
 // Displayed the way preserved squid usually stand in a jar: mantle up, arms hanging down.
 export const SPECIMEN_POSE = {
@@ -29,7 +29,7 @@ export async function createSpecimen({ envMap, liquidBounds, facing }) {
 
   const mixer = new THREE.AnimationMixer(model);
   const hover = THREE.AnimationClip.findByName(gltf.animations, "SQ_Hover");
-  if (!hover) throw new Error("squid.glb に SQ_Hover がありません");
+  if (!hover) throw new Error("specimen_squid.glb に SQ_Hover がありません");
   const action = mixer.clipAction(hover).play();
   action.timeScale = MOTION.hoverRate;
   mixer.update(0);
