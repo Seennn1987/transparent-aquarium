@@ -2,14 +2,20 @@ import * as THREE from "three";
 import { createPostprocessing } from "../../shared/postprocessing.js";
 
 // Product-photo finish: the scene is rendered linear, then one pass adds a shallow depth
-// of field focused on the specimen, a soft vignette, dithering, and the display transform.
+// of field focused on the specimen, the lens's colour fringes, the light's violet cast, a soft
+// vignette, grain, and the display transform.
 export const LENS = {
   aperture: { value: 0.9 },       // blur strength: CoC in px per unit of 1/distance difference
   maxBlur: { value: 14 },         // px at 1080p
   focus: { value: 9 },            // distance to the specimen, updated every frame
   vignette: { value: 0.22 },
-  grain: { value: 0.012 },
+  grain: { value: 0.018 },
+  // The reference photos lean violet-blue (the lightbox and the camera's white balance).
+  tint: { value: 0.5 },
+  aberration: { value: 1 },       // colour fringes at the frame's edge, in px at 1080p
 };
+
+const VIOLET = new THREE.Vector3(0.965, 0.95, 1.04);
 
 const TAPS = { eco: 12, balanced: 28, detail: 48 };
 
@@ -23,12 +29,15 @@ export function createSpecimenPost(camera, quality) {
       focus: LENS.focus,
       vignette: LENS.vignette,
       grain: LENS.grain,
+      tint: LENS.tint,
+      aberration: LENS.aberration,
+      violet: { value: VIOLET },
       frame: { value: 0 },
     },
     fragmentShader: `
       uniform sampler2D beauty; uniform sampler2D depth; uniform vec2 size; uniform vec2 nearFar;
       uniform float aperture; uniform float maxBlur; uniform float focus; uniform float vignette;
-      uniform float grain; uniform float frame;
+      uniform float grain; uniform float frame; uniform float tint; uniform float aberration; uniform vec3 violet;
       varying vec2 vUv;
       float distanceAt(vec2 p) {
         float z = texture2D(depth, p).x;
@@ -61,6 +70,12 @@ export function createSpecimenPost(camera, quality) {
           }
         }
         vec3 color = sum / weight;
+        // Red lands a little outward of green and blue a little inward, more toward the corners.
+        vec2 fringe = (vUv - .5) * 2. * aberration * size.y / 1080. / size;
+        vec3 here = texture2D(beauty, vUv).rgb;
+        color.r += texture2D(beauty, vUv + fringe).r - here.r;
+        color.b += texture2D(beauty, vUv - fringe).b - here.b;
+        color *= mix(vec3(1.), violet, tint);
         vec2 v = (vUv - .5) * vec2(size.x / size.y, 1.);
         color *= 1. - vignette * smoothstep(.25, 1.1, dot(v, v) * 1.6);
         gl_FragColor = vec4(color, 1.);

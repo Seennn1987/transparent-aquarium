@@ -23,7 +23,7 @@ const PART_STAIN = { Arms: 1.2, Head: 1.2, Fins: 0.23 };
 // The specimen squid (blender/generate_specimen_squid.py) replaces the tank's solid head
 // with a muscular shell holding the anatomy that shows through it: eye (wall, cornea,
 // iris, retina, dissolved lens), cartilage, brain, optic lobes and nerves, statocysts,
-// mouth parts and oesophagus.
+// mouth parts and oesophagus. In the mantle it adds the three hearts.
 const SPECIMEN_TISSUE = {
   ...SQUID_TISSUE,
   Head: { mode: "film", absorption: 550, sheen: 1 },
@@ -42,6 +42,8 @@ const SPECIMEN_TISSUE = {
   Beak: { mode: "film", absorption: 1300, sheen: 0.08 },
   Radula: { mode: "film", absorption: 1800, sheen: 0 },
   Esophagus: { mode: "solid", absorption: 1400, sheen: 0 },
+  SystemicHeart: { mode: "solid", absorption: 500, sheen: 0 },
+  BranchialHearts: { mode: "solid", absorption: 420, sheen: 0 },
   Rachis: { mode: "film", absorption: 260, sheen: 0 },
   InkSac: { mode: "solid", absorption: 220, sheen: 0 },
   DigestiveGland: { mode: "solid", absorption: 210, sheen: 0 },
@@ -51,6 +53,7 @@ const SPECIMEN_TISSUE = {
 // deepest, muscle sky blue; nerve stays pale and cloudy; chitin keeps its amber).
 const TISSUE_CLASS = {
   Mantle: "muscle", Fins: "muscle", Funnel: "muscle", Head: "muscle", Arms: "muscle",
+  SystemicHeart: "muscle", BranchialHearts: "muscle",
   Cartilage: "cartilage", OrbitCartilage: "cartilage", Iris: "cartilage",
   OpticNerves: "nerve", OpticLobes: "nerve", Brain: "nerve",
   Beak: "chitin", Radula: "chitin", SuckerRings: "chitin",
@@ -59,7 +62,12 @@ const TISSUE_CLASS = {
 // Screening pigment left after bleaching.
 const PIGMENTED = new Set(["Retina", "InkSac"]);
 // Parts that scatter light back milky instead of only absorbing it.
-const HAZY = new Set(["OpticNerves", "OpticLobes", "Brain", "Statocysts"]);
+const HAZY = new Set(["OpticNerves", "OpticLobes", "Brain", "Statocysts", "Cartilage", "OrbitCartilage"]);
+// Where the stain pools as it soaks in: the arm tips and the crease at the arm crown.
+const PART_POOLING = { Arms: 1, Head: 1, Funnel: 0.6, Mantle: 0.4, Fins: 0.5 };
+// Food and fat left in the gut; the ink that leaked out around its sac.
+const GUT = new Set(["DigestiveGland", "Caecum", "Esophagus"]);
+const INKED = new Set(["Mantle", "Funnel", "DigestiveGland", "Gills", "InkSac"]);
 // Where the chromatophores' remnants show: on the back, the head and the arms.
 const PART_SPOTS = { Mantle: 1, Head: 1, Arms: 0.8, Fins: 0.4, Funnel: 0.5 };
 // Spacing of the remnant dots in mantle lengths (3 mm on a 10 cm squid).
@@ -87,7 +95,18 @@ export const specimenLook = {
   nerveHaze: { value: 0.05 },     // milky white of brain, optic lobes and nerves
   chitin: { value: 1 },
   pigment: { value: 0.15 },       // 0: bleached, 1: the retina and ink as dark as in life
-  lens: { value: 0 },             // the lens dissolves in clearing; >0 leaves some of it
+  lens: { value: 0.1 },           // the lens dissolves in clearing; what is left of it clouds the eye
+  cartilageHaze: { value: 0.03 }, // white left in the blue cartilage
+  // The stain never takes evenly.
+  mottle: { value: 0.6 },         // blotchy stain, fixed to the body
+  pooling: { value: 0.6 },        // stain pooled at the arm tips, the crown crease and in patches
+  hue: { value: 0.5 },            // the blue drifts between aqua and ultramarine
+  // Tissue and fluid refract almost alike, so outlines fade instead of drawing lines.
+  edgeSoft: { value: 0.3 },
+  veil: { value: 0.35 },          // the head's contents seen through its muscle
+  gut: { value: 0.5 },            // dark grains of food left in the gut
+  fat: { value: 0.4 },            // yellow fat in the digestive gland
+  inkBleed: { value: 0.35 },      // ink leaked around its sac
   // Sizes, 1 as baked. Each part grows about its own centre, the eye's parts about the eye.
   headSize: { value: 1 },         // 頭の左右・上下の大きさ
   eyeSize: { value: 1 },
@@ -146,6 +165,67 @@ vec3 specimenFit(vec3 p) {
   else if (uFitHead > .5) p.yz *= uHeadSize;
   return p;
 }
+uniform float uOrganTime;
+uniform float uGutWave;
+uniform float uFunnelSwivel;
+uniform vec4 uEyeTurn;
+uniform float uMotionKind;
+uniform float uMotionAmount;
+uniform float uMotionGain;
+uniform vec3 uMotionCentre;
+uniform float uMotionRadius;
+uniform float uEyeMotion;
+vec2 turned(vec2 v, float a) {
+  float c = cos(a), s = sin(a);
+  return vec2(c * v.x - s * v.y, s * v.x + c * v.y);
+}
+// The organs' own motion (organ-motion.js), on the fitted body before the bones move it.
+vec3 organMotion(vec3 p) {
+  float side = p.z < 0. ? -1. : 1.;
+  vec3 c = uMotionCentre * vec3(1., 1., side);
+  float k = uMotionKind, a = uMotionAmount * uMotionGain;
+  vec3 e = uEyeCenter * vec3(1., 1., side) + vec3(0., 0., side * uEyePop);
+  vec3 axis = normalize(vec3(.04, .25, side));
+  if (k == 1.) {
+    // Beat or squeeze about a centre, strongest in the middle of the organ.
+    vec3 d = p - c;
+    p = c + d * (1. - a * exp(-dot(d, d) / (uMotionRadius * uMotionRadius)));
+  } else if (k == 2.) {
+    // A swelling pushed down the tube by the squeeze just behind it.
+    float x = p.x - uGutWave;
+    float w = exp(-pow((x - .025) / .03, 2.)) - .6 * exp(-pow((x + .03) / .03, 2.));
+    p.yz = c.yz + (p.yz - c.yz) * (1. + a * w);
+  } else if (k == 3.) {
+    p.y += a * sin(p.x * 110. + p.z * 40. - uOrganTime * 6.);
+  } else if (k == 4.) {
+    // The iris folds in toward the pupil (positive) or draws back.
+    vec3 q = p - e;
+    float along = dot(q, axis);
+    vec3 radial = q - axis * along;
+    float w = 1. - smoothstep(.022, .036, length(radial));
+    p = e + axis * along + radial * (1. - a * w);
+  } else if (k == 5.) {
+    p += (uEyeMotion > .5 ? axis : vec3(1., 0., 0.)) * a;
+  } else if (k == 7.) {
+    // The beak's two halves turn about the hinge at its back.
+    vec3 d = p - c;
+    d.xy = turned(d.xy, d.y > 0. ? -a : a);
+    p = c + d;
+  } else if (k == 8.) {
+    // The funnel's mouth widens as the mantle empties, and turns slowly.
+    float w = smoothstep(.02, -.086, p.x);
+    p.yz = c.yz + (p.yz - c.yz) * (1. + a * w);
+    p.z += .012 * uFunnelSwivel * w;
+  }
+  if (uEyeMotion > .5) {
+    vec2 turn = side > 0. ? uEyeTurn.xy : uEyeTurn.zw;
+    vec3 q = p - e;
+    q.xz = turned(q.xz, turn.x);
+    q.yz = turned(q.yz, turn.y);
+    p = e + q;
+  }
+  return p;
+}
 `;
 
 function centreOf(geometry, mirrored) {
@@ -159,8 +239,47 @@ function centreOf(geometry, mirrored) {
   return box.getCenter(new THREE.Vector3());
 }
 
+// How each organ moves (organ-motion.js), in model units. Blender's (x, y, z) is the model's
+// (x, z, −y); left and right parts are mirrored by the side a vertex is on.
+const MOTION_KIND = { pulse: 1, peristalsis: 2, ripple: 3, iris: 4, slide: 5, hinge: 7, funnel: 8 };
+const EYE_TURNS = new Set(["Eyes", "Cornea", "Iris", "Retina", "Lens"]);
+const PART_MOTION = {
+  SystemicHeart: { kind: "pulse", amount: "uBeatSystemic", gain: 0.3, centre: [0.3, -0.058, 0], radius: 0.03 },
+  BranchialHearts: { kind: "pulse", amount: "uBeatBranchial", gain: 0.2, centre: [0.34, -0.052, 0.045], radius: 0.016 },
+  DigestiveGland: { kind: "pulse", amount: "uGland", gain: 0.035, radius: 0.35 },
+  InkSac: { kind: "pulse", amount: "uInk", gain: 0.25, centre: [0.14, -0.035, 0], radius: 0.05 },
+  BuccalMass: { kind: "pulse", amount: "uBuccal", gain: 0.06, radius: 0.05 },
+  Esophagus: { kind: "peristalsis", amount: "uGut", gain: 1.2, centre: [0, 0.004, 0] },
+  Caecum: { kind: "peristalsis", amount: "uGut", gain: 0.15 },
+  Gills: { kind: "ripple", amount: "uBeatBranchial", gain: 0.0025 },
+  Iris: { kind: "iris", amount: "uPupil", gain: 0.22 },
+  Lens: { kind: "slide", amount: "uLens", gain: 0.004 },
+  Radula: { kind: "slide", amount: "uRadula", gain: 0.004 },
+  Beak: { kind: "hinge", amount: "uBite", gain: 0.2, centre: [-0.198, 0, 0] },
+  Funnel: { kind: "funnel", amount: "uFunnelOpen", gain: 0.25, centre: [0, -0.08, 0] },
+};
+
+function motionUniforms(part, fit) {
+  const o = fit.organ;
+  const m = PART_MOTION[part];
+  const centre = m?.centre ? new THREE.Vector3(...m.centre) : fit.centres[part];
+  return {
+    uOrganTime: o.uOrganTime,
+    uGutWave: o.uGutWave,
+    uFunnelSwivel: o.uFunnelSwivel,
+    uEyeTurn: o.uEyeTurn,
+    uMotionKind: { value: m ? MOTION_KIND[m.kind] : 0 },
+    uMotionAmount: m ? o[m.amount] : { value: 0 },
+    uMotionGain: { value: m?.gain ?? 0 },
+    uMotionCentre: { value: centre },
+    uMotionRadius: { value: m?.radius ?? 1 },
+    uEyeMotion: { value: EYE_TURNS.has(part) ? 1 : 0 },
+  };
+}
+
 function fitUniforms(part, fit) {
   return {
+    ...motionUniforms(part, fit),
     uHeadSize: specimenLook.headSize,
     uEyeSize: specimenLook.eyeSize,
     uEyePop: specimenLook.eyePop,
@@ -205,9 +324,9 @@ centroid varying vec3 vViewNormal;
 centroid varying vec3 vViewPosition;
 ${fitVertex}
 void main() {
-  vec3 fitted = specimenFit(position);
   // The pattern is fixed to the body at rest, so it moves with the tissue.
-  vRest = fitted;
+  vRest = specimenFit(position);
+  vec3 fitted = organMotion(vRest);
   vRim = tissueRim;
   #include <skinbase_vertex>
   #include <beginnormal_vertex>
@@ -241,6 +360,23 @@ uniform float rim;
 uniform float finRim;
 uniform float spots;
 uniform float spotted;
+uniform float mottle;
+uniform float pooling;
+uniform float pooled;
+uniform float hue;
+uniform float edgeSoft;
+uniform float veil;
+uniform float inner;
+uniform float gut;
+uniform float fat;
+uniform float fatty;
+uniform float gutted;
+uniform float inkBleed;
+uniform float inked;
+uniform vec3 uInkAt;
+uniform float uInk;
+uniform float uOrganTime;
+uniform float uChromo;
 centroid varying vec4 vTint;
 centroid varying float vDepth;
 centroid varying float vDorsal;
@@ -253,11 +389,14 @@ vec3 hash3(vec3 p) {
   p += dot(p, p.yxz + 33.33);
   return fract((p.xxy + p.yxx) * p.zyx);
 }
-// Scattered dots of uneven size and strength, about half the cells holding one.
-float spotField(vec3 p) {
+// Scattered dots of uneven size and strength, about half the cells holding one. With live > 0
+// each dot is a chromatophore that expands and shrinks on its own beat, in clouds that pass
+// along the body.
+float spotField(vec3 p, float live) {
   vec3 q = p / ${SPOT_CELL.toFixed(3)};
   vec3 i = floor(q), f = fract(q);
   float s = 0.;
+  float cloud = smoothstep(.2, .9, sin(p.x * 9. - uOrganTime * 1.6));
   for (int x = -1; x <= 1; x++)
     for (int y = -1; y <= 1; y++)
       for (int z = -1; z <= 1; z++) {
@@ -265,27 +404,70 @@ float spotField(vec3 p) {
         vec3 h = hash3(i + o + 71.);
         if (h.z > .5) continue;
         float r = .16 + .2 * fract(h.x * 7.13);
+        float beat = pow(.5 + .5 * sin(uOrganTime * (2. + 3. * h.y) + h.x * 40.), 3.);
+        r *= mix(1., .45 + .5 * beat + .6 * cloud, live);
         s = max(s, smoothstep(r, r * .35, length(o + h - f)) * (.4 + h.y));
       }
   return s;
 }
-float tissuePath() {
+// Smooth value noise with three independent channels, and a few octaves of it (about 0.2–0.8).
+vec3 noise3(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3. - 2. * f);
+  return mix(
+    mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + 1.), f.x), f.y),
+    f.z);
+}
+vec3 fbm3(vec3 p) {
+  return .5 * noise3(p) + .3 * noise3(p * 2.13 + 17.) + .2 * noise3(p * 4.37 + 31.);
+}
+vec3 fbm2(vec3 p) {
+  return .62 * noise3(p) + .38 * noise3(p * 2.13 + 17.);
+}
+// wob: how far this spot's outline reaches. The grazing term is softened so an outline is a
+// blurred band, the more so for the head's contents.
+float tissuePath(float wob) {
   float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
-  float sheet = vDepth * (face + rim * (1. / max(c, .12) - 1.));
+  float x = 1. / max(c, .12) - 1.;
+  x = x * wob / (1. + x * edgeSoft * (1. + 2. * inner));
+  float sheet = vDepth * (face + rim * x);
   return mix(vDepth * c, sheet, film);
 }
 vec3 absorbance() {
+  vec3 low = fbm3(vRest * 7.);
+  vec3 high = fbm2(vRest * 23. + 5.);
   vec3 a = 1. - vTint.rgb;
   // Dark pigment absorbs all colours almost alike.
   a = mix(a, vec3(.78, .82, .86), pigment);
   vec3 skyWeights = vec3(${SKY_WEIGHTS.toArray().map((v) => v.toFixed(3)).join(", ")});
   float blue = stained * smoothstep(.7, .85, vTint.b);
   a *= mix(vec3(1.), skyWeights, blue * sky);
+  // From aqua (less green taken) to ultramarine (more).
+  float drift = (low.y - .5) * hue * blue;
+  a *= vec3(1. - .4 * drift, 1. + .9 * drift, 1.);
   a *= (1. + dorsal * vDorsal * stained) * (1. + finRim * vRim);
-  a = max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * classGain * tissuePath(), 0.);
+  float blotch = 1. + mottle * (.5 + .5 * stained) * (low.x - .5) * 1.4;
+  float tip = smoothstep(-.75, -1.2, vRest.x);
+  float crease = exp(-pow((vRest.x + .21) / .025, 2.));
+  float pool = pooled * (tip + .3 * crease) + stained * smoothstep(.6, .78, high.z);
+  float gain = blotch * (1. + pooling * pool * .8) * (1. - veil * inner * .35);
+  a = max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * classGain * gain
+    * tissuePath(.7 + .6 * high.x), 0.);
   // The remnants are brownish: they take more blue than red.
-  float dots = spotted * mix(.25, 1., vDorsal) * vTint.a * spotField(vRest);
-  return a + dots * spots * vec3(.35, .6, .9);
+  float dots = spotted * mix(.25, 1., vDorsal) * vTint.a * (spotted > 0. ? spotField(vRest, uChromo) : 0.);
+  a += dots * spots * vec3(.35, .6, .9);
+  // Grains of food (dark brown) and fat (yellow) in the gut.
+  if (gutted > 0.) {
+    float grains = spotField(vRest * 2.6 + 13., 0.) * smoothstep(.45, .6, low.z);
+    a += vTint.a * (gut * grains * vec3(.9, 1., 1.1) + fat * fatty * smoothstep(.52, .7, high.y) * vec3(.03, .12, .6));
+  }
+  // Ink leaked out of its sac: a grey cloud around it, uneven.
+  if (inked > 0.) {
+    vec3 k = (vRest - uInkAt) / vec3(.16, .06, .07);
+    a += inkBleed * (1. + .8 * uInk) * vTint.a * exp(-dot(k, k)) * (.4 + 1.2 * low.z) * vec3(.55, .55, .5);
+  }
+  return a;
 }`;
 
 const absorbFragment = `
@@ -308,7 +490,7 @@ uniform float haze;
 void main() {
   if (vTint.a < .02) discard;
   float density = dot(absorbance(), vec3(1. / 3.));
-  vec3 cloud = vec3(.96, .94, .86) * haze * (1. - exp(-tissuePath() * 120.));
+  vec3 cloud = vec3(.96, .94, .86) * haze * (1. - exp(-tissuePath(1.) * 120.));
   gl_FragColor = vec4(milkColor * milk * milky * (1. - exp(-density * .8)) + cloud, 1.);
 }`;
 
@@ -328,6 +510,22 @@ function tissueUniforms({ mode, absorption }, part, fit) {
     finRim: specimenLook.finRim,
     spots: specimenLook.spots,
     spotted: { value: PART_SPOTS[part] ?? 0 },
+    mottle: specimenLook.mottle,
+    pooling: specimenLook.pooling,
+    pooled: { value: PART_POOLING[part] ?? 0 },
+    hue: specimenLook.hue,
+    edgeSoft: specimenLook.edgeSoft,
+    veil: specimenLook.veil,
+    inner: { value: HEAD_GROUP.has(part) || part === "Eyes" || part === "Lens" ? 1 : 0 },
+    gut: specimenLook.gut,
+    fat: specimenLook.fat,
+    fatty: { value: part === "DigestiveGland" || part === "Caecum" ? 1 : 0 },
+    gutted: { value: GUT.has(part) ? 1 : 0 },
+    inkBleed: specimenLook.inkBleed,
+    inked: { value: INKED.has(part) ? 1 : 0 },
+    uInkAt: { value: fit.ink },
+    uInk: fit.organ.uInk,
+    uChromo: fit.organ.uChromo,
     ...fitUniforms(part, fit),
   };
 }
@@ -354,7 +552,7 @@ function milkMaterial(tissue, part, fit) {
       milk: specimenLook.milk,
       milkColor: specimenLook.milkColor,
       milky: { value: STAINED_PARTS.has(part) ? 1 : 0 },
-      haze: HAZY.has(part) ? specimenLook.nerveHaze : { value: 0 },
+      haze: !HAZY.has(part) ? { value: 0 } : TISSUE_CLASS[part] === "cartilage" ? specimenLook.cartilageHaze : specimenLook.nerveHaze,
     },
     vertexShader: tissueVertex,
     fragmentShader: milkFragment,
@@ -385,7 +583,7 @@ function surfaceMaterial({ sheen }, envMap, part, fit) {
     Object.assign(shader.uniforms, fitUniforms(part, fit));
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>\nattribute vec4 tint;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;\n${fitVertex}`)
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed = specimenFit(position);\nvRest = transformed;\nvFade = tint.a;");
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRest = specimenFit(position);\ntransformed = organMotion(vRest);\nvFade = tint.a;");
     // Fine creases of the preserved skin break the highlight into uneven streaks.
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform float uSheen;\nuniform float uWrinkles;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;")
@@ -395,7 +593,7 @@ float crease = sin(dot(vRest, vec3(160., 41., 67.)) + 3. * sin(vRest.x * 55. + v
 outgoingLight *= uSheen * vFade * (1. + uWrinkles * crease * .5);
 #include <opaque_fragment>`);
   };
-  material.customProgramCacheKey = () => "specimen-squid-sheen-fit";
+  material.customProgramCacheKey = () => "specimen-squid-sheen-fit-organs";
   return material;
 }
 
@@ -411,8 +609,11 @@ function addPass(mesh, name, material, renderOrder) {
   mesh.parent.add(pass);
 }
 
-/** Absorption, milkiness and sheen for every part; the white studio supplies the light. */
-export function applySpecimenTissue(model, { envMap }) {
+/**
+ * Absorption, milkiness and sheen for every part; the white studio supplies the light.
+ * `organ`: createOrganMotion() from organ-motion.js, whose uniforms move the organs.
+ */
+export function applySpecimenTissue(model, { envMap, organ }) {
   const meshes = [];
   model.traverse((object) => { if (object.isSkinnedMesh) meshes.push(object); });
   const names = new Set(meshes.map((mesh) => mesh.userData.squid_part));
@@ -420,7 +621,7 @@ export function applySpecimenTissue(model, { envMap }) {
   if (missing.length) throw new Error(`specimen_squid.glb に部位がありません: ${missing.join(", ")}`);
   const centres = {};
   for (const mesh of meshes) centres[mesh.userData.squid_part] = centreOf(mesh.geometry, MIRRORED.has(mesh.userData.squid_part));
-  const fit = { eye: centres.Eyes, centres };
+  const fit = { eye: centres.Eyes, ink: centres.InkSac, centres, organ: organ.uniforms };
   for (const mesh of meshes) {
     const part = mesh.userData.squid_part;
     const tissue = SPECIMEN_TISSUE[part];

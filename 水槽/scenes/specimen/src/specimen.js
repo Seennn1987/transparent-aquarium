@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applySpecimenTissue } from "./specimen-material.js";
 import { createSpecimenMotion, MOTION } from "./specimen-motion.js";
+import { createOrganMotion } from "./organ-motion.js";
 
 // The tank's squid reshaped for close viewing (blender/generate_specimen_squid.py). In the
 // file the arms point along -X and the mantle tip along +X, about one mantle length from the head.
@@ -17,7 +18,8 @@ export const SPECIMEN_POSE = {
 export async function createSpecimen({ envMap, liquidBounds, facing }) {
   const gltf = await new GLTFLoader().loadAsync(SQUID_URL);
   const model = gltf.scene;
-  applySpecimenTissue(model, { envMap });
+  const organs = createOrganMotion();
+  applySpecimenTissue(model, { envMap, organ: organs });
   // Mantle up turns the model's back (+Y) to -X; the yaw then turns it to `facing`.
   const yaw = Math.atan2(facing.z, -facing.x);
   model.rotation.set(0, yaw, Math.PI / 2, "YXZ");
@@ -61,10 +63,12 @@ export async function createSpecimen({ envMap, liquidBounds, facing }) {
     mixer,
     hoverAction: action,
     motion,
+    organs,
     bounds: new THREE.Box3().setFromObject(pivot, true),
     update(dt) {
       if (dt <= 0) return;
       mixer.update(dt);
+      organs.update(dt, action.time);
       const s = motion.update(dt);
       pivot.position.set(centre.x + s.x, centre.y + s.y + s.bob, centre.z + s.z);
       pivot.rotation.set(s.pitch, s.yaw, s.roll, "YXZ");

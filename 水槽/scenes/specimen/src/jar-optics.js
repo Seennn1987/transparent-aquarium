@@ -13,11 +13,23 @@ export const OPTICS = {
   // Light reflected completely inside the glass comes back out elsewhere and mostly sees the
   // white studio; this share of it shows the darker softbox room instead (the edge bands).
   mirror: { value: 0.5 },
+  // Old glycerin: yellowed, and cloudier the more of it the light crosses.
+  yellow: { value: 0.35 },
+  haze: { value: 0.03 },          // share of light scattered per unit of liquid crossed
+  specks: { value: 0.5 },         // bubbles clinging to the glass and dust adrift
+  scuff: { value: 0.5 },          // scratches and fingerprints on the outer glass
 };
 
 // Soda-lime glass reads faintly green-blue through its thick parts; the liquid, barely.
 const GLASS_TINT = { color: "#e4f0ec", distance: 1.2 };
 const LIQUID_TINT = { color: "#f1f6ef", distance: 6 };
+const YELLOWED = { color: "#f4ecd0", distance: 2 };
+// Dust adrift: a dozen specks at fixed places in the liquid, as fractions of its radius and height.
+const DUST = Array.from({ length: 12 }, (_, i) => {
+  const a = i * 2.39996 + 0.7;
+  const r = Math.sqrt(((i * 0.618034 + 0.13) % 1) * 0.85);
+  return new THREE.Vector3(Math.cos(a) * r, (i * 0.381966 + 0.21) % 1, Math.sin(a) * r);
+});
 
 function absorption({ color, distance }) {
   const c = new THREE.Color(color);
@@ -95,6 +107,13 @@ const COMMON = /* glsl */ `
   vec3 mirrored(vec3 p, vec3 d) {
     return mix(behind(p, d), studio(d), uMirror);
   }
+
+  float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise2(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3. - 2. * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1, 0)), f.x), mix(hash21(i + vec2(0, 1)), hash21(i + 1.), f.x), f.y);
+  }
 `;
 
 const VERTEX = /* glsl */ `
@@ -110,6 +129,58 @@ const COLUMN_FRAGMENT = /* glsl */ `
   ${COMMON}
   uniform float uRo, uRi, uFloor, uTop;
   uniform vec3 uSpecimen;
+  uniform float uYellow, uHaze, uSpecks, uScuff;
+  uniform vec3 uYellowAbsorb;
+  uniform vec3 uDust[${DUST.length}];
+
+  // Short scratches strewn at random and one fingerprint on the outer glass; they scatter the
+  // white studio back toward the camera.
+  float scuffs(vec3 p) {
+    vec2 uv = vec2(atan(p.z, p.x) * uRo, p.y);
+    float s = 0.;
+    for (int k = 0; k < 2; k++) {
+      vec2 q = uv / .06 + float(k) * vec2(.5, .37);
+      vec2 i = floor(q) + float(k) * 17.;
+      float h = hash21(i);
+      if (h > .45) continue;
+      float a = hash21(i + 5.) * 3.1416;
+      vec2 dir = vec2(cos(a), sin(a));
+      vec2 r = fract(q) - (vec2(hash21(i + 9.), hash21(i + 21.)) * .4 + .3);
+      float len = .15 + .3 * hash21(i + 31.);
+      float along = clamp(dot(r, dir), -len, len);
+      s += smoothstep(.012, 0., length(r - dir * along)) * (1. - abs(along) / len) * (.4 + 1.3 * h);
+    }
+    vec2 f = uv - vec2(.95, .85);
+    float ridges = .5 + .5 * sin(length(f * vec2(1., 1.3)) * 520. + noise2(uv * 30.) * 3.);
+    return s + ridges * exp(-dot(f, f) / .006) * .3;
+  }
+
+  // Small bubbles clinging to the inside of the glass, most under the surface and at the base.
+  // x: the dark rim of a bubble, y: its highlight.
+  vec2 bubble(vec3 p) {
+    vec2 uv = vec2(atan(p.z, p.x) * uRi, p.y) / .05;
+    vec2 i = floor(uv), f = fract(uv);
+    float ends = smoothstep(uFloor + .35, uFloor + .05, p.y) + smoothstep(uTop - .3, uTop - .03, p.y);
+    if (hash21(i + 3.) > uSpecks * (.012 + .3 * ends)) return vec2(0.);
+    vec2 c = vec2(hash21(i + 7.), hash21(i + 11.)) * .6 + .2;
+    float r = .1 + .15 * hash21(i + 13.);
+    float d = length(f - c) / r;
+    float rim = smoothstep(1., .85, d) * smoothstep(.4, .8, d);
+    float spec = smoothstep(.35, 0., length(f - c + vec2(.3, -.3) * r) / r);
+    return vec2(rim, spec);
+  }
+
+  // Dust adrift where this stretch of the ray passes close to a speck.
+  float dust(vec3 p, vec3 d, float t) {
+    float s = 0.;
+    for (int i = 0; i < ${DUST.length}; i++) {
+      vec3 q = vec3(uDust[i].x * uRi, mix(uFloor + .1, uTop - .1, uDust[i].y), uDust[i].z * uRi);
+      float r = .004 + .004 * fract(float(i) * .37);
+      float along = clamp(dot(q - p, d), 0., t);
+      s = max(s, smoothstep(r, r * .3, length(p + d * along - q)));
+    }
+    return s;
+  }
 
   vec2 cylinder(vec3 o, vec3 d, float r) {
     float a = dot(d.xz, d.xz);
@@ -136,6 +207,7 @@ const COLUMN_FRAGMENT = /* glsl */ `
       bend(d, radial(p), 1. / uGlassIor, carry);
       // The front face mirrors the bright studio; the softbox highlights are the wall mesh's.
       light += (1. - carry) * behind(p, reflect(incoming, radial(p)));
+      light += uScuff * scuffs(p) * .12;
       vec2 ti = cylinder(p, d, uRi);
       if (ti.x <= 0.) {
         // Only the glass wall, seen edge-on.
@@ -154,6 +226,9 @@ const COLUMN_FRAGMENT = /* glsl */ `
       carry *= exp(-uGlassAbsorb * ti.x);
       p += d * ti.x;
       bend(d, radial(p), uGlassIor / uLiquidIor, carry);
+      vec2 b = bubble(p);
+      light += carry * b.y * .6;
+      carry *= 1. - .45 * b.x;
     } else if (d.y < 0. && o.y > uTop) {
       p = o + d * ((uTop - o.y) / d.y);
       if (length(p.xz) > uRi) discard;
@@ -182,7 +257,11 @@ const COLUMN_FRAGMENT = /* glsl */ `
         tissue = texture2D(tSpecimen, screenOf(p + d * tPlane)).rgb;
         met = true;
       }
-      carry *= exp(-uLiquidAbsorb * t);
+      if (i == 0) carry *= 1. - uSpecks * .7 * dust(p, d, t) * vec3(.8, .85, .9);
+      // Light scattered by the cloudy liquid on the way: it veils what lies deeper.
+      float h = 1. - exp(-uHaze * t);
+      light += carry * h * vec3(.92, .91, .85);
+      carry *= (1. - h) * exp(-(uLiquidAbsorb + uYellow * uYellowAbsorb) * t);
       p += d * t;
       if (t == tBottom) {
         // Down through the thick glass floor onto the table.
@@ -286,6 +365,12 @@ export function createJarOptics({ dims, lens }) {
         uFloor: { value: dims.floorHeight },
         uTop: { value: dims.liquidTop },
         uSpecimen: { value: new THREE.Vector3(0, (dims.floorHeight + dims.liquidTop) / 2, 0) },
+        uYellow: OPTICS.yellow,
+        uYellowAbsorb: { value: absorption(YELLOWED) },
+        uHaze: OPTICS.haze,
+        uSpecks: OPTICS.specks,
+        uScuff: OPTICS.scuff,
+        uDust: { value: DUST },
       },
       vertexShader: VERTEX,
       fragmentShader: COLUMN_FRAGMENT,

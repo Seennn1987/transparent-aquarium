@@ -2,6 +2,7 @@ import { specimenLook } from "./specimen-material.js";
 import { LENS } from "./postprocess.js";
 import { FLOOR_LOOK } from "./studio.js";
 import { OPTICS } from "./jar-optics.js";
+import { organLook } from "./organ-motion.js";
 
 // Shown on this page. Hide with ?tune=0. Moving a slider writes the look object
 // in place; the next frame reads it. Reset puts the values that shipped in the code back.
@@ -24,6 +25,35 @@ const SLIDERS = [
     ["顎板の濃さ", specimenLook.chitin, 0, 2],
     ["色素の残り", specimenLook.pigment, 0, 1],
     ["水晶体の残り", specimenLook.lens, 0, 1],
+    ["軟骨の白濁", specimenLook.cartilageHaze, 0, 0.3],
+  ]],
+  ["生々しさ", [
+    ["まだら", specimenLook.mottle, 0, 1.5],
+    ["染みの溜まり", specimenLook.pooling, 0, 1.5],
+    ["青の揺らぎ", specimenLook.hue, 0, 1.5],
+    ["輪郭のにじみ", specimenLook.edgeSoft, 0, 1.5],
+    ["中身のかすみ", specimenLook.veil, 0, 1],
+    ["消化管の粒", specimenLook.gut, 0, 1.5],
+    ["脂の黄色", specimenLook.fat, 0, 1.5],
+    ["墨のにじみ", specimenLook.inkBleed, 0, 1.5],
+  ]],
+  ["内臓の動き", [
+    ["全体の速さ", organLook.speed, 0, 3],
+    ["心臓", organLook.heart, 0, 2],
+    ["消化管・墨", organLook.gut, 0, 2],
+    ["眼", organLook.eye, 0, 2],
+    ["口", organLook.mouth, 0, 2],
+    ["漏斗", organLook.funnel, 0, 2],
+    ["色素胞", organLook.chromatophores, 0, 1],
+  ]],
+  ["液と写真", [
+    ["液の黄ばみ", OPTICS.yellow, 0, 2],
+    ["液の霞", OPTICS.haze, 0, 0.3],
+    ["泡・塵", OPTICS.specks, 0, 2],
+    ["ガラスの擦れ", OPTICS.scuff, 0, 2],
+    ["光の紫み", LENS.tint, 0, 1.5],
+    ["粒状感", LENS.grain, 0, 0.06],
+    ["色収差", LENS.aberration, 0, 4],
   ]],
   ["部品の大きさ", [
     ["頭の大きさ", specimenLook.headSize, 0.7, 1.35],

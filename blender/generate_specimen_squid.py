@@ -17,13 +17,19 @@ Blender 5.2 LTS で動作確認済み。
   - エンペラ: 縁を薄く波打たせ、縁の濃い縁取りの位置を _rim（縁1 → 付け根0）として焼き込む
   - 軟甲: 中央の軸を細い線として見える太さ・色の別部位に（部位 Rachis）
   - 内臓: 消化腺・盲嚢・生殖巣を、くびれと凹凸のある形に
+  - 固定の崩れ: 外套は数%縮んで脇がへこみ、エンペラの縁は不規則に縮れ、眼は左右で大きさと向きが少し違う。
+    腕は1本ずつ長さと曲がりが違い、重さで寄り集まって先が絡む。吸盤は大きさがばらつき所々欠ける。
+    全体に細かな凹凸（乱数の種は固定。毎回同じ崩れ方）
+  - 心臓3つ: 体心臓（SystemicHeart、鰓から戻る血管と大動脈を含む）と左右の鰓心臓（BranchialHearts）。
+    拍動は画面側（organ-motion.js）で付ける
 焼き込む値は export_squid_gltf.py と同じ（色 COLOR_0 と _depth）に、全部位の _rim を加える。
 """
 
 import math
 import os
+import random
 import sys
-from mathutils import Vector
+from mathutils import Vector, noise
 
 BLENDER_DIR = "/Users/shoui/transparent-aquarium/transparent-aquarium/blender"
 if not os.path.isdir(BLENDER_DIR):
@@ -64,6 +70,8 @@ COLOR_STATOCYST = (0.85, 0.93, 0.95, 1.0)
 COLOR_BEAK_AMBER = (0.76, 0.60, 0.42, 1.0)
 COLOR_RADULA = (0.78, 0.58, 0.32, 1.0)
 COLOR_ESOPHAGUS = (0.80, 0.88, 0.55, 1.0)
+COLOR_HEART = (0.52, 0.84, 0.92, 1.0)         # 心臓の筋肉は薄く染まる
+COLOR_BRANCHIAL_HEART = (0.74, 0.62, 0.55, 1.0)  # 鰓心臓と付属腺は褐色が残る
 COLOR_BUCCAL_FADED = (0.90, 0.80, 0.42, 1.0)
 COLOR_RACHIS = (0.52, 0.62, 0.38, 1.0)
 COLOR_INK_FADED = (0.34, 0.32, 0.40, 1.0)
@@ -86,6 +94,10 @@ FIN_RIM_FROM = 0.8
 EYE_CENTER = (-0.085, 0.074, 0.012)
 EYE_AXES = (0.064, 0.043, 0.058)    # 前後（体の軸）・光軸（左右）・背腹の半径
 LOBE_CENTER = (-0.058, 0.024, 0.008)
+# 心臓3つ: 体心臓は腹側の正中、鰓心臓は左右の鰓の付け根（外套腔の奥、消化腺の腹側）
+HEART_CENTER = (0.30, 0.0, -0.058)
+BRANCHIAL_HEART_CENTER = (0.34, 0.045, -0.052)
+GILL_BASE = (0.36, 0.052, -0.042)
 # 頭の殻は前端で薄れ、同じ区間で腕が濃くなる（足し合わせて一定）
 CROWN_FROM, CROWN_TO = HEAD_FRONT_X + 0.04, HEAD_FRONT_X - 0.035
 HEAD_PROFILE = [
@@ -192,20 +204,27 @@ def build_head(head_mb, body_mb):
                  taper(13, 0.04, 0.02), 16)
 
 
+EYE_SIDES = {   # 左右差: (大きさ, 前後のずれ, 背腹のずれ, 背側への傾き)
+    1: (1.0, 0.0, 0.0, 0.27),
+    -1: (0.97, 0.003, -0.002, 0.22),
+}
+
+
 def eye_frame(side):
     """開口は左右（±Y）で、背側へ約15°。背側の写真で虹彩が細い楕円に見える傾き。斜め前には向けない"""
-    c = Vector((EYE_CENTER[0], side * EYE_CENTER[1], EYE_CENTER[2]))
-    facing = Vector((0.03, side, 0.27)).normalized()
+    size, dx, dz, tilt = EYE_SIDES[side]
+    c = Vector((EYE_CENTER[0] + dx, side * EYE_CENTER[1], EYE_CENTER[2] + dz))
+    facing = Vector((0.03 + 0.02 * (side < 0), side, tilt)).normalized()
     along = Vector((1, 0, 0))
     along = (along - facing * facing.dot(along)).normalized()
     up = facing.cross(along)
-    return c, facing, along, up
+    return c, facing, along, up, size
 
 
 def eye_point(frame, a, ph, grow=0.0):
     """眼球の楕円体の上の点。a: 光軸（開口）からの角度、ph: 光軸まわりの角度、grow: 面の外への厚み"""
-    c, facing, along, up = frame
-    ax, bf, cz = (s + grow for s in EYE_AXES)
+    c, facing, along, up, size = frame
+    ax, bf, cz = (s * size + grow for s in EYE_AXES)
     back = 1 - EYE_BACK_FLAT * max(0.0, -math.cos(a))
     return c + facing * (bf * math.cos(a) * back) + (along * ax * math.sin(ph) + up * cz * math.cos(ph)) * math.sin(a)
 
@@ -251,9 +270,9 @@ def build_retina(mb, frame):
 
 def build_iris(mb, frame):
     """開口の縁から瞳へ張り出すひだ。幅は場所で違い、瞳は少し横長になる"""
-    c, facing, along, up = frame
+    c, facing, along, up, size = frame
     n_seg, n_u = 36, 6
-    rim_axis = c + facing * (EYE_AXES[1] * math.cos(EYE_OPEN_ANG))
+    rim_axis = c + facing * (EYE_AXES[1] * size * math.cos(EYE_OPEN_ANG))
     outer, inner = [], []
     for i in range(n_u + 1):
         u = i / n_u
@@ -273,8 +292,9 @@ def build_iris(mb, frame):
 
 def build_lens(mb, frame):
     """水晶体。透明標本では溶けるので、画面側で残りの量を決める（既定0）"""
-    c, facing, _, _ = frame
-    mb.ellipsoid(c + facing * (EYE_AXES[1] * math.cos(EYE_OPEN_ANG) - 0.012), 0.024, 0.024, 0.024, seg=20, rings=12)
+    c, facing, _, _, size = frame
+    r = 0.024 * size
+    mb.ellipsoid(c + facing * (EYE_AXES[1] * size * math.cos(EYE_OPEN_ANG) - 0.012), r, r, r, seg=20, rings=12)
 
 
 def build_optic_nerves(mb, frame, side):
@@ -371,6 +391,23 @@ def build_esophagus(mb):
     mb.tube(pts, taper(len(pts), 0.004, 0.0035), 10)
 
 
+def build_hearts(heart_mb, branchial_mb):
+    """体心臓（前後に長い袋）と、鰓から戻る血管・前へ出る大動脈。鰓心臓（丸い袋と付属腺）と鰓への血管"""
+    c = Vector(HEART_CENTER)
+    lumpy(heart_mb, c, 0.028, 0.013, 0.010,
+          lambda t, ph: (1 + 0.12 * math.sin(math.pi * t)) * (1 + 0.04 * math.sin(3 * ph + 2 * t)), seg=20, rings=14)
+    heart_mb.tube(chain([c + Vector((-0.02, 0, 0.002)), Vector((0.2, 0, -0.056)), Vector((0.1, 0, -0.05))], 5),
+                  taper(11, 0.0035, 0.0025), 8)
+    for side in (1, -1):
+        b = Vector((BRANCHIAL_HEART_CENTER[0], side * BRANCHIAL_HEART_CENTER[1], BRANCHIAL_HEART_CENTER[2]))
+        gill = Vector((GILL_BASE[0], side * GILL_BASE[1], GILL_BASE[2]))
+        heart_mb.tube(chain([gill + Vector((-0.02, 0, 0)), c + Vector((0.012, side * 0.012, 0.002)), c], 4),
+                      taper(9, 0.0028, 0.0035), 8)
+        branchial_mb.ellipsoid(b, 0.011, 0.009, 0.009, seg=16, rings=10)
+        branchial_mb.ellipsoid(b + Vector((0.009, side * 0.004, -0.004)), 0.005, 0.004, 0.004, seg=10, rings=6)
+        branchial_mb.tube(chain([b, b.lerp(gill, 0.5) + Vector((0, 0, 0.002)), gill], 3), taper(7, 0.003, 0.0025), 8)
+
+
 def build_fins(fin_mb):
     nu, nv = 60, 16
     for side in (1, -1):
@@ -380,11 +417,15 @@ def build_fins(fin_mb):
             u = FIN_START + (FIN_END - 0.005 - FIN_START) * q
             r = mantle_r(u)
             y0, z0 = r * 0.78, r * MANTLE_FLATTEN * 0.5
-            w = fin_width(q)
+            w = fin_width(q) * (1 + 0.03 * side)
             end_taper = min(1.0, w / 0.05)
-            # 縁ほど大きく、前後に細かく波打つ（面の外へのうねりと、縁の出入り）
-            ripple = math.sin(2 * math.pi * 6 * q + 0.4) * end_taper
-            scallop = 1 + 0.035 * math.sin(2 * math.pi * 9 * q + 1.1) * end_taper
+            # 縁ほど大きく、前後に細かく波打つ（面の外へのうねりと、縁の出入り）。
+            # 固定で縮れた縁は左右で違い、周期もそろわない
+            ripple = (math.sin(2 * math.pi * 6 * q + 0.4 + 0.9 * side)
+                      + 0.5 * math.sin(2 * math.pi * 11 * q + 2.0 * side)) * end_taper * (1.1 - 0.15 * side)
+            scallop = 1 + (0.035 * math.sin(2 * math.pi * 9 * q + 1.1 + side)
+                           + 0.03 * math.sin(2 * math.pi * 17 * q + 2.3 * side)
+                           + 0.02 * math.sin(2 * math.pi * 29 * q + 0.7)) * end_taper
             row_t, row_b, thick_row = [], [], []
             for j in range(nv + 1):
                 v = j / nv
@@ -486,6 +527,172 @@ def build_viscera(mats_mb):
             gill.ellipsoid(c, 0.0035, h, h * 0.8, seg=10, rings=6)
 
 
+MANTLE_SHRINK = 0.96    # 固定で縮んだ太さ
+
+
+def mantle_dent(u, th):
+    """脇腹の浅いへこみ（左が深い）と、背側の細かなしわ。半径に掛ける1未満の値"""
+    side = 1 if math.sin(th) > 0 else -1
+    lateral = math.exp(-((abs(th) if th <= math.pi else 2 * math.pi - th) - 0.95) ** 2 / 0.12)
+    dent = (0.05 if side > 0 else 0.035) * math.exp(-((u - (0.3 if side > 0 else 0.42)) / 0.12) ** 2) * lateral
+    crease = 0.006 * math.sin(2 * math.pi * 14 * u + 3 * th) * max(0.0, math.cos(th)) * math.sin(math.pi * u)
+    return 1 - dent - crease
+
+
+def build_mantle():
+    mb = MeshBuilder()
+    outer, inner = [], []
+    nu, ns = 90, 40
+    for i in range(nu + 1):
+        u = (1 - math.cos(math.pi * i / nu)) / 2
+        r0 = mantle_r(u) * MANTLE_SHRINK
+        ring_o, ring_i = [], []
+        for k in range(ns):
+            th = 2 * math.pi * k / ns
+            r = r0 * mantle_dent(u, th)
+            ri, rzi = r - MANTLE_WALL, r * MANTLE_FLATTEN - MANTLE_WALL
+            lip = -0.035 * max(0.0, math.cos(th)) ** 6 * max(0.0, 1 - u / 0.05)
+            ring_o.append((u + lip, r * math.sin(th), r * MANTLE_FLATTEN * math.cos(th)))
+            ring_i.append((u + lip, max(ri, 0.002) * math.sin(th), max(rzi, 0.002) * math.cos(th)))
+        outer.append(ring_o)
+        if r0 * MANTLE_FLATTEN - MANTLE_WALL > 0.008:
+            inner.append(ring_i)
+    mb.hollow(outer, inner)
+    return mb
+
+
+LIMB_RNG = random.Random(16)
+SUCKER_RNG = random.Random(23)
+
+
+def limb_wander(length, s, amp, phase, turns):
+    """腕が重さで垂れて寄り集まり、先が隣と絡むような、1本ずつ違ううねり"""
+    return Vector((0, math.sin(math.pi * turns * s + phase), math.cos(math.pi * turns * s * 0.8 + phase * 1.7))) \
+        * amp * length * s ** 2
+
+
+def build_arms(body_mb, ring_mb, rng, lines):
+    ring_r = 0.042
+    for name, ang, length, r0, spread, curl in ARMS:
+        for side in (1, -1):
+            phi = math.radians(ang) * side
+            e = Vector((0, math.sin(phi), math.cos(phi)))
+            tdir = Vector((0, math.cos(phi), -math.sin(phi)))
+            jitter = rng.uniform(-0.04, 0.04)
+            size = LIMB_RNG.uniform(0.9, 1.05)
+            reach = length * size
+            bend = curl * LIMB_RNG.uniform(0.4, 1.3) * LIMB_RNG.choice((1, -1))
+            amp, phase, turns = LIMB_RNG.uniform(0.08, 0.16), LIMB_RNG.uniform(0, 2 * math.pi), LIMB_RNG.uniform(0.8, 1.6)
+            ctrl = []
+            for k in range(8):
+                s = k / 7
+                x = HEAD_FRONT_X + 0.05 - (reach + 0.04) * s
+                # 腕冠からは開くが、先は重さで内へ寄る
+                radial = ring_r + (spread + jitter) * reach * (0.55 * s ** 1.3 - 0.35 * s ** 3)
+                p = Vector((x, 0, 0)) + e * radial + tdir * (bend * side * reach * s ** 3)
+                p += Vector((reach * 0.12 * s ** 4 * abs(bend), 0, 0)) + limb_wander(reach, s, amp, phase, turns)
+                ctrl.append(p)
+            pts = chain(ctrl, 8)
+            radii = taper(len(pts), r0 * (0.94 + 0.08 * size), 0.0025, 0.85)
+            body_mb.tube(pts, radii, 14)
+            add_suckers(body_mb, ring_mb, pts, radii, -e, 0.12, 0.93, 2)
+            record_limb(lines, body_mb, ring_mb, f"Arm{name}{'L' if side > 0 else 'R'}", pts, e)
+
+
+def build_tentacles(body_mb, ring_mb, lines):
+    for side in (1, -1):
+        phi = math.radians(TENTACLE_ANGLE) * side
+        e = Vector((0, math.sin(phi), math.cos(phi)))
+        tdir = Vector((0, math.cos(phi), -math.sin(phi)))
+        L = TENTACLE_LENGTH * (1.0 if side > 0 else 0.93)
+        amp, phase = LIMB_RNG.uniform(0.05, 0.08), LIMB_RNG.uniform(0, 2 * math.pi)
+        ctrl = []
+        for k in range(12):
+            s = k / 11
+            x = HEAD_FRONT_X + 0.05 - (L + 0.04) * s
+            # 垂れて寄り、先の触腕掌は内へ折れて反対側の触腕と交わる
+            radial = 0.03 + 0.10 * L * (0.7 * s ** 1.5 - 0.55 * s ** 4)
+            p = Vector((x, 0, 0)) + e * radial + tdir * (0.04 * side * math.sin(2.2 * math.pi * s + phase) * s)
+            p += limb_wander(L, s, amp, phase, 1.3)
+            if s > 0.78:
+                c = (s - 0.78) / 0.22
+                p -= tdir * (0.10 * side * c * c) + Vector((0.07 * c ** 3, 0, 0))
+            ctrl.append(p)
+        pts = chain(ctrl, 8)
+        n = len(pts)
+        radii = []
+        for i in range(n):
+            s = i / (n - 1)
+            if s < 0.72:
+                r = 0.014 - 0.005 * s / 0.72
+            elif s < 0.88:
+                r = 0.009 + 0.010 * math.sin(math.pi * (s - 0.72) / 0.32)
+            else:
+                r = 0.017 * (1 - (s - 0.88) / 0.12) ** 1.2 + 0.0025
+            radii.append(r)
+        body_mb.tube(pts, radii, 14)
+        add_suckers(body_mb, ring_mb, pts, radii, -e, 0.73, 0.97, SPECIES["club_sucker_rows"], size=0.26)
+        record_limb(lines, body_mb, ring_mb, f"Tentacle{'L' if side > 0 else 'R'}", pts, e)
+
+
+def add_suckers(body_mb, ring_mb, pts, radii, oral0, s_from, s_to, rows, size=0.32):
+    """腕の口側に吸盤。大きさは±15%ばらつき、列は少し乱れ、所々欠けている"""
+    rnd = SUCKER_RNG
+    tangents = tangents_of(pts)
+    lengths = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        lengths.append(lengths[-1] + (b - a).length)
+    total = lengths[-1]
+    s = s_from * total
+    idx = 0
+    row = 0
+    while s < s_to * total:
+        while idx < len(lengths) - 2 and lengths[idx + 1] < s:
+            idx += 1
+        f = (s - lengths[idx]) / max(lengths[idx + 1] - lengths[idx], 1e-9)
+        p = pts[idx].lerp(pts[idx + 1], f)
+        r = radii[idx] + (radii[idx + 1] - radii[idx]) * f
+        t = tangents[idx]
+        o = (oral0 - t * oral0.dot(t)).normalized()
+        lat = t.cross(o)
+        offsets = [(-1 + 2 * (k + 0.5) / rows) * 0.8 for k in range(rows)]
+        lateral = offsets[row % rows] if rows == 2 else None
+        places = [lateral] if lateral is not None else offsets
+        base = r * size
+        for off in places:
+            if rnd.random() < 0.07:
+                continue
+            rs = base * rnd.uniform(0.85, 1.15)
+            off += rnd.uniform(-0.12, 0.12)
+            c = p + o * (r * 0.82) + lat * (r * off * (0.55 if rows == 2 else 0.75)) + t * (rs * rnd.uniform(-0.2, 0.2))
+            body_mb.ellipsoid(c, rs * 0.8, rs * 0.8, rs * 0.8, seg=8, rings=5)
+            ring_c = c + o * (rs * 0.45)
+            ring = [ring_c + (t * math.cos(a) + lat * math.sin(a)) * rs * 0.8
+                    for a in (2 * math.pi * k / 10 for k in range(10))]
+            ring_mb.tube(ring, [rs * 0.18] * 10, 5, closed=True)
+        step = base * (2.3 if rows == 2 else 2.2)
+        s += step / (2 if rows == 2 else 1)
+        row += 1
+
+
+# 表面の細かな凹凸: 部位名 → (振れ幅, 細かさ)。眼の部品は光の輪を崩さないよう入れない
+BUMPS = {
+    "Mantle": (0.0018, 16), "Head": (0.0012, 22), "Funnel": (0.0012, 22), "Arms": (0.0007, 30),
+    "Fins": (0.0012, 14), "DigestiveGland": (0.003, 14), "Caecum": (0.002, 20), "Gonad": (0.0015, 24),
+    "BuccalMass": (0.0012, 30), "Cartilage": (0.0012, 26), "OpticLobes": (0.0008, 40), "Brain": (0.0008, 40),
+    "Gills": (0.0008, 30),
+}
+
+
+def roughen(parts):
+    for name, (amp, freq) in BUMPS.items():
+        me = parts[name].data
+        seed = Vector((len(name) * 3.1, len(name) * 1.7, 0.5))
+        for v in me.vertices:
+            v.co += noise.noise_vector(v.co * freq + seed) * amp
+        me.update()
+
+
 SPECIMEN_PARTS = {   # 部位名: 3D ビューで見るときの色（書き出しの色は tint_of）
     "Cornea": COLOR_CORNEA,
     "Iris": COLOR_IRIS,
@@ -499,7 +706,10 @@ SPECIMEN_PARTS = {   # 部位名: 3D ビューで見るときの色（書き出�
     "Cartilage": COLOR_CARTILAGE,
     "Radula": COLOR_RADULA,
     "Esophagus": COLOR_ESOPHAGUS,
+    "SystemicHeart": COLOR_HEART,
+    "BranchialHearts": COLOR_BRANCHIAL_HEART,
 }
+HEART_PARTS = ("SystemicHeart", "BranchialHearts")
 
 
 def build_specimen_extras():
@@ -512,6 +722,7 @@ def build_specimen_extras():
     build_cartilage(parts["Cartilage"])
     build_mouth(MeshBuilder(), MeshBuilder(), parts["Radula"])
     build_esophagus(parts["Esophagus"])
+    build_hearts(parts["SystemicHeart"], parts["BranchialHearts"])
     for name, color in SPECIMEN_PARTS.items():
         emit(name, parts[name], make_glossy_material(name, color, roughness=0.45, alpha=0.4, coat=0.0), coll, root)
 
@@ -531,10 +742,11 @@ def build_viscera_with_rachis(mats_mb):
 build_viscera = build_viscera_with_rachis
 main()
 build_specimen_extras()
+roughen(squid_parts())
 
 exec(stage("rig_squid.py", [chained("generate_squid.py"), "\nrig_squid()\n"]), globals())
-HEAD_PARTS = HEAD_PARTS + tuple(SPECIMEN_PARTS)
-MANTLE_PARTS = MANTLE_PARTS + ("Rachis",)
+HEAD_PARTS = HEAD_PARTS + tuple(p for p in SPECIMEN_PARTS if p not in HEART_PARTS)
+MANTLE_PARTS = MANTLE_PARTS + ("Rachis",) + HEART_PARTS
 rig_squid()
 
 exec(stage("animate_squid.py", [chained("rig_squid.py")]), globals())
@@ -556,6 +768,8 @@ ORGAN_DEPTH.update({   # 膜・板は1枚あたりの厚み、かたまりは太
     "Beak": 0.002,
     "Radula": 0.0006,
     "Esophagus": 0.004,
+    "SystemicHeart": 0.011,
+    "BranchialHearts": 0.009,
 })
 _tint_of, _depth_values, _bake_attributes = tint_of, depth_values, bake_attributes
 SPECIMEN_TINT = {
@@ -575,6 +789,8 @@ SPECIMEN_TINT = {
     "Beak": COLOR_BEAK_AMBER,
     "Radula": COLOR_RADULA,
     "Esophagus": COLOR_ESOPHAGUS,
+    "SystemicHeart": COLOR_HEART,
+    "BranchialHearts": COLOR_BRANCHIAL_HEART,
     "InkSac": COLOR_INK_FADED,
     "DigestiveGland": COLOR_DIGESTIVE_FADED,
     "Caecum": COLOR_CAECUM_FADED,

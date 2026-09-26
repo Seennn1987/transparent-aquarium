@@ -29,7 +29,14 @@
   ok("旧い目の輪は残っていない", !parts.includes("EyeRings"));
 
   const hover = d.specimen.hoverAction;
-  ok("動いているのはホバリングだけ", Boolean(hover?.isRunning()) && hover.getClip().name === "SQ_Hover" && d.specimen.mixer._actions.length === 1, hover?.getClip().name);
+  ok("標本は浮いてホバリングしている（泳ぎはしない）", hover?.getClip().name === "SQ_Hover" && hover.timeScale > 0 && d.specimen.mixer._actions.length === 1, hover?.timeScale);
+  ok("傾けて沈めた姿勢は外してある", !d.specimen.object.getObjectByName("SpecimenLean"));
+  ok("心臓が3つある（体心臓・鰓心臓）", ["SystemicHeart", "BranchialHearts"].every((p) => parts.includes(p)));
+
+  const organs = d.specimen.organs?.uniforms;
+  const clock = organs?.uOrganTime.value;
+  d.specimen.update(0.5);
+  ok("内臓の時計が進み、拍動と瞳が動く", organs && organs.uOrganTime.value > clock && Number.isFinite(organs.uBeatSystemic.value) && Number.isFinite(organs.uPupil.value), organs?.uOrganTime.value);
 
   const wasPaused = document.querySelector("#pause")?.getAttribute("aria-pressed") === "true";
   window.habitatPause(true);
@@ -48,6 +55,9 @@
     if (Math.hypot(s.x, s.z) > limitR + 1e-4 || Math.abs(s.y) > limitH + 1e-4) out = true;
   }
   ok("漂いが液の中に収まる", !out, t0);
+
+  const look = d.look;
+  ok("生々しさの値がそろう", ["mottle", "pooling", "hue", "edgeSoft", "veil", "gut", "fat", "inkBleed"].every((k) => Number.isFinite(look[k]?.value)) && ["yellow", "haze", "specks", "scuff"].every((k) => Number.isFinite(d.optics.uniforms && d.scene.getObjectByName("jar-optics-column").material.uniforms[`u${k[0].toUpperCase()}${k.slice(1)}`]?.value)));
 
   ok("調整パネルは ?tune=0 のときだけ隠す", location.search.includes("tune=0") ? !d.tune?.visible : Boolean(d.tune?.visible), location.search);
 
