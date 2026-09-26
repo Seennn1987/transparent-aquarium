@@ -1,0 +1,16 @@
+---
+description: 描写・標本の見た目は Opus 5.5 以外が編集してはならない
+alwaysApply: true
+---
+
+# 描写は Opus 5.5 だけ
+
+イカ・瓶・透明標本など、ユーザーが見る形・色・光の編集は **Opus 5.5**（Claude Opus 5.5）だけが行う。
+
+自分のモデル名が Opus 5.5 でない（Grok、GPT、Composer、その他）なら、次を編集しない。着手したら即停止し、「描写は Opus 5.5 に切り替えてください」とだけ返す。
+
+- `blender/generate_specimen_squid.py` ほか Blender 生成
+- `水槽/scenes/specimen/` の見た目（材質・瓶・光・glb）
+- `specimen_squid.glb` / `jar.glb` の再書き出し
+
+例外: ユーザーがこのターンで「サーバ再起動」など描写以外を明示したときだけ、その範囲は可。

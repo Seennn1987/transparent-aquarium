@@ -3,19 +3,38 @@ import { LENS } from "./postprocess.js";
 import { FLOOR_LOOK } from "./studio.js";
 import { OPTICS } from "./jar-optics.js";
 
-// Shown only with ?tune=1. Moving a slider writes the look object in place; the next
-// frame reads it. Reset puts the values that shipped in the code back.
+// Shown on this page. Hide with ?tune=0. Moving a slider writes the look object
+// in place; the next frame reads it. Reset puts the values that shipped in the code back.
 const SLIDERS = [
   ["イカ", [
     ["染まり", specimenLook.stain, 0, 2],
     ["空色", specimenLook.sky, 0, 1],
     ["背側", specimenLook.dorsal, 0, 1.2],
-    ["頭の金色", specimenLook.gold, 0, 1],
     ["白濁", specimenLook.milk, 0, 0.6],
     ["紋様", specimenLook.spots, 0, 2],
     ["ツヤ", specimenLook.sheen, 0, 2],
     ["しわ", specimenLook.wrinkles, 0, 2],
     ["エンペラの縁", specimenLook.finRim, 0, 4],
+  ]],
+  ["組織の色", [
+    ["筋肉の染まり", specimenLook.muscle, 0, 2],
+    ["軟骨の染まり", specimenLook.cartilage, 0, 2],
+    ["神経の濃さ", specimenLook.nerve, 0, 2],
+    ["神経の白さ", specimenLook.nerveHaze, 0, 1],
+    ["顎板の濃さ", specimenLook.chitin, 0, 2],
+    ["色素の残り", specimenLook.pigment, 0, 1],
+    ["水晶体の残り", specimenLook.lens, 0, 1],
+  ]],
+  ["部品の大きさ", [
+    ["頭の大きさ", specimenLook.headSize, 0.7, 1.35],
+    ["目の大きさ", specimenLook.eyeSize, 0.7, 1.5],
+    ["目の飛び出し", specimenLook.eyePop, -0.04, 0.05],
+    ["目の前後の長さ", specimenLook.eyeAspect, 0.7, 1.4],
+    ["虹彩の大きさ", specimenLook.irisSize, 0.6, 1.4],
+    ["網膜の深さ", specimenLook.retinaDepth, 0.85, 1.05],
+    ["視葉の大きさ", specimenLook.lobeSize, 0.6, 1.6],
+    ["口球の大きさ", specimenLook.buccalSize, 0.6, 1.5],
+    ["顎板の大きさ", specimenLook.beakSize, 0.6, 1.6],
   ]],
   ["瓶・床", [
     ["ぼけ", LENS.aperture, 0, 2.5],
@@ -53,7 +72,7 @@ function addSlider(parent, label, read, write, min, max, onChange) {
 }
 
 export function installTunePanel({ habitat, renderer, specimen, onChange }) {
-  if (new URLSearchParams(location.search).get("tune") !== "1") return { visible: false };
+  if (new URLSearchParams(location.search).get("tune") === "0") return { visible: false };
 
   const defaults = {
     looks: SLIDERS.flatMap(([, rows]) => rows.map(([label, uniform]) => [uniform, uniform.value])),

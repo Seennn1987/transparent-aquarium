@@ -23,7 +23,10 @@
 
   const parts = [];
   d.specimen.model.traverse((o) => { if (o.userData?.squid_part) parts.push(o.userData.squid_part); });
-  ok("標本用の目の輪と軟甲の軸がある", parts.includes("EyeRings") && parts.includes("Rachis"), parts.sort().join(", "));
+  const anatomy = ["Cornea", "Iris", "Retina", "Lens", "OpticNerves", "OrbitCartilage", "OpticLobes", "Brain",
+    "Statocysts", "Cartilage", "Radula", "Esophagus", "Rachis"];
+  ok("標本用の頭と眼の部品がそろう", anatomy.every((p) => parts.includes(p)), anatomy.filter((p) => !parts.includes(p)).join(", "));
+  ok("旧い目の輪は残っていない", !parts.includes("EyeRings"));
 
   const hover = d.specimen.hoverAction;
   ok("動いているのはホバリングだけ", Boolean(hover?.isRunning()) && hover.getClip().name === "SQ_Hover" && d.specimen.mixer._actions.length === 1, hover?.getClip().name);
@@ -46,7 +49,7 @@
   }
   ok("漂いが液の中に収まる", !out, t0);
 
-  ok("調整パネルは ?tune=1 のときだけ", location.search.includes("tune=1") ? Boolean(d.tune?.visible) : !d.tune?.visible, location.search);
+  ok("調整パネルは ?tune=0 のときだけ隠す", location.search.includes("tune=0") ? !d.tune?.visible : Boolean(d.tune?.visible), location.search);
 
   const { renderer, post } = d;
   renderer.setRenderTarget(post.target);
