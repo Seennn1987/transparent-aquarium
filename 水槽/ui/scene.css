@@ -7,6 +7,7 @@ body { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-item
 .chrome { position: fixed; z-index: 2; left: var(--space-8); right: var(--space-8); display: flex; align-items: center; font-size: var(--text-small); }
 nav.chrome { top: var(--space-6); justify-content: space-between; }
 .home-link { font-size: var(--text-brand); letter-spacing: -.04em; }
+.home-link .wordmark { display: block; height: 30px; width: auto; }
 .scene-nav { display: flex; gap: var(--space-6); align-items: center; }
 .chrome a, .scene-nav span { min-height: var(--control-height); display: inline-flex; align-items: center; }
 .chrome a, .scene-nav span, .home-link { text-shadow: 0 2px 12px var(--background); }

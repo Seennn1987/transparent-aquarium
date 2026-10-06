@@ -1,10 +1,10 @@
 import { qualityName } from './render-policy.js';
 import { setActionIcon } from '../../ui/icons.js';
 
-export function preferredQuality(params) {
+export function preferredQuality(params, fallback = 'balanced') {
   let saved;
   try { saved = localStorage.getItem('habitat-quality'); } catch {}
-  return qualityName(params.get('quality') || saved || (navigator.connection?.saveData ? 'eco' : 'balanced'));
+  return qualityName(params.get('quality') || saved || (navigator.connection?.saveData ? 'eco' : fallback));
 }
 
 export function installControls({ habitat, isPaused, isRunning, pause, feed, quality, setQuality }) {
