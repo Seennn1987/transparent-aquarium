@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f2f2f0" />
+    <meta name="theme-color" content="#2b231d" />
     <meta
       name="description"
-      content="透明標本ケースの観察ページ。白いスタジオでガラス容器内の標本を見る。"
+      content="透明標本ケースの観察ページ。白いガラスの台に並んだ標本瓶のギャラリーで、手前の瓶の標本を見る。"
     />
-    <title>Specimen Case • Desktop Habitats</title>
-    <link rel="icon" href="data:," />
+    <title>Specimen Case • ReSwim</title>
+    <link rel="icon" type="image/svg+xml" href="../../favicon.svg" />
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
       {
@@ -24,11 +24,11 @@
     <main id="habitat" aria-label="透明標本ケースの観察">
       <canvas
         id="scene"
-        aria-label="白いスタジオに置かれた標本ケース。ドラッグで回し、ホイールでズーム。"
+        aria-label="白いガラスの台に並んだ標本瓶のギャラリー。手前の瓶にピントが合っている。ドラッグで回し、ホイールでズーム。"
         tabindex="0"
       ></canvas>
       <nav class="chrome" aria-label="ナビゲーション">
-        <a class="home-link" href="../../" aria-label="Habitats home">Habitats</a>
+        <a class="home-link" href="../../" aria-label="ReSwim ホーム"><img class="wordmark" src="../../ui/reswim-wordmark.png" alt="" width="945" height="231" /></a>
       </nav>
       <footer class="chrome" aria-label="操作">
         <div class="buttons">
@@ -36,10 +36,20 @@
           <button disabled id="fullscreen" title="F">Fullscreen</button>
         </div>
         <div class="preferences">
+          <select disabled id="stage" aria-label="台" title="T">
+            <option value="blocks">光る台</option>
+            <option value="white" selected>白ガラス</option>
+            <option value="black">黒ガラス</option>
+          </select>
+          <select disabled id="wall" aria-label="壁" title="W">
+            <option value="wood">木の壁</option>
+            <option value="white" selected>白い壁</option>
+            <option value="black">黒い壁</option>
+          </select>
           <select disabled id="quality" aria-label="Quality">
             <option value="eco">Eco</option>
-            <option value="balanced" selected>Balanced</option>
-            <option value="detail">Detail</option>
+            <option value="balanced">Balanced</option>
+            <option value="detail" selected>Detail</option>
           </select>
           <button disabled id="hide" title="H">Hide controls</button>
         </div>

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { SQUID_TISSUE } from "../../riverscape/src/squid-material.js";
+import { RIM_DIRECTION } from "./studio.js";
 
 // In the white studio the backdrop is the lightbox: each tissue surface multiplies what is
 // already drawn behind it by exp(-(1 - tint) * absorption * path), as Blender's volume
@@ -23,7 +24,8 @@ const PART_STAIN = { Arms: 1.2, Head: 1.2, Fins: 0.23 };
 // The specimen squid (blender/generate_specimen_squid.py) replaces the tank's solid head
 // with a muscular shell holding the anatomy that shows through it: eye (wall, cornea,
 // iris, retina, dissolved lens), cartilage, brain, optic lobes and nerves, statocysts,
-// mouth parts and oesophagus. In the mantle it adds the three hearts.
+// mouth parts and oesophagus. In the mantle it adds the three hearts, their vessels and the
+// membrane wrapping the gut.
 const SPECIMEN_TISSUE = {
   ...SQUID_TISSUE,
   Head: { mode: "film", absorption: 550, sheen: 1 },
@@ -44,6 +46,8 @@ const SPECIMEN_TISSUE = {
   Esophagus: { mode: "solid", absorption: 1400, sheen: 0 },
   SystemicHeart: { mode: "solid", absorption: 500, sheen: 0 },
   BranchialHearts: { mode: "solid", absorption: 420, sheen: 0 },
+  Vessels: { mode: "solid", absorption: 500, sheen: 0 },
+  VisceralSac: { mode: "film", absorption: 300, sheen: 0 },
   Rachis: { mode: "film", absorption: 260, sheen: 0 },
   InkSac: { mode: "solid", absorption: 220, sheen: 0 },
   DigestiveGland: { mode: "solid", absorption: 210, sheen: 0 },
@@ -53,7 +57,7 @@ const SPECIMEN_TISSUE = {
 // deepest, muscle sky blue; nerve stays pale and cloudy; chitin keeps its amber).
 const TISSUE_CLASS = {
   Mantle: "muscle", Fins: "muscle", Funnel: "muscle", Head: "muscle", Arms: "muscle",
-  SystemicHeart: "muscle", BranchialHearts: "muscle",
+  SystemicHeart: "muscle", BranchialHearts: "muscle", Vessels: "muscle",
   Cartilage: "cartilage", OrbitCartilage: "cartilage", Iris: "cartilage",
   OpticNerves: "nerve", OpticLobes: "nerve", Brain: "nerve",
   Beak: "chitin", Radula: "chitin", SuckerRings: "chitin",
@@ -62,9 +66,13 @@ const TISSUE_CLASS = {
 // Screening pigment left after bleaching.
 const PIGMENTED = new Set(["Retina", "InkSac"]);
 // Parts that scatter light back milky instead of only absorbing it.
-const HAZY = new Set(["OpticNerves", "OpticLobes", "Brain", "Statocysts", "Cartilage", "OrbitCartilage"]);
+const HAZY = new Set(["OpticNerves", "OpticLobes", "Brain", "Statocysts", "Cartilage", "OrbitCartilage", "VisceralSac"]);
 // Where the stain pools as it soaks in: the arm tips and the crease at the arm crown.
 const PART_POOLING = { Arms: 1, Head: 1, Funnel: 0.6, Mantle: 0.4, Fins: 0.5 };
+// Muscle banded across the body: the mantle most, the arms, head and funnel less.
+const PART_STRIATION = { Mantle: 1, Arms: 0.5, Head: 0.4, Funnel: 0.5 };
+// Spacing of the circular muscle's bands in mantle lengths (0.5 mm on a 10 cm squid).
+const MUSCLE_BAND = 0.005;
 // Food and fat left in the gut; the ink that leaked out around its sac.
 const GUT = new Set(["DigestiveGland", "Caecum", "Esophagus"]);
 const INKED = new Set(["Mantle", "Funnel", "DigestiveGland", "Gills", "InkSac"]);
@@ -72,47 +80,53 @@ const INKED = new Set(["Mantle", "Funnel", "DigestiveGland", "Gills", "InkSac"])
 const PART_SPOTS = { Mantle: 1, Head: 1, Arms: 0.8, Fins: 0.4, Funnel: 0.5 };
 // Spacing of the remnant dots in mantle lengths (3 mm on a 10 cm squid).
 const SPOT_CELL = 0.03;
+// Tissue crossed, in mantle lengths, is kept ×10 in the image's alpha: the half floats near
+// the white clear's alpha of 1 are too coarse for it otherwise.
+const THICKNESS_IN_ALPHA = 10;
 
 // Targets, light let through (red/green/blue) on the white-lightbox reference: fin
 // 0.58/0.86/0.98, arms 0.05–0.8 red with blue ≈ 1.5× green, mantle red 0–0.19.
 export const specimenLook = {
-  stain: { value: 0.9 },
-  sky: { value: 1 },              // 0: the tank's blue-green, 1: the specimen's sky blue
+  stain: { value: 1.79 },
+  sky: { value: 0.65 },              // 0: the tank's blue-green, 1: the specimen's sky blue
   dorsal: { value: 0.45 },        // extra stain on the back
   // Thin sheets (mantle, fins): how deep face-on, and how much more along the outline.
   face: { value: 1.8 },
   rim: { value: 0.7 },
-  finRim: { value: 1.8 },         // extra stain toward the fin's outer edge
-  spots: { value: 0.5 },          // chromatophore remnants
+  finRim: { value: 2.84 },         // extra stain toward the fin's outer edge
+  spots: { value: 0.22 },          // chromatophore remnants
   milk: { value: 0.16 },          // light scattered back by thick tissue
   milkColor: { value: new THREE.Color("#e6f3fa") },
+  rimGlow: { value: 0.19 },        // the outline glowing milky against the light behind
   sheen: { value: 1 },
-  wrinkles: { value: 0.6 },       // unevenness of the sheen
+  liquidSheen: { value: 0.29 },    // under glycerin the surface barely reflects
+  wrinkles: { value: 0.96 },       // unevenness of the sheen
   // How each kind of tissue takes the stain (1 as baked).
-  muscle: { value: 1 },
-  cartilage: { value: 1 },
-  nerve: { value: 1 },
-  nerveHaze: { value: 0.05 },     // milky white of brain, optic lobes and nerves
-  chitin: { value: 1 },
-  pigment: { value: 0.15 },       // 0: bleached, 1: the retina and ink as dark as in life
-  lens: { value: 0.1 },           // the lens dissolves in clearing; what is left of it clouds the eye
-  cartilageHaze: { value: 0.03 }, // white left in the blue cartilage
+  muscle: { value: 1.01 },
+  cartilage: { value: 1.4 },
+  nerve: { value: 1.12 },
+  nerveHaze: { value: 0 },     // milky white of brain, optic lobes and nerves
+  chitin: { value: 0.34 },
+  pigment: { value: 0 },       // 0: bleached, 1: the retina and ink as dark as in life
+  lens: { value: 0.42 },           // the lens dissolves in clearing; what is left of it clouds the eye
+  cartilageHaze: { value: 0.08 }, // white left in the blue cartilage
   // The stain never takes evenly.
   mottle: { value: 0.6 },         // blotchy stain, fixed to the body
-  pooling: { value: 0.6 },        // stain pooled at the arm tips, the crown crease and in patches
+  pooling: { value: 0.77 },        // stain pooled at the arm tips, the crown crease and in patches
+  striation: { value: 0.51 },      // fine bands of the muscle and the crossing fibres over it
   hue: { value: 0.5 },            // the blue drifts between aqua and ultramarine
   // Tissue and fluid refract almost alike, so outlines fade instead of drawing lines.
-  edgeSoft: { value: 0.3 },
-  veil: { value: 0.35 },          // the head's contents seen through its muscle
+  edgeSoft: { value: 0.73 },
+  veil: { value: 0.42 },          // the head's contents seen through its muscle
   gut: { value: 0.5 },            // dark grains of food left in the gut
-  fat: { value: 0.4 },            // yellow fat in the digestive gland
-  inkBleed: { value: 0.35 },      // ink leaked around its sac
+  fat: { value: 0.63 },            // yellow fat in the digestive gland
+  inkBleed: { value: 0.49 },      // ink leaked around its sac
   // Sizes, 1 as baked. Each part grows about its own centre, the eye's parts about the eye.
   headSize: { value: 1 },         // 頭の左右・上下の大きさ
   eyeSize: { value: 1 },
   eyePop: { value: 0 },           // 目の飛び出し。正で外へ、負で頭の中へ
   eyeAspect: { value: 1 },        // 目の前後の長さ
-  irisSize: { value: 1 },
+  irisSize: { value: 0.82 },
   retinaDepth: { value: 1 },      // <1 で網膜が眼の奥へ下がる
   lobeSize: { value: 1 },
   buccalSize: { value: 1 },
@@ -247,6 +261,8 @@ const PART_MOTION = {
   SystemicHeart: { kind: "pulse", amount: "uBeatSystemic", gain: 0.3, centre: [0.3, -0.058, 0], radius: 0.03 },
   BranchialHearts: { kind: "pulse", amount: "uBeatBranchial", gain: 0.2, centre: [0.34, -0.052, 0.045], radius: 0.016 },
   DigestiveGland: { kind: "pulse", amount: "uGland", gain: 0.035, radius: 0.35 },
+  VisceralSac: { kind: "pulse", amount: "uGland", gain: 0.03, centre: [0.4, -0.005, 0], radius: 0.35 },
+  Vessels: { kind: "pulse", amount: "uBeatSystemic", gain: 0.08, centre: [0.3, -0.058, 0], radius: 0.08 },
   InkSac: { kind: "pulse", amount: "uInk", gain: 0.25, centre: [0.14, -0.035, 0], radius: 0.05 },
   BuccalMass: { kind: "pulse", amount: "uBuccal", gain: 0.06, radius: 0.05 },
   Esophagus: { kind: "peristalsis", amount: "uGut", gain: 1.2, centre: [0, 0.004, 0] },
@@ -363,6 +379,8 @@ uniform float spotted;
 uniform float mottle;
 uniform float pooling;
 uniform float pooled;
+uniform float striation;
+uniform float striated;
 uniform float hue;
 uniform float edgeSoft;
 uniform float veil;
@@ -434,6 +452,20 @@ float tissuePath(float wob) {
   float sheet = vDepth * (face + rim * x);
   return mix(vDepth * c, sheet, film);
 }
+// The mantle's circular muscle takes the stain in fine bands across the body, and the tunic
+// over it in two sets of crossing fibres. Bands finer than about two pixels fade to their
+// average instead of shimmering.
+float muscleGrain() {
+  float arc = atan(vRest.z, vRest.y) * .1;
+  float band = vRest.x / ${MUSCLE_BAND.toFixed(4)};
+  float f1 = (vRest.x * .89 + arc * .45) / .012;
+  float f2 = (vRest.x * .89 - arc * .45) / .012;
+  float bands = sin(6.2832 * band + 2. * sin(vRest.x * 40. + arc * 60.));
+  float fibres = sin(6.2832 * f1) + sin(6.2832 * f2);
+  float keepBands = 1. - smoothstep(.25, .5, fwidth(band));
+  float keepFibres = 1. - smoothstep(.25, .5, max(fwidth(f1), fwidth(f2)));
+  return .25 * bands * keepBands + .06 * fibres * keepFibres;
+}
 vec3 absorbance() {
   vec3 low = fbm3(vRest * 7.);
   vec3 high = fbm2(vRest * 23. + 5.);
@@ -452,6 +484,7 @@ vec3 absorbance() {
   float crease = exp(-pow((vRest.x + .21) / .025, 2.));
   float pool = pooled * (tip + .3 * crease) + stained * smoothstep(.6, .78, high.z);
   float gain = blotch * (1. + pooling * pool * .8) * (1. - veil * inner * .35);
+  if (striated > 0.) gain *= 1. + striation * striated * muscleGrain();
   a = max(a * absorption * vTint.a * ${REAL_MANTLE_LENGTH.toFixed(3)} * stain * partStain * classGain * gain
     * tissuePath(.7 + .6 * high.x), 0.);
   // The remnants are brownish: they take more blue than red.
@@ -476,7 +509,8 @@ void main() {
   // At the arm crown the head's shell fades out as the arm roots fade in. What is faded to
   // nothing is not drawn; cutting off any higher leaves a visible edge.
   if (vTint.a < .02) discard;
-  gl_FragColor = vec4(exp(-absorbance()), 1.);
+  // Alpha adds up the tissue crossed; jar-optics.js bends the ray by how fast it changes.
+  gl_FragColor = vec4(exp(-absorbance()), ${THICKNESS_IN_ALPHA.toFixed(1)} * vTint.a * tissuePath(1.));
 }`;
 
 // Preserved tissue is not glass-clear: its thick parts send some light back milky, which
@@ -487,11 +521,19 @@ uniform float milk;
 uniform vec3 milkColor;
 uniform float milky;
 uniform float haze;
+uniform float rimGlow;
+uniform vec3 uRimLight;
 void main() {
   if (vTint.a < .02) discard;
   float density = dot(absorbance(), vec3(1. / 3.));
   vec3 cloud = vec3(.96, .94, .86) * haze * (1. - exp(-tissuePath(1.) * 120.));
-  gl_FragColor = vec4(milkColor * milk * milky * (1. - exp(-density * .8)) + cloud, 1.);
+  // Against the light behind it the cloudy tissue glows along its outline, where the light
+  // crosses the most of it on its way to the camera.
+  vec3 v = normalize(-vViewPosition);
+  vec3 toLight = normalize((viewMatrix * vec4(uRimLight, 0.)).xyz);
+  float grazing = 1. - abs(dot(normalize(vViewNormal), v));
+  float glow = rimGlow * pow(grazing, 3.) * smoothstep(-.1, .7, -dot(toLight, v));
+  gl_FragColor = vec4(milkColor * milky * (milk * (1. - exp(-density * .8)) + glow * vTint.a) + cloud, 1.);
 }`;
 
 function tissueUniforms({ mode, absorption }, part, fit) {
@@ -513,6 +555,8 @@ function tissueUniforms({ mode, absorption }, part, fit) {
     mottle: specimenLook.mottle,
     pooling: specimenLook.pooling,
     pooled: { value: PART_POOLING[part] ?? 0 },
+    striation: specimenLook.striation,
+    striated: { value: PART_STRIATION[part] ?? 0 },
     hue: specimenLook.hue,
     edgeSoft: specimenLook.edgeSoft,
     veil: specimenLook.veil,
@@ -542,8 +586,20 @@ function absorbMaterial(tissue, part, fit) {
     blendEquation: THREE.AddEquation,
     blendSrc: THREE.ZeroFactor,
     blendDst: THREE.SrcColorFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneFactor,
   });
 }
+
+// Light added on top of the absorption; it leaves the thickness in alpha alone.
+const ADD_LIGHT = {
+  blending: THREE.CustomBlending,
+  blendEquation: THREE.AddEquation,
+  blendSrc: THREE.SrcAlphaFactor,
+  blendDst: THREE.OneFactor,
+  blendSrcAlpha: THREE.ZeroFactor,
+  blendDstAlpha: THREE.OneFactor,
+};
 
 function milkMaterial(tissue, part, fit) {
   return new THREE.ShaderMaterial({
@@ -552,6 +608,9 @@ function milkMaterial(tissue, part, fit) {
       milk: specimenLook.milk,
       milkColor: specimenLook.milkColor,
       milky: { value: STAINED_PARTS.has(part) ? 1 : 0 },
+      // The funnel's open ends would glow as hard lines.
+      rimGlow: part === "Funnel" ? { value: 0 } : specimenLook.rimGlow,
+      uRimLight: { value: RIM_DIRECTION },
       haze: !HAZY.has(part) ? { value: 0 } : TISSUE_CLASS[part] === "cartilage" ? specimenLook.cartilageHaze : specimenLook.nerveHaze,
     },
     vertexShader: tissueVertex,
@@ -559,7 +618,7 @@ function milkMaterial(tissue, part, fit) {
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    ...ADD_LIGHT,
   });
 }
 
@@ -574,11 +633,12 @@ function surfaceMaterial({ sheen }, envMap, part, fit) {
     specularIntensity: 0.3 * sheen,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    ...ADD_LIGHT,
   });
   material.onBeforeCompile = (shader) => {
     centroidVaryings(shader);
     shader.uniforms.uSheen = specimenLook.sheen;
+    shader.uniforms.uLiquidSheen = specimenLook.liquidSheen;
     shader.uniforms.uWrinkles = specimenLook.wrinkles;
     Object.assign(shader.uniforms, fitUniforms(part, fit));
     shader.vertexShader = shader.vertexShader
@@ -586,11 +646,11 @@ function surfaceMaterial({ sheen }, envMap, part, fit) {
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRest = specimenFit(position);\ntransformed = organMotion(vRest);\nvFade = tint.a;");
     // Fine creases of the preserved skin break the highlight into uneven streaks.
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform float uSheen;\nuniform float uWrinkles;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;")
+      .replace("#include <common>", "#include <common>\nuniform float uSheen;\nuniform float uLiquidSheen;\nuniform float uWrinkles;\ncentroid varying vec3 vRest;\ncentroid varying float vFade;")
       .replace("#include <opaque_fragment>", `
 if (vFade < .02) discard;
 float crease = sin(dot(vRest, vec3(160., 41., 67.)) + 3. * sin(vRest.x * 55. + vRest.z * 38.));
-outgoingLight *= uSheen * vFade * (1. + uWrinkles * crease * .5);
+outgoingLight *= uSheen * uLiquidSheen * vFade * (1. + uWrinkles * crease * .5);
 #include <opaque_fragment>`);
   };
   material.customProgramCacheKey = () => "specimen-squid-sheen-fit-organs";

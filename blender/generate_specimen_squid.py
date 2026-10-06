@@ -72,6 +72,8 @@ COLOR_RADULA = (0.78, 0.58, 0.32, 1.0)
 COLOR_ESOPHAGUS = (0.80, 0.88, 0.55, 1.0)
 COLOR_HEART = (0.52, 0.84, 0.92, 1.0)         # 心臓の筋肉は薄く染まる
 COLOR_BRANCHIAL_HEART = (0.74, 0.62, 0.55, 1.0)  # 鰓心臓と付属腺は褐色が残る
+COLOR_VESSEL = (0.62, 0.82, 0.90, 1.0)        # 血管の壁は心臓よりさらに淡い
+COLOR_VISCERAL_SAC = (0.90, 0.93, 0.86, 1.0)  # 内臓を包む膜は白く薄く濁る
 COLOR_BUCCAL_FADED = (0.90, 0.80, 0.42, 1.0)
 COLOR_RACHIS = (0.52, 0.62, 0.38, 1.0)
 COLOR_INK_FADED = (0.34, 0.32, 0.40, 1.0)
@@ -408,6 +410,30 @@ def build_hearts(heart_mb, branchial_mb):
         branchial_mb.tube(chain([b, b.lerp(gill, 0.5) + Vector((0, 0, 0.002)), gill], 3), taper(7, 0.003, 0.0025), 8)
 
 
+def build_vessels(mb):
+    """心臓から出る細い血管: 後ろの生殖巣へ、外套の左右へ、消化腺へ。鰓心臓へ戻る大静脈"""
+    c = Vector(HEART_CENTER)
+    mb.tube(chain([c + Vector((0.02, 0, 0)), Vector((0.45, 0, -0.056)), Vector((0.62, 0, -0.045)),
+                   Vector((0.8, 0, -0.03))], 5), taper(16, 0.0022, 0.0009), 6)
+    mb.tube(chain([c + Vector((-0.01, 0, 0.008)), Vector((0.26, 0, -0.03)), Vector((0.24, 0.006, -0.012))], 4),
+            taper(9, 0.0018, 0.0009), 6)
+    for side in (1, -1):
+        mb.tube(chain([c + Vector((0.004, side * 0.01, 0)), Vector((0.36, side * 0.07, -0.05)),
+                       Vector((0.5, side * 0.09, -0.03)), Vector((0.66, side * 0.08, -0.01))], 5),
+                taper(16, 0.0018, 0.0008), 6)
+        b = Vector((BRANCHIAL_HEART_CENTER[0], side * BRANCHIAL_HEART_CENTER[1], BRANCHIAL_HEART_CENTER[2]))
+        mb.tube(chain([b + Vector((-0.008, 0, 0)), Vector((0.2, side * 0.03, -0.05)), Vector((0.05, side * 0.012, -0.045)),
+                       Vector((-0.04, 0, -0.04))], 5), taper(16, 0.0024, 0.0014), 6)
+
+
+def build_visceral_sac(mb):
+    """消化腺と盲嚢を包む薄い膜（形は中身に沿い、少し大きい）"""
+    lumpy(mb, Vector((0.40, 0, -0.005)), 0.318, 0.063, 0.058,
+          lambda t, ph: pinch(t, 0.34, 0.14, 0.07) * pinch(t, 0.7, 0.11, 0.06), seg=24, rings=22)
+    lumpy(mb, Vector((0.74, 0, -0.01)), 0.142, 0.038, 0.032,
+          lambda t, ph: 1 + 0.06 * math.sin(2 * math.pi * 4 * t), seg=18, rings=16)
+
+
 def build_fins(fin_mb):
     nu, nv = 60, 16
     for side in (1, -1):
@@ -547,11 +573,15 @@ def build_mantle():
         u = (1 - math.cos(math.pi * i / nu)) / 2
         r0 = mantle_r(u) * MANTLE_SHRINK
         ring_o, ring_i = [], []
+        # 口の縁は薄くなって外へ少しめくれ、固定で細かく波打つ
+        edge = max(0.0, 1 - u / 0.04)
+        wall = MANTLE_WALL * (1 - 0.6 * edge)
         for k in range(ns):
             th = 2 * math.pi * k / ns
-            r = r0 * mantle_dent(u, th)
-            ri, rzi = r - MANTLE_WALL, r * MANTLE_FLATTEN - MANTLE_WALL
+            r = r0 * mantle_dent(u, th) * (1 + 0.07 * edge ** 2)
+            ri, rzi = r - wall, r * MANTLE_FLATTEN - wall
             lip = -0.035 * max(0.0, math.cos(th)) ** 6 * max(0.0, 1 - u / 0.05)
+            lip += (0.005 * math.sin(9 * th + 1.3) + 0.003 * math.sin(16 * th + 0.4)) * edge
             ring_o.append((u + lip, r * math.sin(th), r * MANTLE_FLATTEN * math.cos(th)))
             ring_i.append((u + lip, max(ri, 0.002) * math.sin(th), max(rzi, 0.002) * math.cos(th)))
         outer.append(ring_o)
@@ -664,12 +694,21 @@ def add_suckers(body_mb, ring_mb, pts, radii, oral0, s_from, s_to, rows, size=0.
                 continue
             rs = base * rnd.uniform(0.85, 1.15)
             off += rnd.uniform(-0.12, 0.12)
-            c = p + o * (r * 0.82) + lat * (r * off * (0.55 if rows == 2 else 0.75)) + t * (rs * rnd.uniform(-0.2, 0.2))
+            foot = p + o * (r * 0.8) + lat * (r * off * (0.55 if rows == 2 else 0.75))
+            c = foot + o * (rs * 0.6) + t * (rs * rnd.uniform(-0.2, 0.2))
+            # 短い柄の上に吸盤。口の輪はキチンの輪で、内側へ向いた歯が並ぶ
+            body_mb.tube([foot, c - o * (rs * 0.5)], [rs * 0.34, rs * 0.26], 6)
             body_mb.ellipsoid(c, rs * 0.8, rs * 0.8, rs * 0.8, seg=8, rings=5)
             ring_c = c + o * (rs * 0.45)
-            ring = [ring_c + (t * math.cos(a) + lat * math.sin(a)) * rs * 0.8
-                    for a in (2 * math.pi * k / 10 for k in range(10))]
-            ring_mb.tube(ring, [rs * 0.18] * 10, 5, closed=True)
+            teeth = 2 * rnd.randint(6, 8)
+            ring, ring_r = [], []
+            for k in range(teeth):
+                a = 2 * math.pi * k / teeth
+                tooth = k % 2 == 0
+                ring.append(ring_c + (t * math.cos(a) + lat * math.sin(a)) * rs * (0.68 if tooth else 0.8)
+                            + o * (rs * (0.08 if tooth else 0.0)))
+                ring_r.append(rs * (0.2 if tooth else 0.13))
+            ring_mb.tube(ring, ring_r, 5, closed=True)
         step = base * (2.3 if rows == 2 else 2.2)
         s += step / (2 if rows == 2 else 1)
         row += 1
@@ -708,12 +747,14 @@ SPECIMEN_PARTS = {   # 部位名: 3D ビューで見るときの色（書き出�
     "Esophagus": COLOR_ESOPHAGUS,
     "SystemicHeart": COLOR_HEART,
     "BranchialHearts": COLOR_BRANCHIAL_HEART,
+    "Vessels": COLOR_VESSEL,
+    "VisceralSac": COLOR_VISCERAL_SAC,
 }
-HEART_PARTS = ("SystemicHeart", "BranchialHearts")
+BODY_PARTS = ("SystemicHeart", "BranchialHearts", "Vessels", "VisceralSac")   # 外套と動く部位
 
 
 def build_specimen_extras():
-    """main() が作らない部位（眼の部品・軟骨・脳と視葉・平衡器・歯舌・食道）を足す"""
+    """main() が作らない部位（眼の部品・軟骨・脳と視葉・平衡器・歯舌・食道・心臓・血管・内臓の膜）を足す"""
     coll = bpy.data.collections[SPECIES["name"]]
     root = bpy.data.objects[SPECIES["name"] + "_Root"]
     parts = {name: MeshBuilder() for name in SPECIMEN_PARTS}
@@ -723,6 +764,8 @@ def build_specimen_extras():
     build_mouth(MeshBuilder(), MeshBuilder(), parts["Radula"])
     build_esophagus(parts["Esophagus"])
     build_hearts(parts["SystemicHeart"], parts["BranchialHearts"])
+    build_vessels(parts["Vessels"])
+    build_visceral_sac(parts["VisceralSac"])
     for name, color in SPECIMEN_PARTS.items():
         emit(name, parts[name], make_glossy_material(name, color, roughness=0.45, alpha=0.4, coat=0.0), coll, root)
 
@@ -745,8 +788,8 @@ build_specimen_extras()
 roughen(squid_parts())
 
 exec(stage("rig_squid.py", [chained("generate_squid.py"), "\nrig_squid()\n"]), globals())
-HEAD_PARTS = HEAD_PARTS + tuple(p for p in SPECIMEN_PARTS if p not in HEART_PARTS)
-MANTLE_PARTS = MANTLE_PARTS + ("Rachis",) + HEART_PARTS
+HEAD_PARTS = HEAD_PARTS + tuple(p for p in SPECIMEN_PARTS if p not in BODY_PARTS)
+MANTLE_PARTS = MANTLE_PARTS + ("Rachis",) + BODY_PARTS
 rig_squid()
 
 exec(stage("animate_squid.py", [chained("rig_squid.py")]), globals())
@@ -770,6 +813,8 @@ ORGAN_DEPTH.update({   # 膜・板は1枚あたりの厚み、かたまりは太
     "Esophagus": 0.004,
     "SystemicHeart": 0.011,
     "BranchialHearts": 0.009,
+    "Vessels": 0.0016,
+    "VisceralSac": 0.0012,
 })
 _tint_of, _depth_values, _bake_attributes = tint_of, depth_values, bake_attributes
 SPECIMEN_TINT = {
@@ -791,6 +836,8 @@ SPECIMEN_TINT = {
     "Esophagus": COLOR_ESOPHAGUS,
     "SystemicHeart": COLOR_HEART,
     "BranchialHearts": COLOR_BRANCHIAL_HEART,
+    "Vessels": COLOR_VESSEL,
+    "VisceralSac": COLOR_VISCERAL_SAC,
     "InkSac": COLOR_INK_FADED,
     "DigestiveGland": COLOR_DIGESTIVE_FADED,
     "Caecum": COLOR_CAECUM_FADED,

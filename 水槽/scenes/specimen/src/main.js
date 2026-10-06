@@ -8,14 +8,43 @@ import { createSpecimen } from "./specimen.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
-  STUDIO_BACKGROUND,
+  DEFAULT_VIEW,
+  ROOM_YAW,
+  ROOM_DARK,
   KEY_DIRECTION,
+  RIM_DIRECTION,
+  GALLERY_COLORS,
+  GALLERY_LOOK,
   FLOOR_LOOK,
-  createStudioEnvironment,
-  createBackdrop,
-  createStudioFloor,
-} from "./studio.js";
+  STAGE_NAMES,
+  WALL_NAMES,
+  stageName,
+  wallName,
+  createGallery,
+  createGalleryEnvironment,
+} from "./gallery.js";
+import { createGalleryJars } from "./gallery-jars.js";
+import { slotCount } from "./gallery-layout.js";
 import { installTunePanel } from "./tune-panel.js";
+import { createMirrorPass } from "./table-reflection.js";
+
+const STAGE_KEY = "specimen-stage";
+const WALL_KEY = "specimen-wall";
+
+function saved(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function preferredLook(params) {
+  return {
+    table: stageName(params.get("stage") || saved(STAGE_KEY)),
+    wall: wallName(params.get("wall") || saved(WALL_KEY)),
+  };
+}
+
+// The jars behind are traced copies of the front one except at the lightest quality; the
+// thick glass of their lids and feet is traced only at the highest.
+const jarQuality = (profile) => ({ traced: profile !== "eco", detail: profile === "detail" });
 
 const canvas = document.querySelector("#scene");
 const habitat = document.querySelector("#habitat");
@@ -26,7 +55,7 @@ let paused =
   matchMedia("(prefers-reduced-motion: reduce)").matches;
 const query = new URLSearchParams(location.search);
 const wallpaper = document.documentElement.dataset.motion === "host";
-let profile = preferredQuality(query);
+let profile = preferredQuality(query, "detail");
 if (query.get("still") === "1") paused = true;
 
 let onBattery = false;
@@ -52,8 +81,9 @@ window.habitatPower = (battery) => {
   updateControls();
 };
 
-// Product-shot framing: a long lens from slightly above the jar's middle.
-const CAMERA = { fov: 20, position: new THREE.Vector3(3.1, 3.2, 11.0), target: new THREE.Vector3(0, 1.4, 0) };
+const CAMERA = DEFAULT_VIEW;
+// How far the orbit may turn from the default view before the room's edge would show.
+const ORBIT_TURN = 0.7;
 
 async function start() {
   const renderer = new THREE.WebGLRenderer({
@@ -64,56 +94,48 @@ async function start() {
   });
   if (!renderer.capabilities.isWebGL2) throw new Error("WebGL2 が使えないため標本ケースを表示できません");
   renderer.setPixelRatio(1);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // Applied once, in the final pass: the scene itself is rendered linear.
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.34;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(STUDIO_BACKGROUND);
+  scene.background = ROOM_DARK.clone();
 
   const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.1, 40);
   camera.position.copy(CAMERA.position);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d4cc, 0.45));
-
-  const key = new THREE.DirectionalLight(0xfffaf4, 0.9);
+  // The room and the blocks draw their own light; these only give the glass its highlights.
+  scene.add(new THREE.HemisphereLight(GALLERY_COLORS.key, GALLERY_COLORS.dark, 0.3));
+  const key = new THREE.DirectionalLight(GALLERY_COLORS.key, 1.1);
   key.position.copy(KEY_DIRECTION).multiplyScalar(10);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  Object.assign(key.shadow.camera, {
-    left: -3,
-    right: 3,
-    top: 4,
-    bottom: -1,
-    near: 1,
-    far: 16,
-  });
-  key.shadow.bias = -0.0002;
-  key.shadow.normalBias = 0.02;
   scene.add(key);
+  const rim = new THREE.DirectionalLight(GALLERY_COLORS.key, 0.6);
+  rim.position.copy(RIM_DIRECTION).multiplyScalar(10);
+  scene.add(rim);
 
-  const fill = new THREE.DirectionalLight(0xe8eef4, 0.45);
-  fill.position.set(-2.5, 2.5, 3.5);
-  scene.add(fill);
-
-  // Scene fog must stay off: it veils transmissive glass. The floor fades into the backdrop itself.
-  scene.add(createBackdrop(24));
-
-  const envMap = createStudioEnvironment(renderer);
+  // Scene fog must stay off: it veils transmissive glass.
+  // The room as the glass reflects it, one per table and walls, baked when first shown.
+  let look = preferredLook(query);
+  const envMaps = new Map();
+  const envFor = ({ table, wall }) => {
+    const key = `${table}/${wall}`;
+    if (!envMaps.has(key)) envMaps.set(key, createGalleryEnvironment(renderer, { table, wall }));
+    return envMaps.get(key);
+  };
+  const envMap = envFor(look);
   scene.environment = envMap;
   scene.environmentIntensity = 0.6;
   const jar = await createJar({ envMap, lens: LENS });
   scene.add(jar.root);
-  scene.add(createStudioFloor(23.5, {
+  const gallery = createGallery({
     jarRadius: jar.dims.bodyRadius,
     footRadius: jar.dims.footRadius,
     glassTop: jar.bounds.max.y,
     liquidBottom: jar.liquidBounds.min.y,
     liquidTop: jar.liquidBounds.max.y,
-  }));
+  });
+  scene.add(gallery.root);
   // The specimen is only ever seen through the liquid, so it has a scene of its own, drawn
   // over white into the image the jar's optics look up.
   const specimen = await createSpecimen({
@@ -124,6 +146,49 @@ async function start() {
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);
   specimenScene.add(specimen.object);
+
+  // The row of jars behind; the specimen's pose is baked for the front jar's mirror image
+  // before it starts to move.
+  const galleryJars = createGalleryJars({ jar, specimen, envMap, lens: LENS });
+  scene.add(galleryJars.root);
+  galleryJars.setQuality(jarQuality(profile));
+  function setJarCount(count) {
+    gallery.setBlocks(galleryJars.setCount(count));
+    loop?.invalidate();
+  }
+  setJarCount(slotCount(profile));
+
+  // What the jars stand on and the walls. The glass reflects the room as it now is, so the
+  // environment map is swapped along with them.
+  const mirror = createMirrorPass(gallery.reflection);
+  function setLook(next) {
+    look = { table: stageName(next.table ?? look.table), wall: wallName(next.wall ?? look.wall) };
+    const to = envFor(look);
+    gallery.setLook(look);
+    const blocks = look.table === "blocks";
+    galleryJars.setBlocks(blocks);
+    jar.optics.setBlocks(blocks);
+    scene.background.copy(ROOM_DARK);
+    const baked = new Set(envMaps.values());
+    scene.environment = to;
+    for (const root of [scene, specimenScene]) {
+      root.traverse((object) => {
+        for (const material of [object.material].flat()) {
+          if (material?.envMap && baked.has(material.envMap)) material.envMap = to;
+        }
+      });
+    }
+    loop?.invalidate();
+  }
+  setLook(look);
+
+  // The room without any jar, for the traced jars behind to look through. The lens blurs it
+  // deeply there, so half the size will do.
+  const roomImage = new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.HalfFloatType,
+    generateMipmaps: true,
+    minFilter: THREE.LinearMipmapLinearFilter,
+  });
 
   // Background mips stand in for the lens blur of what is seen far behind the glass.
   const backgroundImage = new THREE.WebGLRenderTarget(1, 1, {
@@ -140,12 +205,18 @@ async function start() {
   createSpecimenImage();
 
   let post = createSpecimenPost(camera, profile);
-  window.specimenDebug = { scene, camera, renderer, jar, specimen, look: specimenLook, lens: LENS, optics: jar.optics, floor: FLOOR_LOOK, get post() { return post; }, get specimenImage() { return specimenImage; } };
+  window.specimenDebug = {
+    scene, camera, renderer, jar, specimen, gallery, galleryJars, setJarCount, setLook, get stageLook() { return look; },
+    look: specimenLook, lens: LENS, optics: jar.optics, floor: FLOOR_LOOK, galleryLook: GALLERY_LOOK,
+    get post() { return post; }, get specimenImage() { return specimenImage; },
+  };
 
   const orbit = createOrbit(camera, canvas, {
     target: CAMERA.target.clone(),
     minDistance: 3.6,
-    maxDistance: 16,
+    maxDistance: 14,
+    minAzimuth: ROOM_YAW - ORBIT_TURN,
+    maxAzimuth: ROOM_YAW + ORBIT_TURN,
     onChange() {
       loop?.invalidate();
     },
@@ -161,11 +232,17 @@ async function start() {
     const w = Math.round(width * scale);
     const h = Math.round(height * scale);
     renderer.setDrawingBufferSize(w, h, 1);
-    post.target.setSize(w, h);
+    post.setSize(w, h);
     backgroundImage.setSize(w, h);
+    const rw = Math.max(1, Math.round(w / 2));
+    const rh = Math.max(1, Math.round(h / 2));
+    roomImage.setSize(rw, rh);
+    galleryJars.setImage(roomImage.texture, rw, rh);
+    // The mirror image is blurred by the polish and the lens anyway.
+    const mirrorScale = profile === "eco" ? 0.35 : 0.5;
+    mirror.setSize(Math.round(w * mirrorScale), Math.round(h * mirrorScale));
     specimenImage.setSize(w, h);
     jar.optics.setSize(w, h);
-    post.post.uniforms.size.value.set(w, h);
     loop?.invalidate();
   }
   resize();
@@ -173,12 +250,9 @@ async function start() {
 
   function setQuality(name) {
     profile = qualityName(name);
-    const mapSize = profile === "eco" ? 512 : profile === "detail" ? 2048 : 1024;
-    key.shadow.mapSize.set(mapSize, mapSize);
-    key.shadow.map?.dispose();
-    key.shadow.map = null;
-    post.target.dispose();
-    post.post.dispose();
+    galleryJars.setQuality(jarQuality(profile));
+    setJarCount(slotCount(profile));
+    post.dispose();
     post = createSpecimenPost(camera, profile);
     createSpecimenImage();
     resize();
@@ -196,10 +270,40 @@ async function start() {
     setQuality,
   });
 
+  const stageSelect = document.querySelector("#stage");
+  const wallSelect = document.querySelector("#wall");
+  function chooseLook(next) {
+    setLook(next);
+    if (stageSelect) stageSelect.value = look.table;
+    if (wallSelect) wallSelect.value = look.wall;
+    try {
+      localStorage.setItem(STAGE_KEY, look.table);
+      localStorage.setItem(WALL_KEY, look.wall);
+    } catch {}
+  }
+  if (stageSelect) {
+    stageSelect.value = look.table;
+    stageSelect.addEventListener("change", () => chooseLook({ table: stageSelect.value }));
+  }
+  if (wallSelect) {
+    wallSelect.value = look.wall;
+    wallSelect.addEventListener("change", () => chooseLook({ wall: wallSelect.value }));
+  }
+  const nextOf = (names, name) => names[(names.indexOf(name) + 1) % names.length];
+  document.addEventListener("keydown", (event) => {
+    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.target.closest?.("button,select,input,textarea,a,[contenteditable]")) return;
+    const key = event.key.toLowerCase();
+    if (key === "t") chooseLook({ table: nextOf(STAGE_NAMES, look.table) });
+    else if (key === "w") chooseLook({ wall: nextOf(WALL_NAMES, look.wall) });
+  });
+
   const tune = installTunePanel({
     habitat,
     renderer,
     specimen,
+    jarCount: () => galleryJars.shown.length,
+    setJarCount,
     onChange() { loop?.invalidate(); },
   });
   window.specimenDebug.tune = tune;
@@ -208,13 +312,28 @@ async function start() {
   let frame = 0;
   loop = createFrameLoop((dt) => {
     specimen.update(dt);
+    galleryJars.advance(dt);
     // Autofocus on the specimen, as a photographer would.
     specimen.object.getWorldPosition(focusPoint);
-    LENS.focus.value = camera.position.distanceTo(focusPoint);
+    LENS.focus.value = camera.position.distanceTo(focusPoint) + LENS.focusShift.value;
     jar.optics.setSpecimen(focusPoint);
+    jar.optics.advance(dt);
     post.post.uniforms.frame.value = frame++ % 997;
 
     jar.root.visible = false;
+    if (look.table !== "blocks") {
+      galleryJars.followSpecimen(specimen.object);
+      gallery.table.visible = false;
+      galleryJars.setPass("mirror");
+      mirror.render(renderer, scene, camera);
+      gallery.table.visible = true;
+    }
+    if (galleryJars.traced && galleryJars.shown.length) {
+      galleryJars.setPass("room");
+      renderer.setRenderTarget(roomImage);
+      renderer.render(scene, camera);
+    }
+    galleryJars.setPass("scene");
     renderer.setRenderTarget(backgroundImage);
     renderer.render(scene, camera);
     jar.root.visible = true;
@@ -223,6 +342,7 @@ async function start() {
 
     renderer.setRenderTarget(post.target);
     renderer.render(scene, camera);
+    post.prepare(renderer);
     renderer.setRenderTarget(null);
     renderer.render(post.postScene, post.postCamera);
   }, {

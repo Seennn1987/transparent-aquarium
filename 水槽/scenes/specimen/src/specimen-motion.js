@@ -5,7 +5,8 @@ import { randomGenerator } from "../../shared/random.js";
 // a few degrees about the jar's axis. A spring pulls it back well before it could reach a
 // wall, the base or the surface, and the fluid's drag keeps every change unhurried.
 export const MOTION = Object.freeze({
-  hoverRate: 0.45,          // playback rate of SQ_Hover: fins move slowly in glycerin
+  hoverRate: 1.2,           // playback rate of SQ_Hover
+  driftRate: 2,             // how fast the drift below runs
   wanderRadius: 0.07,       // horizontal wander target, from the jar's axis
   wanderHeight: 0.03,
   limitRadius: 0.16,        // hard limit of the horizontal offset

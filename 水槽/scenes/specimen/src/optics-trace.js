@@ -7,6 +7,13 @@ const normalize = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l
 const radial = (p) => normalize([p[0], 0, p[2]]);
 const neg = (a) => a.map((v) => -v);
 
+/** The liquid's surface, climbing the glass near the wall. side: 1 seen from above, -1 from below. */
+export function surfaceNormal(p, inner, side, meniscus = 0) {
+  const gap = Math.max(inner - Math.hypot(p[0], p[2]), 0);
+  const slope = meniscus * 1.2 * Math.exp(-gap / 0.012);
+  return normalize(add([0, side, 0], radial(p), -side * slope));
+}
+
 export function cylinder(o, d, r) {
   const a = d[0] * d[0] + d[2] * d[2];
   const b = o[0] * d[0] + o[2] * d[2];

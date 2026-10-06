@@ -55,7 +55,7 @@ export async function createSpecimen({ envMap, liquidBounds, facing }) {
   if (halfWidth + MOTION.limitRadius > wallRoom)
     throw new Error(`標本が壁に近すぎます（半幅 ${halfWidth.toFixed(2)} ＋動き / 余裕込み ${wallRoom.toFixed(2)}）`);
 
-  const motion = createSpecimenMotion();
+  const motion = createSpecimenMotion({ rate: MOTION.driftRate });
 
   return {
     object: pivot,

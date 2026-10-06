@@ -38,8 +38,9 @@ for (const seed of [1, 5021, 77777]) {
     assert.ok(Math.abs(u.uPupil.value) <= 1 && Math.abs(u.uLens.value) <= 1);
     assert.ok(u.uFunnelOpen.value >= 0 && u.uFunnelOpen.value <= 1);
   }
-  // About 50 beats a minute, the branchial hearts first and the systemic heart a moment later.
-  const period = 1 / ORGAN_RATES.heartHz;
+  // About 50 beats a minute at speed 1, the branchial hearts first and the systemic heart a
+  // moment later.
+  const period = 1 / (ORGAN_RATES.heartHz * organLook.speed.value);
   const gaps = peaks.branchial.slice(1).map((p, i) => p - peaks.branchial[i]);
   assert.ok(gaps.length > 60, `seed ${seed}: ${gaps.length} beats`);
   for (const g of gaps) assert.ok(Math.abs(g - period) < 2 * STEP, `seed ${seed}: beat gap ${g}`);

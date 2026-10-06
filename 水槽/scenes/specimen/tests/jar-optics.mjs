@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { traceColumn } from "../src/optics-trace.js";
+import { traceColumn, surfaceNormal } from "../src/optics-trace.js";
 
 // Dimensions of assets/jar.glb (blender/generate_specimen_jar.py).
 const JAR = { outer: 0.62, inner: 0.575 };
@@ -30,5 +30,18 @@ for (let x = 0; x < 0.62; x += 0.002) {
 }
 assert.ok(centre.through > 0.9, `face-on the glass lets most light through (${centre.through.toFixed(3)})`);
 assert.ok(darkest < 0.5 * centre.through, `the edge must be dark (${darkest.toFixed(3)})`);
+
+// With the meniscus turned off, the surface is flat.
+const onWall = [JAR.inner * 0.999, 2.27, 0];
+for (const side of [1, -1]) {
+  assert.deepEqual(surfaceNormal(onWall, JAR.inner, side, 0), [0, side, 0], "no meniscus: a flat surface");
+}
+
+// The meniscus climbs the glass: seen from above, the surface tilts toward the axis at the
+// wall and is flat again a few millimetres in.
+const tiltAt = (gap, side) => surfaceNormal([JAR.inner - gap, 2.27, 0], JAR.inner, side, 1)[0];
+assert.ok(tiltAt(0, 1) < -0.5, `at the wall, from above (${tiltAt(0, 1).toFixed(3)})`);
+assert.ok(tiltAt(0, -1) > 0.5, `at the wall, from below (${tiltAt(0, -1).toFixed(3)})`);
+assert.ok(Math.abs(tiltAt(0.05, 1)) < 0.03, `5 mm in, flat (${tiltAt(0.05, 1).toFixed(3)})`);
 
 console.log(`jar-optics: ok (through face-on ${centre.through.toFixed(3)}, at the edge ${darkest.toFixed(3)})`);

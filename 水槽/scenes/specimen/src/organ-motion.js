@@ -32,13 +32,13 @@ export const ORGAN_RATES = Object.freeze({
 
 // Strength of each kind of motion (0 stops it), and the speed of all of them.
 export const organLook = {
-  speed: { value: 1 },
-  heart: { value: 1 },
-  gut: { value: 1 },
-  eye: { value: 1 },
+  speed: { value: 1.37 },
+  heart: { value: 1.11 },
+  gut: { value: 1.56 },
+  eye: { value: 0.57 },
   mouth: { value: 1 },
   funnel: { value: 1 },
-  chromatophores: { value: 1 },
+  chromatophores: { value: 0.7 },
 };
 
 const DEG = Math.PI / 180;

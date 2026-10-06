@@ -7,6 +7,9 @@ export function createOrbit(camera, canvas, {
   maxDistance = 12,
   minPolar = 0.25,
   maxPolar = Math.PI * 0.48,
+  // Horizontal limits as angles about +Y from +Z; unset, the orbit goes all the way round.
+  minAzimuth = -Infinity,
+  maxAzimuth = Infinity,
   rotateSpeed = 0.0055,
   zoomSpeed = 0.0014,
   onChange = () => {},
@@ -21,7 +24,9 @@ export function createOrbit(camera, canvas, {
   let lastY = 0;
 
   function apply() {
-    spherical.theta = THREE.MathUtils.euclideanModulo(spherical.theta, Math.PI * 2);
+    spherical.theta = Number.isFinite(minAzimuth) || Number.isFinite(maxAzimuth)
+      ? THREE.MathUtils.clamp(spherical.theta, minAzimuth, maxAzimuth)
+      : THREE.MathUtils.euclideanModulo(spherical.theta, Math.PI * 2);
     spherical.phi = THREE.MathUtils.clamp(spherical.phi, minPolar, maxPolar);
     spherical.radius = THREE.MathUtils.clamp(spherical.radius, minDistance, maxDistance);
     offset.setFromSpherical(spherical);
