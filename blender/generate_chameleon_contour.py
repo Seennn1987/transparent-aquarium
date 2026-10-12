@@ -147,9 +147,22 @@ class Spine:
 
 
 # ================================================================ メッシュの小道具
+# 骨組みの定義（rig_chameleon.py が読む）。名前 → (頭, 尾, 親)。頂点グループも同じ名前
+BONES = {}
+
+
+def def_bone(name, head, tail, parent=None):
+    BONES[name] = (Vector(head), Vector(tail), parent)
+
+
 class Builder:
     def __init__(self):
         self.bm = bmesh.new()
+        self.marks = []
+
+    def set_group(self, name):
+        """ここから先に作る頂点を、骨 name の頂点グループに入れる（骨は剛体なので重み 1）。"""
+        self.marks.append((len(self.bm.verts), name))
 
     def tube(self, pts, radii, sides=8, up=None, flat=1.0, cap=True):
         """pts を通る管。radii はスカラーか点ごとの値。flat < 1 で up に直交する向きへ潰す。"""
@@ -219,6 +232,12 @@ class Builder:
             p.use_smooth = True
         ob = bpy.data.objects.new(PREFIX + name, me)
         coll.objects.link(ob)
+        n = len(me.vertices)
+        for k, (start, gname) in enumerate(self.marks):
+            end = self.marks[k + 1][0] if k + 1 < len(self.marks) else n
+            if end > start:
+                vg = ob.vertex_groups.get(gname) or ob.vertex_groups.new(name=gname)
+                vg.add(list(range(start, end)), 1.0, "REPLACE")
         return ob
 
 
@@ -311,7 +330,10 @@ DORSAL_EDGE_PX = [(4490, 1800), (4525, 1860), (4555, 1940), (4575, 2030), (4582,
 def build_skull(spine, bone_mat, coll):
     H = Head(spine)
     sk = Builder()
+    sk.set_group("Head")
     up_lat = Vector((0, 1, 0))
+    c0 = spine.at(0.0)[0]
+    def_bone("Head", c0, c0 + H.A * 0.6, "v00")
 
     def lat_casque(a, b):
         """かぶとの左右の開き: 前上の帯（頭頂稜）は正中に寄り、後ろ下（鱗状骨）ほど外へ開く。"""
@@ -372,6 +394,8 @@ def build_skull(spine, bone_mat, coll):
     # 歯（端生歯の小さな三角）と下顎。口は閉じている（[06]）
     teeth = Builder()
     md = Builder()
+    teeth.set_group("Head")
+    md.set_group("Head")
     for side in (-1, 1):
         for i in range(16):
             f = 0.15 + 0.80 * i / 15
@@ -429,8 +453,15 @@ def build_axial(spine, bone_mat, coll):
     vb = Builder()
     rb = Builder()
     stations = vertebra_stations(spine)
-    for kind, i, s, l in stations:
+    i_sac = next(k for k, st in enumerate(stations) if st[0] == "sacral")
+    for idx, (kind, i, s, l) in enumerate(stations):
         P, T, N = spine.at(s)
+        vname = f"v{idx:02d}"
+        # 椎骨の骨: 仙椎を根に、前は頭へ、後ろは尾の先へ連なる
+        parent = None if idx == i_sac else (f"v{idx + 1:02d}" if idx < i_sac else f"v{idx - 1:02d}")
+        def_bone(vname, P - T * (l * 0.5), P + T * (l * 0.5), parent)
+        vb.set_group(vname)
+        rb.set_group(vname)
         if kind == "caudal":
             f = i / max(1, M["caudal"] - 1)
             rc = 0.045 * (1 - f) ** 1.1 + 0.006
@@ -460,7 +491,8 @@ def build_axial(spine, bone_mat, coll):
             vb.tube([P - N * rc * 0.6, P - N * (rc + hh) + T * hh * 0.4], rc * 0.3, sides=5)
         # 肋骨
         if kind == "trunk":
-            build_rib(spine, rb, i, s)
+            build_rib(spine, rb, i, s, vname)
+            rb.set_group(vname)
         if kind == "cervical" and i >= 3:
             for side in (-1, 1):
                 rb.tube([spine.local(s, 0, -0.02, side * 0.05), spine.local(s, 0.08, -0.12 - 0.05 * (i - 3), side * 0.09)], 0.012, sides=5)
@@ -473,11 +505,13 @@ RIB_LEN = [0.35, 0.55, 0.75, 0.9, 1, 1, 1, 1, 1, 1, 1, 0.95, 0.8, 0.6, 0.4, 0.22
 HOOP = set(range(2, 12))   # 腹側の肋骨が正中で左右つながる範囲（[06] 腹側で前へ折れる線）
 
 
-def build_rib(spine, rb, i, s):
+def build_rib(spine, rb, i, s, vname):
     D = depth_at(s)
     w = M["body_half_width"] * lerp_table([(0.45, 0.6), (1.5, 1.0), (2.8, 1.0), (3.41, 0.65)], s)
     f = RIB_LEN[min(i, len(RIB_LEN) - 1)]
     for side in (-1, 1):
+        bname = f"rib{i:02d}.{'L' if side > 0 else 'R'}"
+        rb.set_group(bname)
         # [06] 背側の肋骨は後ろ下へ長く斜めに、腹側の肋骨は前下へ折れて正中へ
         ctrl = [spine.local(s, 0.0, -0.01, side * 0.045),
                 spine.local(s, 0.16, -0.16 * D, side * 0.75 * w),
@@ -486,6 +520,7 @@ def build_rib(spine, rb, i, s):
         pts = bezier_pts(ctrl, 8)
         cut = max(2, int(len(pts) * f))
         pts = pts[:cut]
+        def_bone(bname, ctrl[0], pts[-1], vname)
         rb.tube(pts, [0.016] * len(pts), sides=6)
         if i in HOOP:
             v = [pts[-1], spine.local(s, 0.55, -0.85 * D, side * 0.45 * w), spine.local(s, 0.42, -0.99 * D, side * 0.02)]
@@ -530,7 +565,7 @@ def build_hand(b, wrist, D, G, phal, bundles, length, curl_deg=80.0):
                 p = q + dcur * 0.008
 
 
-def limb(b, j0, dirs, lens, radii, paired_offset=0.0):
+def limb(b, j0, dirs, lens, radii, paired_offset=0.0, groups=None):
     pts = [j0]
     p = j0
     for d, l in zip(dirs, lens):
@@ -538,6 +573,8 @@ def limb(b, j0, dirs, lens, radii, paired_offset=0.0):
         pts.append(p)
     for k in range(len(lens)):
         a, c = pts[k], pts[k + 1]
+        if groups:
+            b.set_group(groups[k])
         if paired_offset > 0 and k == 1:
             # 前腕・下腿は2本（橈骨と尺骨、脛骨と腓骨）
             side = (c - a).cross(Vector((0, 1, 0)))
@@ -552,7 +589,12 @@ def limb(b, j0, dirs, lens, radii, paired_offset=0.0):
     return pts
 
 
-def build_appendicular(spine, bone_mat, coll):
+def nearest_station(stations, s):
+    k = min(range(len(stations)), key=lambda j: abs(stations[j][2] - s))
+    return f"v{k:02d}"
+
+
+def build_appendicular(spine, bone_mat, coll, stations):
     g = Builder()
     fl = Builder()
     hl = Builder()
@@ -560,8 +602,11 @@ def build_appendicular(spine, bone_mat, coll):
     s_sh = M["neck_len"] + 0.18
     shoulders = {}
     for side in (-1, 1):
+        S = "L" if side > 0 else "R"
         top = spine.local(s_sh, -0.02, -0.08, side * 0.12)
         sh = spine.local(s_sh, 0.04, -0.08 - M["scapula"], side * 0.19)
+        g.set_group(f"scapula.{S}")
+        def_bone(f"scapula.{S}", top, sh, nearest_station(stations, s_sh))
         g.tube([top, (top + sh) * 0.5 + Vector((0, side * 0.03, 0)), sh], [0.03, 0.026, 0.035], sides=8, up=Vector((0, 1, 0)), flat=0.5)
         # 烏口骨: 肩関節から腹側の正中（胸骨は軟骨なので手順 5）
         g.tube([sh, spine.local(s_sh, -0.06, -0.08 - M["scapula"] - 0.28, side * 0.05)], 0.028, sides=7, up=Vector((0, 1, 0)), flat=0.5)
@@ -569,6 +614,8 @@ def build_appendicular(spine, bone_mat, coll):
     # ---- 腰帯
     s_hip = spine.s_sacrum + 0.12
     hips = {}
+    g.set_group("pelvis")
+    def_bone("pelvis", spine.local(s_hip, 0.0, -0.02), spine.local(s_hip, 0.06, -M["ilium"]), nearest_station(stations, s_hip))
     for side in (-1, 1):
         top = spine.local(s_hip, 0.0, -0.02, side * 0.07)
         ac = spine.local(s_hip, 0.06, -M["ilium"], side * 0.15)
@@ -582,18 +629,31 @@ def build_appendicular(spine, bone_mat, coll):
     # ---- 四肢: [01] では前肢も後肢も腹側（+X）へほぼ水平に出し、手足は軽く握る
     joints = {}
     for side in (-1, 1):
+        S = "L" if side > 0 else "R"
         lat = side * 0.35
         dz = side * 0.12     # [01] 手前と奥の肢が上下に少しずれて見える
         fore = limb(fl, shoulders[side],
                     [Vector((0.86, lat, -0.30 + dz)), Vector((0.95, lat * 0.25, 0.18 + dz))],
-                    [M["humerus"], M["forearm"]], [0.038, 0.024], paired_offset=0.026)
+                    [M["humerus"], M["forearm"]], [0.038, 0.024], paired_offset=0.026,
+                    groups=[f"upperarm.{S}", f"forearm.{S}"])
         joints[("fore", side)] = fore
-        build_hand(fl, fore[-1], Vector((0.9, lat * 0.2, 0.05)), Vector((0.0, 0.0, 1.0)),
+        dh = Vector((0.9, lat * 0.2, 0.05))
+        def_bone(f"upperarm.{S}", fore[0], fore[1], f"scapula.{S}")
+        def_bone(f"forearm.{S}", fore[1], fore[2], f"upperarm.{S}")
+        def_bone(f"hand.{S}", fore[2], fore[2] + dh.normalized() * M["manus"] * 0.6, f"forearm.{S}")
+        fl.set_group(f"hand.{S}")
+        build_hand(fl, fore[-1], dh, Vector((0.0, 0.0, 1.0)),
                    PHALANGES_MANUS, BUNDLE_MANUS, M["manus"])
         hind = limb(hl, hips[side],
                     [Vector((0.80, lat, -0.20 + dz)), Vector((0.96, lat * 0.2, 0.25 + dz))],
-                    [M["femur"], M["tibia"]], [0.040, 0.026], paired_offset=0.028)
+                    [M["femur"], M["tibia"]], [0.040, 0.026], paired_offset=0.028,
+                    groups=[f"thigh.{S}", f"shin.{S}"])
         joints[("hind", side)] = hind
+        df = Vector((0.9, lat * 0.2, 0.08))
+        def_bone(f"thigh.{S}", hind[0], hind[1], "pelvis")
+        def_bone(f"shin.{S}", hind[1], hind[2], f"thigh.{S}")
+        def_bone(f"foot.{S}", hind[2], hind[2] + df.normalized() * M["pes"] * 0.6, f"shin.{S}")
+        hl.set_group(f"foot.{S}")
         # 足根: 近位の3要素は癒合して1つ（[D15]）
         hl.ellipsoid(hind[-1] + Vector((0.03, 0, 0)), Vector((0.05, 0, 0)), Vector((0, 0.045, 0)), Vector((0, 0, 0.04)), 8)
         build_hand(hl, hind[-1] + Vector((0.04, 0, 0)), Vector((0.9, lat * 0.2, 0.08)), Vector((0.0, 0.0, -1.0)),
@@ -650,12 +710,13 @@ def landmarks(spine, H, joints, stations):
 
 
 def build():
+    BONES.clear()
     coll = clear_previous()
     mat = bone_material()
     spine = Spine()
     H = build_skull(spine, mat, coll)
     stations = build_axial(spine, mat, coll)
-    joints = build_appendicular(spine, mat, coll)
+    joints = build_appendicular(spine, mat, coll, stations)
     root = bpy.data.objects.new(PREFIX + "Root", None)
     coll.objects.link(root)
     for ob in coll.objects:
