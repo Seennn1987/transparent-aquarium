@@ -8,7 +8,7 @@
 
 | ファイル | 用途 | ライセンス | 出典 |
 |---|---|---|---|
-| `05-lightbox-calyptratus-1.jpg` | 実物の透明標本。背側に近い角度 | CC BY-SA 4.0 | Brianwray26, Wikimedia Commons, File:Lightbox Chameleon-1.jpg。標本は *Chamaeleo calyptratus*、スミソニアン国立自然史博物館、カタログ 66198、イエメン、1951-01-21 |
+| `05-lightbox-calyptratus-1.jpg` | 実物の透明標本。背側に近い角度 | CC BY-SA 4.0 | Brianwray26, Wikimedia Commons, File:Lightbox Chameleon-1.jpg。標本は *Chamaeleo calyptratus*、カタログ 66198、イエメン、1951-01-21。写真の中のラベルは「Field Museum of Natural History, Division of Amphibians and Reptiles」と読める（以前の「スミソニアン」は取り下げ。Commons の記載は未確認） |
 | `06-lightbox-calyptratus-2.jpg` | 同じ標本の側面。染まりの数値と、かぶとの輪はこちら | CC BY-SA 4.0 | Brianwray26, Wikimedia Commons, File:Lightbox Chameleon-2.jpg。標本は上と同じ |
 | `07-erpetologie-chamaeleon-skeleton.jpg` | 全身の骨のつながり、対生の足、巻いた尾。種は *Chamaeleo chamaeleon* で、かぶとの高さはエボシカメレオンに使わない | パブリックドメイン（PD-old） | Bibron, Duméril, Duméril『Erpétologie générale』（1834–1854）。Wikimedia Commons |
 | `08-live-calyptratus-male-lateral.jpg` | 生きている雄の横姿。かぶと、トサカ、足の把握 | CC BY-SA 3.0 | Geoff（英語版 Wikipedia から Commons へ）。File:C Calyptratus male.jpg |
