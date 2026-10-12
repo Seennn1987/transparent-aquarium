@@ -31,3 +31,11 @@
 - Commons の `ChameleonSkeletonNHMLondon.jpg` は、展示ラベルがアガマ科のキノボリトカゲ（*Calotes*）を指している。ファイル名がカメレオンでも使わない
 - *Brookesia nana* の解剖図は葉カメレオンで、かぶとの比率が違う
 - ヒトの舌骨、リクガメの骨格が同じページにある図版は、カメレオンの部分が小さい
+
+## CT データ（頭骨の形の正、2026-10-12〜）
+
+| ファイル | 用途 | 出典 | 扱い |
+|---|---|---|---|
+| `Chamaeleo.stl`（リポジトリ外: `画像サンプル収集/エボシカメレオン/`） | 頭骨の 3D 形状をそのまま使う | DigiMorph, *Chamaeleo calyptratus*, Texas Memorial Museum TNHC 62768。スキャン Matthew Colbert（2003-07-11）、画像処理 Jessie Maisano。https://www.digimorph.org/specimens/Chamaeleo_calyptratus/whole/ | 再配布しない。公開・販売の前に利用許可を確認する |
+
+ユーザーが集めた写真（`画像サンプル収集/エボシカメレオン/`、出典なし、一部に販売会社のロゴ）は、形を見比べる参考にだけ使い、リポジトリにも公開物にも入れない。

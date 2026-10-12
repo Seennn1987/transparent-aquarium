@@ -332,13 +332,73 @@ CASQUE_INNER_PX = [(4035, 1345), (4080, 1380), (4130, 1450), (4185, 1540), (4235
 DORSAL_EDGE_PX = [(4490, 1800), (4525, 1860), (4555, 1940), (4575, 2030), (4582, 2110), (4575, 2160)]
 
 
+CT_SKULL = os.path.join(HERE, "private", "chameleon_skull_ct.npz")   # Digimorph の CT から作る（リポジトリ外）
+CT_SKULL_FACES = 90000
+
+
+def load_ct_skull():
+    """CT 由来の頭骨（頭の局所座標 a, b, lat）。間引いたものを _dec.npz に保存して次から使う。"""
+    import numpy as np
+    dec = CT_SKULL.replace(".npz", "_dec.npz")
+    if os.path.exists(dec) and os.path.getmtime(dec) >= os.path.getmtime(CT_SKULL):
+        d = np.load(dec)
+        return d["v"], d["f"], tuple(d["condyle"][:2])
+    d = np.load(CT_SKULL)
+    me = bpy.data.meshes.new("_ct_tmp")
+    me.vertices.add(len(d["v"]))
+    me.vertices.foreach_set("co", d["v"].ravel())
+    f = d["f"]
+    me.loops.add(f.size)
+    me.loops.foreach_set("vertex_index", f.ravel())
+    me.polygons.add(len(f))
+    me.polygons.foreach_set("loop_start", np.arange(0, f.size, 3))
+    me.update()
+    ob = bpy.data.objects.new("_ct_tmp", me)
+    bpy.context.scene.collection.objects.link(ob)
+    sm = ob.modifiers.new("S", "SMOOTH")
+    sm.factor, sm.iterations = 0.5, 3
+    dm = ob.modifiers.new("D", "DECIMATE")
+    dm.ratio = CT_SKULL_FACES / len(f)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me2 = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+    bpy.data.objects.remove(ob)
+    bpy.data.meshes.remove(me)
+    me2.calc_loop_triangles()
+    V = np.empty(len(me2.vertices) * 3, np.float32)
+    me2.vertices.foreach_get("co", V)
+    T = np.empty(len(me2.loop_triangles) * 3, np.int32)
+    me2.loop_triangles.foreach_get("vertices", T)
+    bpy.data.meshes.remove(me2)
+    np.savez_compressed(dec, v=V.reshape(-1, 3), f=T.reshape(-1, 3), condyle=d["condyle"])
+    return V.reshape(-1, 3), T.reshape(-1, 3), tuple(d["condyle"][:2])
+
+
 def build_skull(spine, bone_mat, coll):
+    use_ct = os.path.exists(CT_SKULL)
+    if use_ct:
+        v, f, cond = load_ct_skull()
+        Head.CONDYLE = (float(cond[0]), float(cond[1]))   # CT の後頭顆を首の付け根に合わせる
     H = Head(spine)
     sk = Builder()
     sk.set_group("Head")
     up_lat = Vector((0, 1, 0))
     c0 = spine.at(0.0)[0]
     def_bone("Head", c0, c0 + H.A * 0.6, "v00")
+    if use_ct:
+        # 2026-10-12: 頭骨は CT（Digimorph, TNHC 62768）の形をそのまま使う（build_chameleon_skull_from_ct.py）
+        sk.bm.free()
+        me = bpy.data.meshes.new(PREFIX + "Skull")
+        O, A_, B_ = H.origin, H.A, H.B
+        W = [O + A_ * float(a) + B_ * float(b) + Vector((0.0, float(l), 0.0)) for a, b, l in v]
+        me.from_pydata(W, [], f.tolist())
+        me.update()
+        for p in me.polygons:
+            p.use_smooth = True
+        me.materials.append(bone_mat)
+        ob = bpy.data.objects.new(PREFIX + "Skull", me)
+        coll.objects.link(ob)
+        ob.vertex_groups.new(name="Head").add(list(range(len(me.vertices))), 1.0, "REPLACE")
+        return H
     if PLATE_SKULL:
         # 2026-10-12 作り直し: 板と帯を融合した頭骨（chameleon_skull.py）
         sk.bm.free()
