@@ -16,3 +16,5 @@ docs/references/chameleon/04-user-*.jpg
 docs/references/chameleon/ペースト済み*
 # Digimorph の CT から作った頭骨（再配布しない）
 blender/private/
+# MorphoSource の全身 CT から書き出したカメレオン（非商用・再配布しない）
+水槽/scenes/specimen/assets/private/
