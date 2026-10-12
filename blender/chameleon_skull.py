@@ -1,18 +1,26 @@
 """
-エボシカメレオン頭骨（手順 1 の作り直し、2026-10-12）
+エボシカメレオン頭骨（手順 1 の作り直し 第 2 版、2026-10-12）
 
-方針: 骨を細い管で組まない。実物の輪郭どおりの「穴のあいた板」と「帯」を作り、
-重ねたまま Voxel Remesh で 1 つの殻に融合し、ならしてから表面のざらつきを付ける。
+方針: 骨を細い管で組まない。実物の輪郭どおりの「穴のあいた板」と、断面を変えながらつなぐ立体（loft）を作り、
+重ねたまま Voxel Remesh で 1 つの殻に融合してならす。表面のざらつきは後回し（RUGOSITY = 0）。
 
 頭の局所座標（generate_chameleon_contour.Head と同じ）:
   a = 方形骨の後縁 0 → 吻端 1（頭骨長 L = 1）、b = 顎の線から背側へ、y = 左右。
   画素 (x, y) は [06] の原寸で a = (x - 3975) / 601、b = (2160 - y) / 601。
 
 形の出どころ:
-  [06]  外形・かぶと・眼窩・背側の稜・鼻孔の位置・下顎の下縁（実物の C. calyptratus 標本の側面）
-  [p6]  ユーザーが保存した頭骨の側面写真（透かし入り、リポジトリ外）: 側頭窓・眼窩前の孔・方形骨の柱・下顎の高さ
-  [p4][p1] 斜め前と正面の写真: 幅（眼窩で最も広く、吻と頭頂へ狭まる。かぶとは正中の薄い刃）
-  幅の値（眼窩の高さで半幅 0.24 L）は p1 の目測で、測定ではない。
+  [06]  外形・かぶと・眼窩・背側の稜・下顎の下縁（実物の C. calyptratus 標本の側面）
+  [p6]  ユーザー保存の頭骨の側面（透かし入り、リポジトリ外）: 下側頭窓・方形骨・下顎の深さ
+  [p4][u2] 斜め前: 眼窩はすり鉢状のくぼみで輪は無い、眉が張り出す、眼窩の前に細長い孔が 3〜4 本並ぶ、吻は丸い楔
+  [p1]  正面: 眉の高さが最も広い逆三角形、顎へ細くなる。かぶとは正中の薄い刃
+  幅の値（眉の高さで半幅 約 0.24 L）は p1 の目測で、測定ではない。
+
+第 2 版での変更（プロデューサーの指摘 4 点ほか）:
+  1 正面の幅を逆三角形に（眉で最大、顎で細い）
+  2 眼窩の輪をやめ、縁へ向かって面を沈めてすり鉢状に。眉はひさし
+  3 方形骨と下顎を、断面の形を変えながらつなぐ立体に（下顎は涙形の断面、方形骨は前後に広い板）
+  4 口の中の 2 枚の板を消し、口蓋は細い棒（口蓋骨・翼状骨・外翼状骨）と吻の裏の小さな板に
+  5 眼窩前の孔を細長い 3 本に、鼻孔を吻の先へ  6 かぶとを正中の刃＋後ろの 2 本の棒に  7 歯を顎の縁の内側へ
 """
 
 import math
@@ -22,15 +30,20 @@ import bpy
 import numpy as np
 from mathutils import Vector, noise
 
+RUGOSITY = 0.0   # 表面のざらつき（後回し）。1.0 で以前の強さ
+
 
 def px2ab(x, y):
     return ((x - 3975.0) / 601.0, (2160.0 - y) / 601.0)
 
 
 def interp(table, x):
-    xs = [p[0] for p in table]
-    ys = [p[1] for p in table]
-    return float(np.interp(x, xs, ys))
+    return float(np.interp(x, [p[0] for p in table], [p[1] for p in table]))
+
+
+def smoothstep(e0, e1, x):
+    t = min(1.0, max(0.0, (x - e0) / (e1 - e0)))
+    return t * t * (3 - 2 * t)
 
 
 def ellipse(c, ra, rb, n=40, rot=0.0):
@@ -59,8 +72,7 @@ def inside(poly, P):
 
 
 def slab(bm, outline, holes, to3d, thick_vec, res=0.008):
-    """(u, v) 平面の領域（outline の内側、holes の外側）を格子で埋め、厚みのある閉じた板にする。
-    to3d(u, v) → 表の面の点、thick_vec(u, v) → 裏へ向かう厚みのベクトル。"""
+    """(u, v) 平面の領域（outline の内側、holes の外側）を格子で埋め、厚みのある閉じた板にする。"""
     us = [p[0] for p in outline]
     vs = [p[1] for p in outline]
     u0, u1, v0, v1 = min(us), max(us), min(vs), max(vs)
@@ -97,83 +109,110 @@ def slab(bm, outline, holes, to3d, thick_vec, res=0.008):
                     bm.faces.new([V(*p, 0), V(*p, 1), V(*q, 1), V(*q, 0)])
 
 
+def loft(bm, centers, ups, section, n=16):
+    """centers の点を通る立体。各点で断面 section(i, θ) → (up 方向, 横方向) のずれを返す。両端は閉じる。"""
+    rings = []
+    m = len(centers)
+    for i, c in enumerate(centers):
+        T = (centers[min(i + 1, m - 1)] - centers[max(i - 1, 0)]).normalized()
+        U = ups[i] - T * ups[i].dot(T)
+        U.normalize()
+        W = T.cross(U)
+        ring = []
+        for k in range(n):
+            th = 2 * math.pi * k / n
+            du, dw = section(i, th)
+            ring.append(bm.verts.new(c + U * du + W * dw))
+        rings.append(ring)
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(n):
+            bm.faces.new((r0[k], r0[(k + 1) % n], r1[(k + 1) % n], r1[k]))
+    for ring, rev in ((rings[0], True), (rings[-1], False)):
+        c = sum((v.co for v in ring), Vector()) / len(ring)
+        cv = bm.verts.new(c)
+        for k in range(n):
+            a, b = ring[k], ring[(k + 1) % n]
+            bm.faces.new((cv, b, a) if rev else (cv, a, b))
+
+
 # ---------------------------------------------------------------- 形の表（a, b）
-# 頭骨の側面の外周 [06]: 顎の線 → 吻端 → 背側のぎざぎざの稜 → 眼窩の上の屋根 → 後ろの方形骨
 DORSAL_RIDGE = [px2ab(x, y) for x, y in ((4600, 2150), (4596, 2080), (4575, 2000), (4545, 1920), (4505, 1850), (4450, 1800))]
-# 有鱗類は下側頭弓が無いので、眼窩の後ろの下側頭窓は下が開いている（[p6] 眼窩の後ろから翼状骨が見える）。
-# 側面の板は、眼窩の後ろの柱（後眼窩骨）と、その上の上側頭弓の帯だけを後ろへ伸ばす
-LATERAL_OUTLINE = ([(0.405, 0.0), (0.98, 0.0), (1.02, 0.04)] + DORSAL_RIDGE[1:] +
+# 有鱗類は下側頭弓が無いので、眼窩の後ろの下側頭窓は下が開いている。側面の板は後眼窩骨の柱と上側頭弓の帯だけを後ろへ
+LATERAL_OUTLINE = ([(0.405, 0.0), (0.97, 0.0), (1.005, 0.02), (1.02, 0.06)] + DORSAL_RIDGE[2:] +
                    [(0.70, 0.635), (0.55, 0.645), (0.42, 0.635), (0.30, 0.62), (0.18, 0.60), (0.10, 0.578),
                     (0.05, 0.55), (0.04, 0.50), (0.12, 0.465), (0.28, 0.46), (0.345, 0.43), (0.375, 0.34),
                     (0.385, 0.20), (0.39, 0.08)])
-ORBIT_C = (0.632, 0.30)      # [06] 眼球の中心（0.29）より少し上。[p6] 眼窩の上縁は屋根に近い
-ORBIT_R = (0.205, 0.19)      # 骨の開口。[p6] 開口の幅は頭骨長の約 0.3、縁を含めて 0.45（[06]）
-ORBIT_ROT = 0.25             # 後ろ上がりの卵形（[p6]）
-# 眼窩の後ろの下側頭窓 [p6]（眼窩との間に太い後眼窩骨の柱を残す）
-TEMPORAL = [(0.13, 0.20), (0.30, 0.15), (0.37, 0.21), (0.375, 0.34), (0.32, 0.45), (0.19, 0.46), (0.115, 0.38), (0.105, 0.28)]
-NOSTRIL = ellipse(px2ab(4528, 2095), 0.032, 0.022, 20)                 # [06] 吻の先の明るい点
-PREORBITAL = ellipse((0.865, 0.30), 0.02, 0.034, 16, rot=-0.5)        # [p6] 眼窩前の小孔
+ORBIT_C = (0.632, 0.30)
+ORBIT_R = (0.20, 0.19)
+ORBIT_ROT = 0.25
+NOSTRIL = ellipse((0.975, 0.085), 0.026, 0.02, 20)                     # 吻の先
+# 眼窩の前の縁に沿って並ぶ細長い孔（[p4][u2]）
+SLITS = []
+for _k, _ang in enumerate((-0.35, 0.05, 0.45)):
+    _c = (ORBIT_C[0] + ORBIT_R[0] * 1.55 * math.cos(_ang), ORBIT_C[1] + ORBIT_R[1] * 1.55 * math.sin(_ang))
+    SLITS.append(ellipse(_c, 0.012, 0.042 - 0.006 * _k, 16, rot=_ang))
 
-# 左右の半幅（a に沿って）と、高さによる絞り。眼窩の縁は外へ張り出す
-HALF_WIDTH = [(0.0, 0.165), (0.15, 0.185), (0.35, 0.205), (0.55, 0.215), (0.70, 0.20), (0.82, 0.16), (0.92, 0.105), (0.98, 0.06), (1.03, 0.025)]
-# 顎の高さでは細く、眼窩の高さで最も広く、屋根へ向かって絞る（[p1][p4]）
-HEIGHT_PINCH = [(-0.2, 0.70), (0.0, 0.78), (0.15, 0.94), (0.30, 1.0), (0.45, 0.92), (0.58, 0.72), (0.66, 0.58)]
+# 左右の半幅（a に沿って）。正面から見ると眉の高さで最も広い逆三角形（[p1]）
+HALF_WIDTH = [(0.0, 0.17), (0.15, 0.19), (0.35, 0.215), (0.55, 0.235), (0.70, 0.22), (0.82, 0.17), (0.92, 0.11), (0.98, 0.065), (1.03, 0.03)]
+HEIGHT_PINCH = [(-0.2, 0.52), (0.0, 0.60), (0.15, 0.74), (0.30, 0.86), (0.45, 0.98), (0.55, 1.0), (0.62, 0.9), (0.66, 0.8)]
+HEIGHT_PINCH_SNOUT = [(-0.2, 0.60), (0.0, 0.70), (0.15, 0.85), (0.30, 0.85), (0.45, 0.62), (0.60, 0.42)]
 
 
-# 吻では左右の背側の稜が正中へ寄り、顔は上から下へ外へ開く斜面になる（[p4] 吻は楔形）
-HEIGHT_PINCH_SNOUT = [(-0.2, 0.75), (0.0, 0.85), (0.15, 0.92), (0.30, 0.80), (0.45, 0.55), (0.60, 0.38)]
+def orbit_polar(a, b):
+    cr, sr = math.cos(-ORBIT_ROT), math.sin(-ORBIT_ROT)
+    du, dv = a - ORBIT_C[0], b - ORBIT_C[1]
+    u, v = du * cr - dv * sr, du * sr + dv * cr
+    u /= ORBIT_R[0]
+    v /= ORBIT_R[1]
+    return math.hypot(u, v), math.atan2(v, u)
 
 
 def lat_skull(a, b):
-    f = min(1.0, max(0.0, (a - 0.70) / 0.15))
+    f = smoothstep(0.70, 0.88, a)
     pinch = (1 - f) * interp(HEIGHT_PINCH, b) + f * interp(HEIGHT_PINCH_SNOUT, b)
     y = interp(HALF_WIDTH, a) * pinch
-    # 眼窩の縁の張り出し（縁の帯で最大）
-    da = (a - ORBIT_C[0]) / ORBIT_R[0]
-    db = (b - ORBIT_C[1]) / ORBIT_R[1]
-    r = math.hypot(da, db)
-    y += 0.05 * math.exp(-((r - 1.12) / 0.3) ** 2)
-    # 起伏: 頬骨の丸い帯（眼窩の下）、後眼窩骨の柱、背側の稜は外へ、眼窩と鼻孔のあいだの顔はわずかに凹む
+    r, th = orbit_polar(a, b)
+    # 眼窩: 縁へ向かって面が内側へ沈む（すり鉢）。上の縁は眉のひさしとして外へ張り出す
+    y -= 0.075 * (1 - smoothstep(1.0, 1.75, r))
+    y += 0.04 * math.exp(-((r - 1.35) / 0.25) ** 2) * max(0.0, math.sin(th)) ** 1.5
+    # 頬骨の帯（眼窩の下）は丸くわずかに外へ
     if a > 0.38:
-        y += 0.02 * math.exp(-((b - 0.05) / 0.045) ** 2)
-    y += 0.015 * math.exp(-((a - 0.40) / 0.035) ** 2) * (1.0 if b < 0.5 else 0.0)
-    y -= 0.012 * math.exp(-((a - 0.86) / 0.06) ** 2 - ((b - 0.22) / 0.12) ** 2)
+        y += 0.015 * math.exp(-((b - 0.05) / 0.045) ** 2)
     return y
 
 
+TOP_EDGE = sorted(DORSAL_RIDGE[2:] + [(0.70, 0.635), (0.55, 0.645), (0.42, 0.635), (0.30, 0.62), (0.18, 0.60),
+                                      (0.10, 0.578), (0.05, 0.55)], key=lambda p: p[0])
+
+
 def top_b(a):
-    """背側の輪郭の高さ（屋根の高さ）。"""
-    pts = [p for p in LATERAL_OUTLINE if p[1] > 0.1]
-    pts = sorted(pts, key=lambda p: p[0])
-    return interp(pts, a)
+    """背側の輪郭の高さ（屋根の高さ）。側面の板の下側の縁（上側頭弓の下縁など）は混ぜない。"""
+    return interp(TOP_EDGE, a)
 
 
-# かぶと [06]（外周と、内側の窓）
 CASQUE_OUTER = [px2ab(x, y) for x, y in (
     (4030, 1325), (4110, 1345), (4200, 1405), (4280, 1505), (4345, 1605), (4400, 1700), (4450, 1800),
     (4400, 1815), (4280, 1835), (4150, 1820), (4075, 1810), (4048, 1760), (4020, 1665), (3998, 1545),
-    (3988, 1430), (3992, 1362))]   # 後ろの縁は細い棒（鱗状骨）だけにするため、内側の窓へ寄せた
+    (3988, 1430), (3992, 1362))]
 CASQUE_INNER = [px2ab(x, y) for x, y in (
     (4040, 1352), (4085, 1385), (4140, 1450), (4200, 1540), (4245, 1620), (4272, 1690), (4255, 1735),
     (4195, 1745), (4130, 1720), (4080, 1660), (4045, 1580), (4022, 1490), (4015, 1410))]
+# 正中の刃（頭頂稜）: 前の帯と窓の下の帯。後ろの縁は板にせず、左右の鱗状骨の棒だけにする
+CREST = CASQUE_OUTER[:10] + list(reversed(CASQUE_INNER[:8]))
+SQUAMOSAL_PATH = [CASQUE_OUTER[0], CASQUE_OUTER[15], CASQUE_OUTER[14], CASQUE_OUTER[13], CASQUE_OUTER[12],
+                  CASQUE_OUTER[11], (0.06, 0.62), (0.045, 0.54)]
 
-
-def lat_casque(a, b):
-    """前上の帯（頭頂稜）は正中で薄い刃。後ろ下（鱗状骨の 2 本）ほど左右へ開く。"""
-    f_low = min(1.0, max(0.0, (1.40 - b) / 0.85))
-    f_back = min(1.0, max(0.0, 1.0 - (a - 0.05) / 0.35))
-    return 0.006 + 0.15 * (f_low ** 1.3) * f_back
-
-
-# 下顎 [06][p6]: 口は閉じている。後ろほど深く、鉤状突起が上へ立つ
-MANDIBLE_OUTLINE = [(1.03, -0.012), (0.75, -0.016), (0.40, -0.016), (0.27, 0.0), (0.20, 0.06), (0.15, 0.055),
-                    (0.10, -0.005), (0.02, -0.012), (-0.045, -0.035), (-0.05, -0.08), (0.05, -0.115), (0.20, -0.132),
-                    (0.45, -0.135), (0.70, -0.125), (0.88, -0.10), (0.98, -0.068), (1.035, -0.035)]
-MANDIBLE_HALF = [(-0.05, 0.135), (0.1, 0.14), (0.3, 0.145), (0.55, 0.145), (0.8, 0.11), (0.95, 0.055), (1.04, 0.015)]
+# 下顎: 上縁（口を閉じて上顎に合う）と下縁、厚み、左右の位置
+# 後ろ寄りは上縁が少し高い（上角骨・鉤状骨の高まり、[p6]）。独立した板は立てない
+MAND_TOP = [(-0.05, -0.035), (0.02, -0.01), (0.10, 0.012), (0.20, 0.02), (0.30, 0.0), (0.40, -0.016), (0.75, -0.016), (1.03, -0.012)]
+MAND_BOT = [(-0.05, -0.08), (0.05, -0.115), (0.20, -0.132), (0.45, -0.135), (0.70, -0.125), (0.88, -0.10), (0.98, -0.068), (1.035, -0.035)]
+MAND_THICK = [(-0.05, 0.04), (0.10, 0.055), (0.40, 0.05), (0.80, 0.04), (1.03, 0.03)]
+# 下顎は上顎の縁の内側に収まる（正面から見て顎が外へはみ出さない）
+MANDIBLE_HALF = [(-0.05, 0.14), (0.1, 0.14), (0.3, 0.135), (0.55, 0.13), (0.8, 0.10), (0.95, 0.055), (1.04, 0.015)]
 
 
 # ---------------------------------------------------------------- 組み立て
-def build_skull_mesh(H, Builder, def_bone, spine, bone_mat, coll, voxel=0.0065, target_faces=70000):
+def build_skull_mesh(H, Builder, def_bone, spine, bone_mat, coll, voxel=0.0055, target_faces=70000):
     sk = Builder()
     sk.set_group("Head")
     bm = sk.bm
@@ -181,97 +220,90 @@ def build_skull_mesh(H, Builder, def_bone, spine, bone_mat, coll, voxel=0.0065, 
     LY = Vector((0, 1, 0))
 
     for side in (-1, 1):
-        # 1. 側面の板（上顎・頬骨・前前頭骨・後眼窩骨・鱗状骨の外側の面を一枚に）
-        holes = [ellipse(ORBIT_C, ORBIT_R[0], ORBIT_R[1], 48, ORBIT_ROT), NOSTRIL, PREORBITAL]
+        # 1. 側面の板（上顎・頬骨・前前頭骨・後眼窩骨・上側頭弓の外側の面を 1 枚に）。眼窩のまわりはすり鉢
+        holes = [ellipse(ORBIT_C, ORBIT_R[0], ORBIT_R[1], 56, ORBIT_ROT), NOSTRIL] + SLITS
         slab(bm, LATERAL_OUTLINE, holes,
              lambda u, v, s=side: ab(u, v, s * lat_skull(u, v)),
-             lambda u, v, s=side: LY * (-s * 0.026))
-        # 2. 眼窩の縁の帯（上と前で太く、後ろで細い）
-        ring = []
-        rads = []
-        for k in range(49):
-            t = 2 * math.pi * k / 48
-            cr, sr = math.cos(ORBIT_ROT), math.sin(ORBIT_ROT)
-            du, dv = ORBIT_R[0] * 1.06 * math.cos(t), ORBIT_R[1] * 1.06 * math.sin(t)
-            u, v = ORBIT_C[0] + du * cr - dv * sr, ORBIT_C[1] + du * sr + dv * cr
-            ring.append(ab(u, v, side * (lat_skull(u, v) + 0.008)))
-            top = max(0.0, math.sin(t))
-            front = max(0.0, math.cos(t))
-            rads.append(0.03 + 0.02 * top + 0.012 * front)
-        sk.tube(ring, rads, sides=10, cap=False)
-        # 3. 方形骨の柱と、口蓋から下へ張り出す翼状骨
-        sk.tube([ab(0.045, 0.53, side * 0.135), ab(0.05, 0.30, side * 0.15), ab(0.07, 0.04, side * 0.155), ab(0.075, -0.015, side * 0.15)],
-                [0.03, 0.034, 0.042, 0.05], sides=10)
-        slab(bm, [(0.12, 0.10), (0.42, 0.06), (0.40, -0.02), (0.26, -0.07), (0.14, -0.04)], [],
-             lambda u, v, s=side: ab(u, v, s * (0.06 + 0.06 * (0.42 - u))),
-             lambda u, v, s=side: LY * (-s * 0.02))
-        # 4. 上顎の歯の土台（内側へ少し張り出す棚）
-        slab(bm, [(0.40, -0.002), (1.0, -0.002), (1.0, 0.035), (0.40, 0.035)], [],
-             lambda u, v, s=side: ab(u, v, s * lat_skull(u, 0.0)),
-             lambda u, v, s=side: LY * (-s * 0.05))
-        # 5. かぶと（頭頂稜の刃と、後ろの 2 本の鱗状骨）
-        slab(bm, CASQUE_OUTER, [CASQUE_INNER],
-             lambda u, v, s=side: ab(u, v, s * lat_casque(u, v)),
-             lambda u, v, s=side: LY * (-s * 0.016), res=0.007)
-        # 後ろの縁: 左右の鱗状骨は細い丸い棒（[p6] 2 本が頂で合わさる）
-        back = CASQUE_OUTER[10:] + CASQUE_OUTER[:1]
-        sk.tube([ab(u, v, side * (lat_casque(u, v) + 0.004)) for u, v in reversed(back)],
-                [0.02] * len(back), sides=8)
-        # 6. 下顎の板と、丸い下縁
-        slab(bm, MANDIBLE_OUTLINE, [],
-             lambda u, v, s=side: ab(u, v, s * interp(MANDIBLE_HALF, u)),
-             lambda u, v, s=side: LY * (-s * 0.035))
-        low = [p for p in MANDIBLE_OUTLINE if p[1] < -0.04]
-        low = sorted(low, key=lambda p: p[0])
-        sk.tube([ab(u, v + 0.018, side * (interp(MANDIBLE_HALF, u) - 0.022)) for u, v in low],
-                [0.026] * len(low), sides=10)
+             lambda u, v, s=side: LY * (-s * 0.026), res=0.006)
+        # 2. 方形骨: 前後に幅のある平たい骨。上は鱗状骨、下端は下顎と関節するこぶ
+        qa = [(0.05, 0.53), (0.04, 0.40), (0.042, 0.26), (0.055, 0.12), (0.072, 0.01)]
+        qc = [ab(u, v, side * (0.135 + 0.02 * k / 4)) for k, (u, v) in enumerate(qa)]
+        depth = [0.045, 0.07, 0.08, 0.07, 0.055]
+        loft(bm, qc, [H.A] * len(qc),
+             lambda i, th, d=depth: (d[i] * 0.5 * math.cos(th) * (1.0 if math.cos(th) < 0 else 0.7), 0.016 * math.sin(th)), 14)
+        sk.ellipsoid(ab(0.075, -0.012, side * 0.152), H.A * 0.04, Vector((0, 0.035, 0)), H.B * 0.03, 10)
+        # 3. 下顎: 断面は涙形（下が厚く丸い）。前で浅く、後ろで深い
+        us = [1.03 - (1.08) * k / 36 for k in range(37)]
+        cs, hs, ts = [], [], []
+        for u in us:
+            top, bot, t = interp(MAND_TOP, u), interp(MAND_BOT, u), interp(MAND_THICK, u)
+            cs.append(ab(u, 0.5 * (top + bot), side * (interp(MANDIBLE_HALF, u) - t * 0.5)))
+            hs.append(top - bot)
+            ts.append(t)
 
-    # 7. 屋根（眼窩の間の前頭骨〜頭頂骨、吻の上の鼻骨）: 背側の輪郭に沿って左右の板をつなぐ
+        def msec(i, th, hs=hs, ts=ts):
+            up = 0.5 * hs[i] * math.sin(th)
+            fat = 0.6 + 0.4 * (1 - math.sin(th)) * 0.5      # 下ほど厚い
+            return up, 0.5 * ts[i] * math.cos(th) * fat
+        loft(bm, cs, [H.B] * len(cs), msec, 16)
+        # 4. 口蓋の棒: 口蓋骨（吻の裏 → 後ろ）、翼状骨（→ 方形骨の下端）、外翼状骨（上顎の後端 → 翼状骨）
+        sk.tube([ab(0.82, 0.035, side * 0.05), ab(0.62, 0.05, side * 0.075), ab(0.46, 0.05, side * 0.09)],
+                [0.018, 0.02, 0.02], sides=8, up=LY, flat=0.6)
+        sk.tube([ab(0.46, 0.05, side * 0.09), ab(0.30, 0.035, side * 0.11), ab(0.17, 0.015, side * 0.13), ab(0.08, 0.0, side * 0.145)],
+                [0.02, 0.018, 0.017, 0.02], sides=8, up=H.B, flat=0.55)
+        sk.tube([ab(0.43, 0.02, side * (lat_skull(0.43, 0.02) - 0.015)), ab(0.42, 0.045, side * 0.10)], 0.018, sides=8)
+        # 5. かぶとの後ろの縁: 左右の鱗状骨は細い丸い棒（頂から方形骨の上端へ、下るほど外へ開く）
+        rod = []
+        for k, (u, v) in enumerate(SQUAMOSAL_PATH):
+            f = k / (len(SQUAMOSAL_PATH) - 1)
+            rod.append(ab(u, v, side * (0.008 + 0.13 * smoothstep(0.0, 1.0, f) ** 1.2)))
+        pts = []
+        for p, q in zip(rod, rod[1:]):
+            for j in range(4):
+                pts.append(p.lerp(q, j / 4))
+        pts.append(rod[-1])
+        sk.tube(pts, [0.018 + 0.006 * (k / len(pts)) for k in range(len(pts))], sides=10)
+        # 6. 正中の刃（左右の板が中央で重なって 1 枚になる）
+        slab(bm, CREST, [],
+             lambda u, v, s=side: ab(u, v, s * 0.008),
+             lambda u, v, s=side: LY * (-s * 0.016), res=0.006)
+
+    # かぶとの前縁は丸く太い稜
+    front = CASQUE_OUTER[:7]
+    sk.tube([ab(u - 0.006, v - 0.006, 0.0) for u, v in front], [0.022 + 0.012 * k / 6 for k in range(7)], sides=10)
+
+    # 7. 屋根: 眉のあいだの広い三角の額（前頭骨）と、吻の上の鼻骨
     def roof3d(u, t):
         bt = top_b(u)
-        w = lat_skull(u, bt - 0.01) * 0.94
-        return ab(u, bt - 0.014 + 0.02 * (1 - t * t), t * w)
+        w = lat_skull(u, bt - 0.012) * 0.96
+        return ab(u, bt - 0.014 + 0.018 * (1 - t * t), t * w)
     slab(bm, [(0.10, -1.0), (1.015, -1.0), (1.015, 1.0), (0.10, 1.0)], [], roof3d,
          lambda u, t: -H.B * 0.03, res=0.01)
-    # かぶとの前縁: 頭頂稜は丸く太い稜（[p4][p6]）
-    front = CASQUE_OUTER[:7]
-    sk.tube([ab(u - 0.006, v - 0.006, 0.0) for u, v in front], [0.024 + 0.012 * k / 6 for k in range(7)], sides=10)
-    # 8. 脳函と後頭顆（外からはほとんど見えない）
-    sk.ellipsoid(ab(0.18, 0.45, 0.0), H.A * 0.17, Vector((0, 0.11, 0)), H.B * 0.11, 16)
+    # 吻の裏の小さな口蓋（前上顎骨・鋤骨）
+    slab(bm, [(0.80, -1.0), (1.0, -1.0), (1.0, 1.0), (0.80, 1.0)], [],
+         lambda u, t: ab(u, 0.03, t * (lat_skull(u, 0.02) - 0.015)),
+         lambda u, t: H.B * 0.02, res=0.01)
+    # 8. 脳函（平たく小さく、口蓋の奥）と後頭顆
+    sk.ellipsoid(ab(0.20, 0.47, 0.0), H.A * 0.15, Vector((0, 0.06, 0)), H.B * 0.065, 16)
     sk.ellipsoid(ab(0.04, 0.53, 0.0), H.A * 0.035, Vector((0, 0.04, 0)), H.B * 0.035, 10)
-    # 9. 歯: 上下の縁に細かい三角が交互に並ぶ（口を閉じたので、のこぎりの線になる）
+    # 9. 歯: 上下の縁の内側に、細かい三角が交互に並ぶ
     for side in (-1, 1):
         for k in range(26):
-            u = 0.20 + 0.78 * k / 25
-            w = interp(HALF_WIDTH, u) - 0.012
-            sk.cone(ab(u, 0.004, side * w), ab(u, -0.024, side * w), 0.012, 4)
+            u = 0.22 + 0.76 * k / 25
+            w = lat_skull(u, 0.0) - 0.014
+            sk.cone(ab(u, 0.006, side * w), ab(u, -0.022, side * w), 0.011, 4)
             u2 = u + 0.015
-            wm = interp(MANDIBLE_HALF, u2) - 0.006
-            sk.cone(ab(u2, -0.02, side * wm), ab(u2, 0.006, side * wm), 0.011, 4)
-    # 10. 結節: 背側の稜、眼窩の上縁、かぶとの前縁に並ぶ小さな突起
+            wm = interp(MANDIBLE_HALF, u2) - interp(MAND_THICK, u2) * 0.5
+            sk.cone(ab(u2, interp(MAND_TOP, u2) - 0.004, side * wm), ab(u2, interp(MAND_TOP, u2) + 0.02, side * wm), 0.010, 4)
+    # 10. 背側の稜の結節（[06] の輪郭でもぎざぎざに見える範囲だけ）
     ridge = []
     for (u0, v0), (u1, v1) in zip(DORSAL_RIDGE, DORSAL_RIDGE[1:]):
         for k in range(6):
             f = k / 6
             ridge.append((u0 + (u1 - u0) * f, v0 + (v1 - v0) * f))
     for side in (-1, 1):
-        for u, v in ridge[2:]:
-            sk.ellipsoid(ab(u - 0.01, v, side * (lat_skull(u, v) * 0.85)), H.A * 0.016, Vector((0, 0.016, 0)), H.B * 0.016, 6)
-        for k in range(10):
-            t = 0.35 + 0.65 * k / 9          # 眼窩の上縁（前上から真上）
-            ang = math.pi * (0.25 + 0.5 * t)
-            u = ORBIT_C[0] + ORBIT_R[0] * 1.25 * math.cos(ang)
-            v = ORBIT_C[1] + ORBIT_R[1] * 1.25 * math.sin(ang)
-            sk.ellipsoid(ab(u, v, side * (lat_skull(u, v) + 0.005)), H.A * 0.014, Vector((0, 0.012, 0)), H.B * 0.014, 6)
-    for k in range(18):
-        f = k / 17
-        i = f * (6 - 1)
-        i0 = int(i)
-        i1 = min(6, i0 + 1)
-        (u0, v0), (u1, v1) = CASQUE_OUTER[i0], CASQUE_OUTER[i1]
-        g = i - i0
-        u, v = u0 + (u1 - u0) * g, v0 + (v1 - v0) * g
-        sk.ellipsoid(ab(u - 0.008, v - 0.008, 0.0), H.A * 0.013, Vector((0, 0.02, 0)), H.B * 0.013, 6)
+        for u, v in ridge[3:]:
+            sk.ellipsoid(ab(u - 0.008, v - 0.004, side * (lat_skull(u, v - 0.01) * 0.85)), H.A * 0.012, Vector((0, 0.012, 0)), H.B * 0.012, 6)
 
     ob = sk.emit("Skull", bone_mat, coll)
     fuse(ob, voxel, target_faces, H)
@@ -279,7 +311,7 @@ def build_skull_mesh(H, Builder, def_bone, spine, bone_mat, coll, voxel=0.0065, 
 
 
 def fuse(ob, voxel, target_faces, H):
-    """板と帯を 1 つの殻に融合 → ならす → 上面のざらつき → 間引き。結果を実メッシュにする。"""
+    """板と立体を 1 つの殻に融合 → ならす → （必要なら）ざらつき → 間引き。結果を実メッシュにする。"""
     m = ob.modifiers.new("Fuse", "REMESH")
     m.mode = "VOXEL"
     m.voxel_size = voxel
@@ -287,28 +319,25 @@ def fuse(ob, voxel, target_faces, H):
     m.use_smooth_shade = True
     s = ob.modifiers.new("Soften", "SMOOTH")
     s.factor = 0.6
-    s.iterations = 6
+    s.iterations = 8
     dg = bpy.context.evaluated_depsgraph_get()
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
     ob.modifiers.clear()
     old = ob.data
     ob.data = me
     bpy.data.meshes.remove(old)
-    # ざらつき: 背側ほど強い細かな凹凸（[p4] 頭の上の面全体が顆粒状）
-    bmx = bmesh.new()
-    bmx.from_mesh(me)
-    bmx.normal_update()
-    org = H.origin
-    for v in bmx.verts:
-        rel = v.co - org
-        b = rel.dot(H.B)
-        w = min(1.0, max(0.0, (b - 0.15) / 0.4))
-        n1 = noise.noise(v.co * 55.0)
-        n2 = noise.noise(v.co * 130.0 + Vector((3.1, 1.7, 0.4)))
-        v.co += v.normal * ((0.0045 * n1 + 0.0025 * n2) * (0.1 + 0.9 * w))
-    bmx.to_mesh(me)
-    bmx.free()
-    # 間引き（ウェブで扱える面数へ）
+    if RUGOSITY > 0:
+        bmx = bmesh.new()
+        bmx.from_mesh(me)
+        bmx.normal_update()
+        for v in bmx.verts:
+            b = (v.co - H.origin).dot(H.B)
+            w = min(1.0, max(0.0, (b - 0.15) / 0.4))
+            n1 = noise.noise(v.co * 55.0)
+            n2 = noise.noise(v.co * 130.0 + Vector((3.1, 1.7, 0.4)))
+            v.co += v.normal * RUGOSITY * ((0.0045 * n1 + 0.0025 * n2) * (0.1 + 0.9 * w))
+        bmx.to_mesh(me)
+        bmx.free()
     if len(me.polygons) > target_faces:
         d = ob.modifiers.new("Thin", "DECIMATE")
         d.ratio = target_faces / len(me.polygons)
@@ -323,5 +352,3 @@ def fuse(ob, voxel, target_faces, H):
     ob.vertex_groups.clear()
     vg = ob.vertex_groups.new(name="Head")
     vg.add(list(range(len(me.vertices))), 1.0, "REPLACE")
-    if not me.materials:
-        pass
