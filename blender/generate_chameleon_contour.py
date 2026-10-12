@@ -30,6 +30,11 @@ import sys
 from mathutils import Vector, Matrix
 
 PREFIX = "CH_"
+PLATE_SKULL = True    # False で以前の管で組んだ頭骨（比較用）
+try:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    HERE = "/Users/shoui/transparent-aquarium/transparent-aquarium/blender"
 
 # ---------------------------------------------------------------- 測った数（L = 頭骨長）
 M = {
@@ -334,6 +339,13 @@ def build_skull(spine, bone_mat, coll):
     up_lat = Vector((0, 1, 0))
     c0 = spine.at(0.0)[0]
     def_bone("Head", c0, c0 + H.A * 0.6, "v00")
+    if PLATE_SKULL:
+        # 2026-10-12 作り直し: 板と帯を融合した頭骨（chameleon_skull.py）
+        sk.bm.free()
+        import runpy
+        cs = runpy.run_path(os.path.join(HERE, "chameleon_skull.py"), run_name="chameleon_skull")
+        cs["build_skull_mesh"](H, Builder, def_bone, spine, bone_mat, coll)
+        return H
 
     def lat_casque(a, b):
         """かぶとの左右の開き: 前上の帯（頭頂稜）は正中に寄り、後ろ下（鱗状骨）ほど外へ開く。"""
