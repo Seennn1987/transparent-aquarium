@@ -65,7 +65,7 @@ def decimated_meshes(d, k):
     if os.path.exists(dec) and os.path.getmtime(dec) >= os.path.getmtime(DATA):
         e = np.load(dec)
         return {n[:-3]: (e[n], e[n[:-3] + "__f"]) for n in e.files if n.endswith("__v")}
-    names = sorted({f.split("__")[0] for f in d.files if not f.startswith(("rig__", "soft__"))})
+    names = sorted({f.split("__")[0] for f in d.files if not f.startswith(("rig__", "soft__", "cart__"))})
     total = sum(len(d[n + "__f"]) for n in names)
     ratio = min(1.0, FACES_TOTAL / total)
     out = {}
@@ -208,6 +208,52 @@ def build_skin(d, k, coll, rigob):
     return ob
 
 
+CART_COLOR = (0.35, 0.55, 0.95, 1.0)   # 仮。軟骨（アルシアンブルーで青）。色は手順 A5 で測った通し光に合わせる
+
+
+def cartilage_material():
+    mat = bpy.data.materials.get(PREFIX + "Cartilage") or bpy.data.materials.new(PREFIX + "Cartilage")
+    mat.use_nodes = True
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    bsdf.inputs["Base Color"].default_value = CART_COLOR
+    bsdf.inputs["Roughness"].default_value = 0.5
+    return mat
+
+
+def build_cartilage(d, k, coll, rigob):
+    """肋骨の途切れ（CT で骨の濃さに写らない 0.2〜2 mm の隙間）をつなぐ軟骨の棒（ct_body_pipeline/cartgaps.py）。
+    トカゲの腹側の肋骨・胸骨につながる肋骨は軟骨であることが多い（Williston 1925, The Osteology of the Reptiles, 第 3 章）。
+    どの隙間も、その肋骨の骨に重み 1 で付ける。"""
+    if "cart__a" not in d.files or len(d["cart__a"]) == 0:
+        return None
+    A = ct_to_model(d["cart__a"], k); Bv = ct_to_model(d["cart__b"], k); R = d["cart__r"] * k; names = [str(n) for n in d["cart__bone"]]
+    verts, faces, owner = [], [], []
+    NSEG = 8
+    for a, b, r, nm in zip(A, Bv, R, names):
+        ax = b - a; L = np.linalg.norm(ax)
+        if L < 1e-6:
+            continue
+        u = ax / L; t = np.cross(u, [0, 0, 1.0]); t = t if np.linalg.norm(t) > 1e-3 else np.cross(u, [0, 1.0, 0]); t /= np.linalg.norm(t); w = np.cross(u, t)
+        base = len(verts)
+        for end in (a - u * r, b + u * r):            # 両端を太さの分だけ骨の中へ差し込む
+            for j in range(NSEG):
+                th = 2 * np.pi * j / NSEG
+                verts.append(end + r * (np.cos(th) * t + np.sin(th) * w)); owner.append(nm)
+        for j in range(NSEG):
+            j2 = (j + 1) % NSEG
+            faces.append((base + j, base + j2, base + NSEG + j2, base + NSEG + j))
+        faces.append(tuple(base + j for j in range(NSEG))[::-1]); faces.append(tuple(base + NSEG + j for j in range(NSEG)))
+    me = bpy.data.meshes.new(PREFIX + "Cartilage"); me.from_pydata([list(v) for v in verts], [], faces); me.update()
+    me.materials.append(cartilage_material())
+    ob = bpy.data.objects.new(PREFIX + "Cartilage", me); coll.objects.link(ob)
+    for nm in set(owner):
+        ob.vertex_groups.new(name=nm).add([i for i, o in enumerate(owner) if o == nm], 1.0, "REPLACE")
+    ob.parent = rigob
+    mo = ob.modifiers.new("Armature", "ARMATURE"); mo.object = rigob
+    print(f"[Chameleon CT] 軟骨（肋骨の途切れ） {len(A)} 本")
+    return ob
+
+
 def bone_material():
     mat = bpy.data.materials.get(PREFIX + "BoneGray") or bpy.data.materials.new(PREFIX + "BoneGray")
     mat.use_nodes = True
@@ -299,6 +345,7 @@ def build():
     mo = ob.modifiers.new("Armature", "ARMATURE")
     mo.object = rigob
     build_skin(d, k, coll, rigob)
+    build_cartilage(d, k, coll, rigob)
     root = bpy.data.objects.new(PREFIX + "Root", None)
     coll.objects.link(root)
     rigob.parent = root

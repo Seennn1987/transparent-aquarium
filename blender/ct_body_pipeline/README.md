@@ -61,7 +61,8 @@
 | 28 | fanfix.py B_h9 B_h10 | → `B_h10.npy` | 束になったラベル（同じ側の他の 1.6 倍より大きい）を、骨格線の枝のつながりで 1 本ずつに分け、肋骨の先へ 1 対 1 で割り当てる（B_h10 = 最終。`chameleon_body_labels.npz`） |
 | 29 | softmesh.py | → `soft_mesh.npz` | 皮膚・筋肉の膜の外形（軟部の密度、別の個体と標識を外す） |
 | 30 | softrig.py | → `soft_rigged.npz` | 膜の骨への重み、肋骨の復元と同じ変形、離れた骨どうしをつなぐ面を外す |
-| 31 | finish.sh B_h10.npy | → `chameleon_body_ct.npz` | bonemesh.py（骨ごとのメッシュ。肋骨は ribrestore.py で復元した位置）→ rig_data.py（骨組み。肋骨の骨、舌骨は頸 v02 の子）→ 統合（膜を含む） |
+| 31 | cartgaps.py | → `cart_gaps.json` | 肋骨の途切れ（骨の濃さに写らない 0.15〜2 mm の隙間、22 か所）の両端と太さ。軟骨の棒にする |
+| 32 | finish.sh B_h10.npy | → `chameleon_body_ct.npz` | bonemesh.py（骨ごとのメッシュ。肋骨は ribrestore.py で復元した位置）→ rig_data.py（骨組み。肋骨の骨、舌骨は頸 v02 の子）→ 統合（膜を含む） |
 
 確認用:
 - `frag.py <B.npy>` で、骨ごとの離れた破片を数えます。

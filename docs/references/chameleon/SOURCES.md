@@ -40,3 +40,13 @@
 | `Chamaeleo-calyptratus-000050726.zip`（リポジトリ外: `画像サンプル収集/エボシカメレオン/morphosource_media-id-000050726_download-c86f5ae0/`）。JPEG 断面 4287 枚、3059×3791、0.026 mm | 頭以外の全身の骨の形をそのまま使う（2026-10-13〜） | MorphoSource Media 000050726, *Chamaeleo calyptratus calyptratus*, California Academy of Sciences CAS:HERP:135515（oVert）。https://www.morphosource.org/concern/media/000050726 | 権利表示 In Copyright – Non-Commercial Use Permitted。商用利用は不可、3D プリントは制限あり。データとここから作ったメッシュ・骨ラベルは再配布しない（`blender/private/`）。使うときは oVert を引用する。Blackburn et al. 2024, *BioScience* 74:169–186。資金: Christopher V. Anderson / University of South Dakota, NSF DBI-1701665 |
 
 ユーザーが集めた写真（`画像サンプル収集/エボシカメレオン/`、出典なし、一部に販売会社のロゴ）は、形を見比べる参考にだけ使い、リポジトリにも公開物にも入れない。
+
+## 文献（軟骨の場所、2026-10-13）
+
+- Williston, S. W. (1925). *The Osteology of the Reptiles*. Chapter III. Wikisource: https://en.wikisource.org/wiki/The_Osteology_of_the_Reptiles/Chapter_3（パブリックドメイン）
+  - トカゲの胸骨は多少石灰化した板で、胸骨の肋骨は軟骨
+  - カメレオンには V 字の腹側の肋骨が多く、ふつう軟骨
+- Diaz, R. E. Jr. & Trainor, P. A. (2015). Hand/foot splitting and the 're-evolution' of mesopodial skeletal elements during the evolution and radiation of chameleons. *BMC Evolutionary Biology* 15:184. https://pmc.ncbi.nlm.nih.gov/articles/PMC4574539/
+  - エボシカメレオンの遠位手根骨 3 は軟骨のまま
+- madcham.de（愛好家の解説。論文ではない）: https://www.madcham.de/en/?p=1025
+  - ほとんどの肋骨が胸骨か、反対側の肋骨の軟骨につながる
