@@ -1,0 +1,13 @@
+set -e
+cd "$(dirname "$0")"
+cp "$1" B.npy
+python3 bonemesh.py
+python3 rig_data.py > rig.log
+python3 -c "
+import numpy as np
+b=dict(np.load('bones_raw.npz')); r=np.load('rig.npz')
+for k in r.files: b['rig__'+k]=r[k]
+b['rig__axis']=((np.load('axis5_s.npy')*2+0.5)*0.104).astype(np.float32); b['rig__dorsal']=np.load('frame_D.npy')
+b['rig__J']=np.load('J.npy'); b['rig__axis_step']=np.array(0.1)
+np.savez_compressed('chameleon_body_ct.npz',**b)"
+cp chameleon_body_ct.npz ../ctb/private/; rm -f ../ctb/private/chameleon_body_ct_dec.npz
