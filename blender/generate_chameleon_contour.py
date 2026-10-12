@@ -607,7 +607,12 @@ def build_appendicular(spine, bone_mat, coll):
 def bone_material():
     mat = bpy.data.materials.get(PREFIX + "BoneGray") or bpy.data.materials.new(PREFIX + "BoneGray")
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    # ノード名は UI の言語で訳されるので、種類で探す
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        bsdf = mat.node_tree.nodes.new("ShaderNodeBsdfPrincipled")
+        outn = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None) or mat.node_tree.nodes.new("ShaderNodeOutputMaterial")
+        mat.node_tree.links.new(bsdf.outputs[0], outn.inputs[0])
     bsdf.inputs["Base Color"].default_value = BONE_GRAY
     bsdf.inputs["Roughness"].default_value = 0.55
     return mat
