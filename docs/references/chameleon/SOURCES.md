@@ -1,0 +1,33 @@
+# カメレオン参考画像の出典
+
+制作時の比較用。画面や公開物には貼らない。
+
+透かし入りの 01〜04 は、このフォルダに置くだけで、リポジトリには含めない（`.gitignore`）。
+
+## この計画で正にする写真
+
+| ファイル | 用途 | ライセンス | 出典 |
+|---|---|---|---|
+| `05-lightbox-calyptratus-1.jpg` | 実物の透明標本。背側に近い角度 | CC BY-SA 4.0 | Brianwray26, Wikimedia Commons, File:Lightbox Chameleon-1.jpg。標本は *Chamaeleo calyptratus*、スミソニアン国立自然史博物館、カタログ 66198、イエメン、1951-01-21 |
+| `06-lightbox-calyptratus-2.jpg` | 同じ標本の側面。染まりの数値と、かぶとの輪はこちら | CC BY-SA 4.0 | Brianwray26, Wikimedia Commons, File:Lightbox Chameleon-2.jpg。標本は上と同じ |
+| `07-erpetologie-chamaeleon-skeleton.jpg` | 全身の骨のつながり、対生の足、巻いた尾。種は *Chamaeleo chamaeleon* で、かぶとの高さはエボシカメレオンに使わない | パブリックドメイン（PD-old） | Bibron, Duméril, Duméril『Erpétologie générale』（1834–1854）。Wikimedia Commons |
+| `08-live-calyptratus-male-lateral.jpg` | 生きている雄の横姿。かぶと、トサカ、足の把握 | CC BY-SA 3.0 | Geoff（英語版 Wikipedia から Commons へ）。File:C Calyptratus male.jpg |
+| `09-live-calyptratus-head-casque.jpg` | かぶとと眼塔の寄り | CC BY 4.0 | Σ64, Wikimedia Commons, File:Chamaeleo calyptratus 03.jpg |
+| `10-plate-1852-calyptratus.jpg` | 図1が *Chamaeleo calyptratus*。図2は別種（*C. balteatus*）なので比率に使わない | 制限なし（Internet Archive Book Images / Flickr Commons） | Duméril『Description des reptiles nouveaux…』（1852）Pl. XXI。Wikimedia Commons |
+
+## ユーザーが貼った写真（低解像・再配布しない）
+
+添付をコピーした。いずれも 1 辺 447px 前後で、色の数値は仮。
+
+| ファイル | 用途 |
+|---|---|
+| `01-user-jar-diaphonized.jpg` | 瓶の中の姿勢と、骨の赤・軟骨の青・内臓の褐色。透かしは Kaisei Kakou |
+| `02-user-skeleton-blue-light.jpg` | 枝をつかむ骨格。照明が青いので染まりの色には使わない |
+| `03-user-mood-only.jpg` | 色の雰囲気の絵。骨の形と比率には使わない |
+| `04-user-skeleton-black.jpg` | 黒背景の骨格。透かしは Aflo |
+
+## 採らなかったもの
+
+- Commons の `ChameleonSkeletonNHMLondon.jpg` は、展示ラベルがアガマ科のキノボリトカゲ（*Calotes*）を指している。ファイル名がカメレオンでも使わない
+- *Brookesia nana* の解剖図は葉カメレオンで、かぶとの比率が違う
+- ヒトの舌骨、リクガメの骨格が同じページにある図版は、カメレオンの部分が小さい

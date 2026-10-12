@@ -7,3 +7,8 @@ __pycache__/
 *.pyc
 .claude/
 renders/
+# 透かし入りの参考写真。再配布しない
+docs/references/chameleon/01-user-*.jpg
+docs/references/chameleon/02-user-*.jpg
+docs/references/chameleon/03-user-*.jpg
+docs/references/chameleon/04-user-*.jpg
