@@ -43,10 +43,20 @@ export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // crosses about 0.38 units side-on; the photo's neck absorbs 0.371 in blue.
 export const SKIN_GAIN = 0.98;
 
+// The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
+// only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,
+// absorbance 0.69 : 0.87 : 0.97. Photo 06 shows no brown mass (that specimen may have been gutted; Davis &
+// Gore 1936 make removing the viscera necessary when the gut is full). The gain is set on screen: where
+// the mass is thickest side-on (0.13 model units or more, no bone in front), blue lets through 0.38 with
+// the skin in front counted (median of the gains each pixel needs, 4.8; quartiles 3.8–5.8).
+export const VISCERA_SPECTRUM = [0.71, 0.9, 1];
+export const VISCERA_GAIN = 4.8;
+
 /** Light let through (red, green, blue) for paths through bone, cartilage and skin films. */
-export function transmitted({ bone = 0, cartilage = 0, skin = 0 }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1 } = {}) {
+export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0 }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1, visceraScale = 1 } = {}) {
   const b = BONE_GAIN * boneScale * boneT0 * (1 - Math.exp(-Math.max(bone, 0) / boneT0));
   const c = CARTILAGE_GAIN * cartilageScale * Math.max(cartilage, 0);
   const s = SKIN_GAIN * skinScale * Math.max(skin, 0);
-  return [0, 1, 2].map((i) => Math.exp(-(b * BONE_SPECTRUM[i] + c * CARTILAGE_SPECTRUM[i] + s * SKIN_SPECTRUM[i])));
+  const v = VISCERA_GAIN * visceraScale * Math.max(viscera, 0);
+  return [0, 1, 2].map((i) => Math.exp(-(b * BONE_SPECTRUM[i] + c * CARTILAGE_SPECTRUM[i] + s * SKIN_SPECTRUM[i] + v * VISCERA_SPECTRUM[i])));
 }

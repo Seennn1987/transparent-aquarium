@@ -17,5 +17,8 @@ if os.path.exists('cart_gaps.json'):              # 肋骨の途切れをつな�
 np.savez_compressed('chameleon_body_ct.npz',**b)
 import os
 if os.path.exists('soft_rigged.npz'):            # 膜は別のファイル（1 ファイルを 30 MB 未満に保つため）
-    z=np.load('soft_rigged.npz'); np.savez_compressed('chameleon_body_soft.npz',**{'soft__'+k:z[k] for k in z.files})"
+    z=np.load('soft_rigged.npz'); out={'soft__'+k:z[k] for k in z.files}
+    if os.path.exists('viscera_rigged.npz'):     # 体腔の内臓の一塊（visceramesh.py）
+        v=np.load('viscera_rigged.npz'); out.update({'visc__'+k:v[k] for k in v.files})
+    np.savez_compressed('chameleon_body_soft.npz',**out)"
 cp chameleon_body_ct.npz ../ctb/private/; [ -f chameleon_body_soft.npz ] && cp chameleon_body_soft.npz ../ctb/private/; rm -f ../ctb/private/chameleon_body_ct_dec.npz

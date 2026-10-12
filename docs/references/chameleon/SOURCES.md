@@ -50,3 +50,17 @@
   - エボシカメレオンの遠位手根骨 3 は軟骨のまま
 - madcham.de（愛好家の解説。論文ではない）: https://www.madcham.de/en/?p=1025
   - ほとんどの肋骨が胸骨か、反対側の肋骨の軟骨につながる
+
+## 文献（体腔・肺・内臓・色素、2026-10-13）
+
+- Klaver, C. J. J. (1977). Comparative lung-morphology in the genus *Chamaeleo* Laurenti, 1768 (Sauria: Chamaeleonidae). *Beaufortia* 25(327):167–199. https://repository.naturalis.nl/pub/505191/BEAU1977025327001.pdf
+  - *Chamaeleo* の肺には、腹側縁と尾側縁から盲嚢（diverticula）が出る（p.167）。*C. calyptratus* は 7 本で、うち 2 本は二叉（p.169）
+- Klaver, C. J. J. (1973). Lung-anatomy: aid in Chameleon-taxonomy. *Beaufortia* 20(269). https://repository.naturalis.nl/pub/504814/BEAU1973020269001.pdf
+- Cassel, N. (2014). The Basics of Reptile Radiology. VIN（獣医向けの講演録）. https://www.vin.com/doc/?id=7054882
+  - トカゲの肺は嚢状で、肝臓の背側にあり、体腔の背壁に接する
+- Melero, A. et al. (2023). Computed tomography of the coelomic cavity in healthy veiled chameleons (*Chamaeleo calyptratus*) and panther chameleons (*Furcifer pardalis*). *Open Veterinary Journal* 13(9):1071–1081. https://www.openveterinaryjournal.com/?mno=113832
+  - 本文は未読。臓器の位置関係は、この論文で確かめる
+- Davis, D. D. & Gore, U. R. (1936). Clearing and Staining Skeletons of Small Vertebrates. Field Museum Technique Series 4. https://www.archive.org/download/clearingstaining04davis/clearingstaining04davis_bw.pdf
+  - 消化管に未消化物が多いときは内臓を取り除く。`06` に褐色の塊が見えないことの説明の候補（確かめてはいない）
+- Griffing, A. H., Gamble, T. & Bauer, A. M. (2020). *BMC Evolutionary Biology* 20:40. https://link.springer.com/article/10.1186/s12862-020-01604-9
+  - 昼行性の小型有鱗類の多くは腹膜に色素が多い。*Chamaeleo* の腹膜が黒いかは、Bauer 1997（*Afr. J. Herpetol.* 46:117–123）の本文を読めておらず未確認

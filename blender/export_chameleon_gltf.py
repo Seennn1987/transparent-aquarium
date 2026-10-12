@@ -5,7 +5,7 @@
 骨の形は MorphoSource 000050726（CAS:HERP:135515、In Copyright – Non-Commercial Use Permitted）から作った。
 再配布しないので、書き出し先は git に入れない private/ にする（.gitignore）。
 
-部位はメッシュの custom property `chameleon_part`（Bone / Skin / Cartilage）で渡す。
+部位はメッシュの custom property `chameleon_part`（Bone / Skin / Cartilage / Viscera）で渡す。
 読み込み側（chameleon-material.js）は、この名前で組織を選ぶ。
 """
 import math
@@ -21,7 +21,7 @@ try:
 except NameError:
     HERE = "/Users/shoui/transparent-aquarium/transparent-aquarium/blender"
 RIG = os.path.join(HERE, "rig_chameleon_ct.py")
-PARTS = {"CH_Skeleton": "Bone", "CH_Skin": "Skin", "CH_Cartilage": "Cartilage"}
+PARTS = {"CH_Skeleton": "Bone", "CH_Skin": "Skin", "CH_Cartilage": "Cartilage", "CH_Viscera": "Viscera"}
 
 
 def closed_report(ob):
@@ -34,25 +34,17 @@ def closed_report(ob):
     return open_edges, vol
 
 
-SKIN_DEPTH_MAX = 1.5      # 膜の厚みの上限（モデル単位、頭骨長 L = 1.04）。体の幅より長い光線は抜けとみなす
-
-
-def bake_skin_depth(ob):
-    """膜の各頂点から内向きに、膜の反対側までの距離（その場の組織の厚み）を `_depth` に焼く。
-    膜は開いた殻なので、表と裏の深さの差では厚みが測れない。代わりにこの厚みの半分を、
-    膜を横切るたびに通る組織の長さとする（入る所と出る所で 1 回ずつ数える）。"""
-    from mathutils.bvhtree import BVHTree
-    me = ob.data
-    bvh = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get(), deform=False)
-    depth = np.zeros(len(me.vertices), np.float32)
-    for i, v in enumerate(me.vertices):
-        n = -v.normal
-        hit = bvh.ray_cast(v.co + n * 1e-4, n, SKIN_DEPTH_MAX)
-        depth[i] = hit[3] if hit[0] is not None else 0.0
-    attr = me.attributes.get("_depth") or me.attributes.new("_depth", "FLOAT", "POINT")
-    attr.data.foreach_set("value", depth)
-    print(f"[Chameleon glb] 膜の厚み: 中央値 {np.median(depth):.3f}、90% {np.percentile(depth, 90):.3f}、抜け {np.mean(depth == 0):.1%}")
-    return depth
+def stretch_report(ob, limit=2.0):
+    """展示の姿勢で、静止時より何倍に伸びた辺があるか（膜は面を外さないので、伸びは数えて見るだけ）。"""
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = ob.evaluated_get(dg); me = ev.to_mesh()
+    P = np.empty(len(me.vertices) * 3, np.float32); me.vertices.foreach_get("co", P); P = P.reshape(-1, 3)
+    ev.to_mesh_clear()
+    R = np.empty(len(ob.data.vertices) * 3, np.float32); ob.data.vertices.foreach_get("co", R); R = R.reshape(-1, 3)
+    E = np.empty(len(ob.data.edges) * 2, np.int32); ob.data.edges.foreach_get("vertices", E); E = E.reshape(-1, 2)
+    r = np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1) / np.maximum(np.linalg.norm(R[E[:, 0]] - R[E[:, 1]], axis=1), 1e-6)
+    print(f"[Chameleon glb] 膜の辺の伸び: 中央値 {np.median(r):.2f}、99% {np.percentile(r, 99):.2f}、{limit} 倍より伸びた辺 {int((r > limit).sum())} / {len(r)}")
+    return r
 
 
 def prepare():
@@ -62,9 +54,9 @@ def prepare():
     d, _, k = gen["load"]()
     g["build_pose"](rigob, d, k, g["POSE_JAR"])
     bpy.context.view_layer.update()
-    g["trim_skin"]()
+    # 膜は体積のうちに切り離して作った（ct_body_pipeline/softmesh2.py）ので、伸びた面を外さない
+    stretch_report(bpy.data.objects["CH_Skin"])
     frames = g["write_hover"](rigob)
-    bake_skin_depth(bpy.data.objects["CH_Skin"])
     report = {}
     for name, part in PARTS.items():
         ob = bpy.data.objects.get(name)
@@ -88,7 +80,7 @@ def export(path):
         use_selection=True,
         export_yup=True,
         export_materials="NONE",
-        export_attributes=True,
+        export_attributes=False,
         export_extras=True,
         export_skins=True,
         export_def_bones=False,

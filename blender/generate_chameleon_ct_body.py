@@ -165,16 +165,17 @@ def skin_material():
     return mat
 
 
-def build_skin(d, k, coll, rigob):
-    """皮膚・筋肉の膜（CT の軟部の外形。ct_body_pipeline/softmesh.py と softrig.py）。骨組みに重みで付ける。"""
+def build_skin(d, k, coll, rigob, key="soft", name="Skin", material=None):
+    """皮膚・筋肉の膜（CT の軟部の外形。ct_body_pipeline/softvol2.py と softmesh2.py）。骨組みに重みで付ける。
+    key="visc" で体腔の内臓の一塊（ct_body_pipeline/visceramesh.py）。"""
     soft = DATA.replace("chameleon_body_ct.npz", "chameleon_body_soft.npz")
     if os.path.exists(soft):
         d = np.load(soft)
-    if "soft__v" not in d.files:
+    if f"{key}__v" not in d.files:
         return None
-    V = ct_to_model(d["soft__v"], k).astype(np.float32)
-    F = d["soft__f"][:, ::-1].astype(np.int32)
-    widx = d["soft__w_idx"]; wval = d["soft__w_val"]; wnames = [str(n) for n in d["soft__names"]]
+    V = ct_to_model(d[f"{key}__v"], k).astype(np.float32)
+    F = d[f"{key}__f"][:, ::-1].astype(np.int32)
+    widx = d[f"{key}__w_idx"]; wval = d[f"{key}__w_val"]; wnames = [str(n) for n in d[f"{key}__names"]]
     me = bpy.data.meshes.new("_skin_tmp"); me.from_pydata(V.tolist(), [], F.tolist())
     tmp = bpy.data.objects.new("_skin_tmp", me); bpy.context.scene.collection.objects.link(tmp)
     if len(F) > SKIN_FACES:
@@ -182,10 +183,10 @@ def build_skin(d, k, coll, rigob):
     dg = bpy.context.evaluated_depsgraph_get()
     me2 = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
     bpy.data.objects.remove(tmp); bpy.data.meshes.remove(me)
-    me2.name = PREFIX + "Skin"
+    me2.name = PREFIX + name
     me2.polygons.foreach_set("use_smooth", np.ones(len(me2.polygons), bool))
-    me2.materials.append(skin_material())
-    ob = bpy.data.objects.new(PREFIX + "Skin", me2); coll.objects.link(ob)
+    me2.materials.append(material or skin_material())
+    ob = bpy.data.objects.new(PREFIX + name, me2); coll.objects.link(ob)
     # 間引いた頂点に、元の最も近い頂点の重みを写す
     from mathutils.kdtree import KDTree
     kd = KDTree(len(V))
@@ -204,8 +205,20 @@ def build_skin(d, k, coll, rigob):
         vg.add(idx, x, "REPLACE")
     ob.parent = rigob
     mo = ob.modifiers.new("Armature", "ARMATURE"); mo.object = rigob
-    print(f"[Chameleon CT] 膜 面 {len(me2.polygons)}")
+    print(f"[Chameleon CT] {name} 面 {len(me2.polygons)}")
     return ob
+
+
+VISCERA_COLOR = (0.50, 0.42, 0.38, 1.0)   # 仮。瓶写真 01 の内臓（液 217 で割った値、1 辺 447px）。Web の色は chameleon-stain.js
+
+
+def viscera_material():
+    mat = bpy.data.materials.get(PREFIX + "Viscera") or bpy.data.materials.new(PREFIX + "Viscera")
+    mat.use_nodes = True
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is not None:
+        bsdf.inputs["Base Color"].default_value = VISCERA_COLOR
+    return mat
 
 
 CART_COLOR = (0.35, 0.55, 0.95, 1.0)   # 仮。軟骨（アルシアンブルーで青）。色は手順 A5 で測った通し光に合わせる
@@ -345,6 +358,7 @@ def build():
     mo = ob.modifiers.new("Armature", "ARMATURE")
     mo.object = rigob
     build_skin(d, k, coll, rigob)
+    build_skin(d, k, coll, rigob, key="visc", name="Viscera", material=viscera_material())
     build_cartilage(d, k, coll, rigob)
     root = bpy.data.objects.new(PREFIX + "Root", None)
     coll.objects.link(root)

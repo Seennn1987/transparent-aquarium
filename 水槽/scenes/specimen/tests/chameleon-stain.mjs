@@ -17,5 +17,7 @@ for (const t of [0.005, 0.05, 0.3]) {
 }
 // The neck, about 0.38 model units of tissue side-on.
 near(transmitted({ skin: 0.38 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
+// The viscera at its thickest side-on, behind the skin: the jar photo 01's brown mass, blue 0.38.
+assert.ok(Math.abs(transmitted({ viscera: 0.15, skin: 0.3 })[2] - 0.38) < 0.06, "内臓の褐色が瓶写真 01 と合わない");
 near(transmitted({}), [1, 1, 1], 1e-9, "空");
 console.log("chameleon-stain: ok");
