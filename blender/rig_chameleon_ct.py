@@ -53,10 +53,10 @@ POSE_JAR = {
     "head_dir": -57.0,            # 頭骨（後頭顆→吻端）の向き。01 のかぶと→吻端の向き（約 -33°）に合わせて決めた
     # 四肢: 骨ごとの向き（面内の角 θ[度]、外へ開く角 φ[度]）。01 では 4 本とも腹側（+X）へほぼ水平に出る
     "limbs": {
-        "fA_upper": (-25.0, 35.0), "fA_lower": (15.0, 10.0), "fA_hand": (-10.0, 0.0),
-        "fB_upper": (-25.0, 35.0), "fB_lower": (15.0, 10.0), "fB_hand": (-10.0, 0.0),
-        "hA_upper": (-10.0, 35.0), "hA_lower": (20.0, 10.0), "hA_foot": (-5.0, 0.0),
-        "hB_upper": (-10.0, 35.0), "hB_lower": (20.0, 10.0), "hB_foot": (-5.0, 0.0),
+        "fR_upper": (-25.0, 35.0), "fR_lower": (15.0, 10.0), "fR_hand": (-10.0, 0.0),
+        "fL_upper": (-25.0, 35.0), "fL_lower": (15.0, 10.0), "fL_hand": (-10.0, 0.0),
+        "hL_upper": (-10.0, 35.0), "hL_lower": (20.0, 10.0), "hL_foot": (-5.0, 0.0),
+        "hR_upper": (-10.0, 35.0), "hR_lower": (20.0, 10.0), "hR_foot": (-5.0, 0.0),
     },
 }
 
@@ -100,7 +100,7 @@ def head_dorsal(b):
 def limb_sides(arm, axis_at, J, n, step):
     """肢が体の左右どちら側か（+1 = 背を -X・腹を +X に置いたとき +Y 側）。肢帯の付け根を体軸の横向きに投影する。"""
     out = {}
-    for c in ("fA", "fB", "hA", "hB"):
+    for c in ("fR", "fL", "hL", "hR"):
         b = arm.bones.get(c + "_girdle") or arm.bones.get(c + "_upper")
         p = b.head_local
         # 体軸で最も近い点
@@ -219,7 +219,7 @@ def write_hover(rigob):
     ws = sum(w)
     for i, n in enumerate(caud):
         ch.append((n, TAIL_TIGHTEN_DEG * w[i] / ws, lambda t: bump(t, LOOP_SEC)))
-    for c, ph in (("fA", 0.0), ("fB", 0.37), ("hA", 0.18), ("hB", 0.55)):
+    for c, ph in (("fR", 0.0), ("fL", 0.37), ("hL", 0.18), ("hR", 0.55)):
         dist = "hand" if c[0] == "f" else "foot"
         amp = HAND_SWAY_DEG if c[0] == "f" else FOOT_SWAY_DEG
         if f"{c}_{dist}" in names:

@@ -6,6 +6,7 @@ jt={k:np.array(v)*0.104 for k,v in json.load(open('joints.json')).items()}
 bones={}
 nv=max(int(n[1:]) for n in names if n.startswith('v'))
 ROOT=22
+SIDE=json.load(open('sides.json'))   # 四肢 A/B → 左右（sides.py）
 for k in range(1,nv+1):
     nm=f'v{k:02d}'; a=at(J[k-1]); b=at(J[k]) if k<len(J) else C[-1]
     if k<ROOT: bones[nm]=(b,a,f'v{k+1:02d}')        # pivot posterior
@@ -13,6 +14,10 @@ for k in range(1,nv+1):
     else: bones[nm]=(a,b,f'v{k-1:02d}')
 hv=d['head__v']; tip=hv[np.argmax(hv[:,0]-hv[:,1])]   # 吻端（CT 画像で左下）
 bones['head']=(at(J[0]),tip,'v01')
+# 舌骨（角鰓骨の棒など。頭の子）: 骨の根元 = 頭骨に最も近い点、先 = そこから最も遠い点
+if 'hyoid__v' in d.files:
+    yv=d['hyoid__v']; hc=at(J[0]); r0=yv[np.argmin(np.linalg.norm(yv-hv.mean(0),axis=1))]
+    bones['hyoid']=(r0,yv[np.argmax(np.linalg.norm(yv-r0,axis=1))],'head')
 def nearest_v(p):
     i=np.argmin(np.linalg.norm(C-p,axis=1)); k=int(np.searchsorted(J,s[i])); return f'v{max(1,min(nv,k)):02d}'
 ch={'fA':['fA_scap0','fA_shoulder','fA_elbow','fA_wrist','fA_tip'],'fB':['fB_scap0','fB_shoulder','fB_elbow','fB_wrist','fB_tip'],
@@ -21,7 +26,7 @@ seg={'fA':['girdle','upper','lower','hand'],'fB':['girdle','upper','lower','hand
 for c,ks in ch.items():
     P=[jt[k] for k in ks]; par=nearest_v(P[0])
     for i,sn in enumerate(seg[c]):
-        nm=f'{c}_{sn}'; bones[nm]=(P[i],P[i+1],par); par=nm
+        nm=f'{SIDE[c]}_{sn}'; bones[nm]=(P[i],P[i+1],par); par=nm
 missing=[n for n in names if n not in bones]; print('meshes without bone',missing)
 print('no mesh',[b for b in bones if b not in names])
 out={'names':np.array(list(bones)),'head':np.array([bones[b][0] for b in bones]),'tail':np.array([bones[b][1] for b in bones]),
