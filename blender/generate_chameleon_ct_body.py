@@ -40,7 +40,7 @@ FACES_TOTAL = int(os.environ.get("CH_FACES", "450000"))          # 全身の面�
 SKULL_LENGTH_L = 1.04
 BONE_GRAY = (0.62, 0.60, 0.57, 1.0)
 # 胴の肋骨のしなり（soft_rib_weights）: 剛体のままの半径 [mm]、なめらかに移る幅 [mm]、体軸に沿った広がり σ [mm]。None で全て剛体
-SOFT_RIBS = (2.5, 4.0, 4.0)
+SOFT_RIBS = None   # 2026-10-13: 肋骨を左右・椎骨ごとの骨にしたので、しなりの重みは使わない（以前は (2.5, 4.0, 4.0)）
 TRUNK_END_MM = 104.7          # 胴の終わり（v21 の後ろの関節 = 仙椎の前）
 
 
@@ -65,7 +65,7 @@ def decimated_meshes(d, k):
     if os.path.exists(dec) and os.path.getmtime(dec) >= os.path.getmtime(DATA):
         e = np.load(dec)
         return {n[:-3]: (e[n], e[n[:-3] + "__f"]) for n in e.files if n.endswith("__v")}
-    names = sorted({f.split("__")[0] for f in d.files if not f.startswith("rig__")})
+    names = sorted({f.split("__")[0] for f in d.files if not f.startswith(("rig__", "soft__"))})
     total = sum(len(d[n + "__f"]) for n in names)
     ratio = min(1.0, FACES_TOTAL / total)
     out = {}
@@ -140,6 +140,72 @@ def soft_rib_weights(d, k, V, groups):
         idx = np.arange(a, b)
         out[n] = (idx, {trunk[c]: Wm[:, c] for c in range(len(trunk)) if Wm[:, c].max() > 1e-3})
     return out
+
+
+SKIN_FACES = int(os.environ.get("CH_SKIN_FACES", "150000"))   # 膜の面数の目安（間引き後）
+SKIN_COLOR = (0.90, 0.92, 0.95, 1.0)
+SKIN_ALPHA = 0.18           # 仮。透明標本の、白く濁った薄い膜。値は見た目で決めた（第5節の通し光を測り直したら合わせる）
+
+
+def skin_material():
+    mat = bpy.data.materials.get(PREFIX + "Skin") or bpy.data.materials.new(PREFIX + "Skin")
+    mat.use_nodes = True
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        bsdf = mat.node_tree.nodes.new("ShaderNodeBsdfPrincipled")
+        outn = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None) or mat.node_tree.nodes.new("ShaderNodeOutputMaterial")
+        mat.node_tree.links.new(bsdf.outputs[0], outn.inputs[0])
+    bsdf.inputs["Base Color"].default_value = SKIN_COLOR
+    bsdf.inputs["Roughness"].default_value = 0.6
+    bsdf.inputs["Alpha"].default_value = SKIN_ALPHA
+    try:
+        mat.surface_render_method = "BLENDED"
+    except Exception:
+        pass
+    return mat
+
+
+def build_skin(d, k, coll, rigob):
+    """皮膚・筋肉の膜（CT の軟部の外形。ct_body_pipeline/softmesh.py と softrig.py）。骨組みに重みで付ける。"""
+    soft = DATA.replace("chameleon_body_ct.npz", "chameleon_body_soft.npz")
+    if os.path.exists(soft):
+        d = np.load(soft)
+    if "soft__v" not in d.files:
+        return None
+    V = ct_to_model(d["soft__v"], k).astype(np.float32)
+    F = d["soft__f"][:, ::-1].astype(np.int32)
+    widx = d["soft__w_idx"]; wval = d["soft__w_val"]; wnames = [str(n) for n in d["soft__names"]]
+    me = bpy.data.meshes.new("_skin_tmp"); me.from_pydata(V.tolist(), [], F.tolist())
+    tmp = bpy.data.objects.new("_skin_tmp", me); bpy.context.scene.collection.objects.link(tmp)
+    if len(F) > SKIN_FACES:
+        dm = tmp.modifiers.new("D", "DECIMATE"); dm.ratio = SKIN_FACES / len(F)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me2 = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
+    bpy.data.objects.remove(tmp); bpy.data.meshes.remove(me)
+    me2.name = PREFIX + "Skin"
+    me2.polygons.foreach_set("use_smooth", np.ones(len(me2.polygons), bool))
+    me2.materials.append(skin_material())
+    ob = bpy.data.objects.new(PREFIX + "Skin", me2); coll.objects.link(ob)
+    # 間引いた頂点に、元の最も近い頂点の重みを写す
+    from mathutils.kdtree import KDTree
+    kd = KDTree(len(V))
+    for i, p in enumerate(V):
+        kd.insert(p, i)
+    kd.balance()
+    groups = {}
+    for v in me2.vertices:
+        _, i, _ = kd.find(v.co)
+        for a in range(widx.shape[1]):
+            x = float(wval[i, a])
+            if x > 1e-3:
+                groups.setdefault((wnames[int(widx[i, a])], round(x * 32) / 32), []).append(v.index)
+    for (g, x), idx in groups.items():
+        vg = ob.vertex_groups.get(g) or ob.vertex_groups.new(name=g)
+        vg.add(idx, x, "REPLACE")
+    ob.parent = rigob
+    mo = ob.modifiers.new("Armature", "ARMATURE"); mo.object = rigob
+    print(f"[Chameleon CT] 膜 面 {len(me2.polygons)}")
+    return ob
 
 
 def bone_material():
@@ -232,6 +298,7 @@ def build():
     ob.parent = rigob
     mo = ob.modifiers.new("Armature", "ARMATURE")
     mo.object = rigob
+    build_skin(d, k, coll, rigob)
     root = bpy.data.objects.new(PREFIX + "Root", None)
     coll.objects.link(root)
     rigob.parent = root

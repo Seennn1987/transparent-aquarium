@@ -17,7 +17,8 @@ bones['head']=(at(J[0]),tip,'v01')
 # 舌骨（角鰓骨の棒など。頭の子）: 骨の根元 = 頭骨に最も近い点、先 = そこから最も遠い点
 if 'hyoid__v' in d.files:
     yv=d['hyoid__v']; hc=at(J[0]); r0=yv[np.argmin(np.linalg.norm(yv-hv.mean(0),axis=1))]
-    bones['hyoid']=(r0,yv[np.argmax(np.linalg.norm(yv-r0,axis=1))],'head')
+    # 親は頸の椎骨（v02）。舌骨は喉の軟部に吊られていて、頭を回しても喉と一緒に残る。頭の子にすると、頭を下へ回したとき棒が胸の外へ振り出した
+    bones['hyoid']=(r0,yv[np.argmax(np.linalg.norm(yv-r0,axis=1))],'v02')
 def nearest_v(p):
     i=np.argmin(np.linalg.norm(C-p,axis=1)); k=int(np.searchsorted(J,s[i])); return f'v{max(1,min(nv,k)):02d}'
 ch={'fA':['fA_scap0','fA_shoulder','fA_elbow','fA_wrist','fA_tip'],'fB':['fB_scap0','fB_shoulder','fB_elbow','fB_wrist','fB_tip'],
@@ -27,6 +28,18 @@ for c,ks in ch.items():
     P=[jt[k] for k in ks]; par=nearest_v(P[0])
     for i,sn in enumerate(seg[c]):
         nm=f'{SIDE[c]}_{sn}'; bones[nm]=(P[i],P[i+1],par); par=nm
+# 肋骨（左右・椎骨ごと）: 根元 = 中心線の始め、先 = 中心線の終わり（どちらも復元した位置）。親 = その椎骨
+import ribrestore
+for l,rb in ribrestore.ribs.items():
+    nm=f"rib{rb['k']:02d}_{'RL'[(l-160)%2]}"
+    if nm+'__v' not in d.files: continue
+    tip=ribrestore.restore(rb['track'][-1:],np.array([l]))[0]
+    bones[nm]=(rb['h']*0.104,tip*0.104,f"v{rb['k']:02d}")
+# 中心線の無い肋骨（短い・途中で止まった）: 根元 = 体軸に最も近いメッシュの点、先 = そこから最も遠い点
+for n in names:
+    if n.startswith('rib') and n not in bones:
+        v=d[n+'__v']; h=v[np.argmin(np.linalg.norm(v[:,None,:]-C[None,::20,:],axis=2).min(1))]
+        bones[n]=(h,v[np.argmax(np.linalg.norm(v-h,axis=1))],f"v{int(n[3:5]):02d}")
 missing=[n for n in names if n not in bones]; print('meshes without bone',missing)
 print('no mesh',[b for b in bones if b not in names])
 out={'names':np.array(list(bones)),'head':np.array([bones[b][0] for b in bones]),'tail':np.array([bones[b][1] for b in bones]),

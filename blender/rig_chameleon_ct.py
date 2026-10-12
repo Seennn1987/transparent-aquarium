@@ -278,6 +278,35 @@ def hover_bounds(skel, frames, step=12):
             "loop_max": out[1].tolist(), "grow_max": grow}
 
 
+SKIN_STRETCH_MAX = 2.0      # 展示の姿勢で、辺が静止時の何倍より伸びた膜の面を外すか
+
+
+def trim_skin(max_ratio=SKIN_STRETCH_MAX):
+    """展示の姿勢で大きく伸びた膜の面を外す。CT では手足が胴に押し付けられて外形がつながって写るので、
+    手足を開くと、その間に膜が引き伸ばされる。そこを穴として外す（静止時のメッシュから消す）。"""
+    ob = bpy.data.objects.get("CH_Skin")
+    if ob is None:
+        return 0
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = ob.evaluated_get(dg); me = ev.to_mesh()
+    n = len(me.vertices)
+    P = np.empty(n * 3, np.float32); me.vertices.foreach_get("co", P); P = P.reshape(-1, 3)
+    ev.to_mesh_clear()
+    R = np.empty(n * 3, np.float32); ob.data.vertices.foreach_get("co", R); R = R.reshape(-1, 3)
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(ob.data); bm.faces.ensure_lookup_table()
+    bad = []
+    for f in bm.faces:
+        idx = [v.index for v in f.verts]
+        r = max(np.linalg.norm(P[idx[a]] - P[idx[a - 1]]) / max(np.linalg.norm(R[idx[a]] - R[idx[a - 1]]), 1e-6) for a in range(len(idx)))
+        if r > max_ratio:
+            bad.append(f)
+    bmesh.ops.delete(bm, geom=bad, context="FACES")
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print(f"[Chameleon CT] 膜: 姿勢で {max_ratio} 倍より伸びた面 {len(bad)} を外した")
+    return len(bad)
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     g = runpy.run_path(GEN, run_name="chameleon_ct")
@@ -286,6 +315,8 @@ def main():
     if not os.environ.get("CH_REST"):
         build_pose(rigob, d, k, POSE_JAR)
         print("[Chameleon CT] 瓶の姿勢を付けました")
+        bpy.context.view_layer.update()
+        trim_skin()
     if argv and argv[0] == "--hover":
         import json
         frames = write_hover(rigob)
