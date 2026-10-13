@@ -147,7 +147,9 @@ def build_pose(rigob, d, k, pose):
     def theta(s):
         if s <= pose["tail_start"]:
             return interp(pose["trunk"], s)
-        h0 = interp(pose["trunk"], pose["tail_start"]) + pose["tail_lift"]
+        # 尾の付け根で背側へ起こす角は、4 mm かけて入れる（一度に入れると折れ目ができ、膜に継ぎ目の線が出た）
+        lift = pose["tail_lift"] * min(1.0, (s - pose["tail_start"]) / 4.0)
+        h0 = interp(pose["trunk"], pose["tail_start"]) + lift
         u = (s - pose["tail_start"]) / (L_mm * scale_tail)
         return h0 + interp(TAIL_TURN_06, u)
 

@@ -92,8 +92,8 @@ RA = table(np.hypot(a_, b_), np.arctan2(b_, a_), j // SEC, NSA, 48, 4.0, 3.0)
 selb = np.array([n.startswith(('v', 'rib', 'hL_girdle', 'hR_girdle')) or n == 'hyoid' for n in owb])
 xb = Xb[selb]; jb = cKDTree(C).query(xb, workers=-1)[1]; qb = xb - C[jb]
 ab = (qb * Dd[jb]).sum(1); bb_ = (qb * E2[jb]).sum(1)
-# 肋骨の先どうしの間も腹の壁でつなぐ: 骨の外側を体軸に沿って 4.5 mm の幅で最大にしてからならす
-RA = with_bone(RA, bone_table(np.hypot(ab, bb_), np.arctan2(bb_, ab), jb // SEC, NSA, 48, span=9), 4.0, 3.0)
+# 肋骨の先どうしの間も腹の壁でつなぐ: 骨の外側を体軸に沿って 7.5 mm（肋骨 2 本分）の幅で最大にしてからならす
+RA = with_bone(RA, bone_table(np.hypot(ab, bb_), np.arctan2(bb_, ab), jb // SEC, NSA, 48, span=15), 4.0, 3.0)
 # 断面の椎骨: 弧長を椎骨の境（J）で区切る。境の前後は 2 つの椎骨の変形を混ぜる
 vk = np.clip(np.searchsorted(J, arc), 1, len(J))            # 1..55
 centre = np.array([0.5 * (J[kk - 1] + (J[kk] if kk < len(J) else arc[-1])) for kk in range(1, len(J) + 1)])
@@ -188,6 +188,15 @@ lab = None
 simp = pyfqmr.Simplify(); simp.setMesh(v.astype(np.float64), f.astype(np.int32))
 simp.simplify_mesh(target_count=int(os.environ.get('SOFT_FACES', '150000')), aggressiveness=7, preserve_border=True, verbose=False)
 v, f, _ = simp.getMesh()
+# 面のしわ・継ぎ目をならす（Taubin。体積がほとんど縮まない）
+import scipy.sparse as sp
+TAUBIN = int(os.environ.get('SKIN_TAUBIN', '20'))
+E = np.concatenate([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]); E = np.concatenate([E, E[:, ::-1]])
+A = sp.coo_matrix((np.ones(len(E)), (E[:, 0], E[:, 1])), shape=(len(v), len(v))).tocsr(); A.data[:] = 1
+deg = np.asarray(A.sum(1)).ravel(); Lap = sp.diags(1 / np.maximum(deg, 1)) @ A
+for _ in range(TAUBIN):
+    v = v + 0.5 * (Lap @ v - v)
+    v = v - 0.53 * (Lap @ v - v)
 print('mesh', len(v), len(f), f'{time.time()-t0:.0f}s')
 # ---- 重み ----
 cols = ['AX'] + list(tubes)
