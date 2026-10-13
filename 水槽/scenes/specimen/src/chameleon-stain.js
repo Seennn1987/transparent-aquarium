@@ -96,24 +96,31 @@ export const STAINS = {
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
     film: { spectrum: [1, 0.636, 0.34], gain: 0.1145 },
-    // The organs of the body cavity (blender/ct_body_pipeline/organs.py: placed and sized after Melero et al. 2023,
-    // Open Vet J 13:1071, the CT of 17 living veiled chameleons). They replace the one brown mass ("06" keeps it).
-    // Absorbance per model unit of organ crossed, added to the tissue around it. Fitted on photo 01's patches inside
-    // the trunk, by where along the trunk they lie (shoulder → hip = 0 → 1; ct_body_pipeline/fit_organs01.py):
-    //   C (t 0.35, brown mottle) less the screen's skin, film and bone there: 0.182 / 0.254 / 0.382, over the liver's
-    //     median path in that band (0.198)                                      → liver 0.92 / 1.29 / 1.93
-    //   B (t 0.60, brown mottle) 0.375 / 0.514 / 0.718 over the gut contents' path (0.065), A (t 0.85, dark grey)
-    //     0.571 / 0.574 / 0.674 over 0.077; their mean                            → contents 6.56 / 7.64 / 9.84
-    // By where across the trunk they lie the patches do not match: in 01 they sit nearer the spine, where the
-    // living animals' CT has the lungs (> 2/3 of the dorsal coelom, Melero 2023). Not settled.
-    // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys, the gut's wall) are given the cleared
-    // tissue's own absorbance (the skin's volume above, 0 / 0.109 / 0.230) once more: faint, provisional.
+    // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
+    // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
+    // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
+    // the lungs are often contracted (Klaver 1973, Beaufortia 20: 164–169), and in five photos of cleared-and-stained
+    // chameleons (docs/chameleon_ct_body/organs_ref_compare, sources in docs/references/chameleon/SOURCES.md) the
+    // visible mass lies at shoulder → hip t 0.20–0.95 and back → belly 0–0.86 (medians). So the gut (no size in the
+    // source) fills that range from behind the liver to the kidneys (provisional). They replace the one brown mass
+    // ("06" keeps it). Absorbance per model unit of organ crossed, added to the tissue around it, fitted on photo 01
+    // (ct_body_pipeline/fit_organs01.py), each patch less the screen's skin, film and bone there:
+    //   C (t 0.35, brown mottle) 0.182 / 0.254 / 0.382 over the liver's median path in that band (0.198)
+    //                                                                            → liver 0.92 / 1.29 / 1.93
+    //   A (t 0.85, dark grey) 0.571 / 0.575 / 0.674 and B (t 0.60, brown mottle) 0.375 / 0.514 / 0.718; mean
+    //     0.473 / 0.544 / 0.696. 01's trunk bends unlike the model's, so the same places on screen catch only the
+    //     mass's edge (gut path A 0.054, B 0.030); matched by share instead, as for the film and bone above: over the
+    //     median gut path of the screen's gut pixels (0.131)                     → gut 3.62 / 4.17 / 5.33
+    // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
+    // gut in 01, so they add nothing beyond it (provisional).
+    // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
+    // absorbance (the skin's volume above, 0 / 0.109 / 0.230) once more: faint, provisional.
     organs: {
       liver_r: [0.92, 1.29, 1.93], liver_l: [0.92, 1.29, 1.93],
-      contents: [6.56, 7.64, 9.84],
+      contents: [0, 0, 0],
       heart: [0, 0.109, 0.23], gallbladder: [0, 0.109, 0.23], fat_r: [0, 0.109, 0.23], fat_l: [0, 0.109, 0.23],
       kidney_r: [0, 0.109, 0.23], kidney_l: [0, 0.109, 0.23],
-      stomach: [0, 0.109, 0.23], intestine: [0, 0.109, 0.23], colon: [0, 0.109, 0.23],
+      stomach: [3.62, 4.17, 5.33], intestine: [3.62, 4.17, 5.33], colon: [3.62, 4.17, 5.33],
     },
   },
 };

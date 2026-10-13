@@ -91,23 +91,26 @@ def tube(path, rad):
 def pts(fu,fv,fr,n=400):
     t=np.linspace(0,1,n); return np.stack([fu(t),fv(t),fr(t)],1)
 st0=heart_end-1; st1=liver_end-2
-F['stomach']=tube(pts(lambda t: st0+(st1-st0)*t, lambda t: Vwu(st0+(st1-st0)*t)-9.9*s-2.0, lambda t: -1.0+0*t), 2.0)
+# 標本では肺が縮む（Klaver 1973, Beaufortia 20: 164–169）。胃は肝臓の背側の、縮んだ肺のすぐ腹側（深さ 0.2、仮。参考写真の塊の背の縁が脊椎に接する）
+F['stomach']=tube(pts(lambda t: st0+(st1-st0)*t, lambda t: 1.0+0.2*(Vwu(st0+(st1-st0)*t)-1.0), lambda t: -1.0+0*t), 2.0)
 # 腸: 尾腹側の、肝臓（頭側）・肺（頭背側）・腎臓と骨盤（尾背側）の間（Melero 2023）。腸の区分は CT でも分けられない（同）。
-#   ここでは、腹側 2/5 の深さ（frac ≥ 0.6、仮）の、肝臓の後ろから腎臓の手前までを、うねる 4 本の管（太さ 1.3 mm、仮）で埋める
+#   標本では肺が縮み（Klaver 1973）、参考写真 5 枚（docs/chameleon_ct_body/organs_ref_compare の出典）の塊は
+#   肩→股の t 0.20〜0.95、背→腹の深さ 0〜0.86（中央値）。腸はその範囲の、肝臓の後ろから腎臓の手前までを
+#   うねる 16 本の管（太さ 1.3 mm、仮）で、深さ 0.12〜0.66 の 4 層 × 左右 4 列に埋める（層と列の位置は仮）
 i0=liver_end-3; i1=kid_end-10
 # うねりは決まった種のなめらかな乱数（規則正しい波だと作り物に見える）。振れ幅と細かさは仮
 rng_i=np.random.default_rng(2023)
 def wander(n, amp, corr):
     w=nd.gaussian_filter1d(rng_i.standard_normal(n),corr,mode='nearest'); return amp*w/np.abs(w).max()
 paths=[]
-for dv in (2.2,4.8):
-    for dr in (-2.6,2.6):
+for fv in (0.12,0.30,0.48,0.66):
+    for dr in (-4.0,-1.3,1.3,4.0):
         n=600; uu_=np.linspace(i0,i1,n)
         # 管は前後にも折り返す（u にも小さな戻り）
         du=wander(n,2.5,25); dvv=wander(n,1.6,18); drr=wander(n,1.6,22)
-        paths.append(np.stack([uu_+du, Vwu(uu_)-dv+dvv, dr+drr],1))
+        paths.append(np.stack([uu_+du, 1.0+fv*(Vwu(uu_)-1.0)+dvv, dr+drr],1))
 F['intestine']=np.minimum.reduce([tube(p_,1.3) for p_ in paths])
-F['intestine']=np.where(frac>=0.6,F['intestine'],9.0)
+F['intestine']=np.where((frac>=0.03)&(frac<=0.88),F['intestine'],9.0)
 # 結腸: 腸の尾端から骨盤（総排泄腔）へ。結腸は中身があると見分けられる（Melero 2023）。太さ 2 mm と道筋は仮
 c0=i1-2; c1=kid_end
 F['colon']=tube(pts(lambda t: c0+(c1-c0)*t, lambda t: (Vwu(c0)-3.5)*(1-t)+(4.5)*t, lambda t: 0*t), 2.0)

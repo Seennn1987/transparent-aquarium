@@ -1,6 +1,3 @@
-# 色 "01" の臓器の色を写真 01 から当てはめる（chameleon-stain.js STAINS["01"].organs）
-#   入力: 写真 01（リポジトリ外ではないが再配布しない）、organcal.py で chameleon.html?stain=01 から書き出した web/cal01.npz
-#   （通り道・膜の層・臓器ごとの通り道）と、lm.py の web/lm01.json（画面の関節窩・股関節）
 # 写真 01 の胴の中の色（A〜D）を、画面の臓器の通り道に当てはめる
 import numpy as np, json, math, sys
 from PIL import Image
@@ -57,3 +54,22 @@ for r,cls in ASSIGN.items():
 for cls,v in per.items(): abs_unit[cls]=np.mean(v,0).round(2).tolist()
 print('abs_unit',abs_unit)
 json.dump({'assign':ASSIGN,'abs_unit':abs_unit,'res':res},open('fit_organs01.json','w'),ensure_ascii=False,indent=1)
+
+# v2（臓器を参考写真の範囲へ広げた後）: 画面の同じ楕円に腸の通り道が来るので、A・B は重なりで解く
+#   各色で、excess = a_gut × 腸の通り道 + a_contents × 中身の通り道（どちらも 0 以上、最小二乗）。C は画面の同じ所に臓器が無いので、肝臓は上の t の帯の値のまま
+from scipy.optimize import nnls
+Mx=np.array([[res[r]['paths']['gut'],res[r]['paths']['contents']] for r in ('A','B')])
+ex=np.array([np.maximum(res[r]['excess'],0) for r in ('A','B')])
+sol=np.array([nnls(Mx,ex[:,c])[0] for c in range(3)]).T
+print('overlap fit  gut',sol[0].round(2),'contents',sol[1].round(2),'residual',(Mx@sol-ex).round(3).tolist())
+abs_unit['gut']=sol[0].round(2).tolist(); abs_unit['contents']=sol[1].round(2).tolist()
+json.dump({'assign':ASSIGN,'abs_unit':abs_unit,'res':res,'v2':'gut and contents from the overlap of A and B'},open('fit_organs01.json','w'),ensure_ascii=False,indent=1)
+
+# v2b: 写真と画面で胴の曲がりが違い、A・B の楕円は画面の塊の縁にかかる（腸の通り道の中央値が A 0.054・B 0.030 なのに、
+#   画面の腸のある画素全体の中央値は 0.131）。そこで場所ではなく割合でそろえる（膜・骨と同じやり方）:
+#   写真の塊（A と B の excess の平均）= 画面の腸の通り道の中央値 × a_gut
+c2=np.load('web/cal01.npz'); g=sum(np.maximum(c2['org_'+n],0) for n in ('stomach','intestine','colon')); gm=float(np.median(g[g>1e-4]))
+exm=np.mean([np.maximum(res[r]['excess'],0) for r in ('A','B')],0)
+abs_unit['gut']=(exm/gm).round(2).tolist(); abs_unit['contents']=[0,0,0]
+print('gut median path %.4f'%gm,'photo mass excess',exm.round(3),'-> gut',abs_unit['gut'])
+json.dump({'assign':ASSIGN,'abs_unit':abs_unit,'res':res,'gut_median_path':gm,'v2':'gut from the share-matched median (A,B mean over the screen gut median path)'},open('fit_organs01.json','w'),ensure_ascii=False,indent=1)

@@ -56,6 +56,7 @@
 - Klaver, C. J. J. (1977). Comparative lung-morphology in the genus *Chamaeleo* Laurenti, 1768 (Sauria: Chamaeleonidae). *Beaufortia* 25(327):167–199. https://repository.naturalis.nl/pub/505191/BEAU1977025327001.pdf
   - *Chamaeleo* の肺には、腹側縁と尾側縁から盲嚢（diverticula）が出る（p.167）。*C. calyptratus* は 7 本で、うち 2 本は二叉（p.169）
 - Klaver, C. J. J. (1973). Lung-anatomy: aid in Chameleon-taxonomy. *Beaufortia* 20(269). https://repository.naturalis.nl/pub/504814/BEAU1973020269001.pdf
+  - 保存された標本の肺はしばしば縮んでいる（"contracted"、pp.164, 166, 167, 169）。体腔の臓器を背側へ広げた根拠の一つ（`organs.py`、2026-10-13）
 - Cassel, N. (2014). The Basics of Reptile Radiology. VIN（獣医向けの講演録）. https://www.vin.com/doc/?id=7054882
   - トカゲの肺は嚢状で、肝臓の背側にあり、体腔の背壁に接する
 - Melero, A. et al. (2023). Computed tomography of the coelomic cavity in healthy veiled chameleons (*Chamaeleo calyptratus*) and panther chameleons (*Furcifer pardalis*). *Open Veterinary Journal* 13(9):1071–1081. https://www.openveterinaryjournal.com/?mno=113832
@@ -82,3 +83,17 @@
 - Melero, A. et al. (2023). *Open Vet. J.* 13(9):1071–1081. https://www.openveterinaryjournal.com/?mno=113832
   - 心臓は体腔のいちばん前、肋骨のかごの中。肝臓は心臓の後ろ・肺の腹側で腹壁に接する。肺は体腔の背側の 2/3 以上
 - 鎖骨・間鎖骨の有無: 出典は見つからず（未確認）
+
+## 参考写真（体腔の臓器の位置、2026-10-13）
+
+透明標本のカメレオンの写真。どれも販売品・作品の写真で透かしや著作権があるので、比べるためだけに見て、リポジトリには入れない（写真 01 と同じ）。
+見えた塊の範囲は目測（肩 → 股の t、背 → 腹の割合）。図は `docs/chameleon_ct_body/organs_ref_layout.png`（写真は含めない）。
+
+- 写真 01: カイセイ加工（透明屋パク）「透明標本 エボシカメレオン」 https://www.creema.jp/item/17230557/detail — t 0.20〜0.95、深さ 0〜0.60（オリーブ褐色、脊椎沿い）
+- 標本 2: 同 https://www.creema.jp/item/17230551/detail — t 0.26〜1.00、深さ 0〜1.00（濃い褐色の大きな塊）
+- 標本 3: 同 https://www.creema.jp/item/17230543/detail — 股関節から胴の中ほどまで、背側 1/2〜2/3（目測の数値は取っていない）
+- 標本 4: 同じ作り手の楽天の店（カイセイ加工（透明屋パク）、https://item.rakuten.co.jp/pakupaku/）の画像 compass1706244301・compass1706244314。商品ページの URL は控えていない — t 0.23〜0.89、深さ 0.03〜0.86
+- ma-paku の出品の画像 https://img.fril.jp/img/623705502/l/1991114482.jpg（商品ページの URL は控えていない。種名は画像から確かめていない）— t 0.15〜0.85、深さ 0〜0.52
+- 角のあるカメレオン（別種、種名不明）: Pinterest https://jp.pinterest.com/pin/558024210055732218/ （画像 https://i.pinimg.com/736x/ce/e4/08/cee40876e1a9a94e9131aa5f4f75e656.jpg、元の作り手は不明）— t 0.12〜1.00、深さ 0.25〜0.94（黄緑）
+- 内臓を抜いた（または見えない）もの: Nighttime Nicholas https://www.nighttimenicholas.com/past-pieces/2021/1/27/suspended-veiled-chameleon 、Chameleon Forums https://www.chameleonforums.com/threads/diaphonized-chameleon-pictures.195479/ の数枚、sorarikuworld https://sorarikuworld.up.seesaa.net/image/IMG_70221.jpg 。数に入れない
+- 上の 5 枚（標本 3 を除く）の中央値: t 0.20〜0.95、深さ 0〜0.86

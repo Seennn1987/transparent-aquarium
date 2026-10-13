@@ -12,25 +12,26 @@ def m2ct(m): m=np.asarray(m,float)/k; return np.stack([-m[...,2],m[...,0],-m[...
 vnames=[f'v{kk:02d}' for kk in ks]; vid=[bn.index(n) for n in vnames]
 kt=cKDTree(AP)
 out={}; bones=sorted(set(vnames)); bidx={n:i for i,n in enumerate(bones)}
-FACES={'contents':16000,'intestine':20000}
+FACES={'contents':16000,'intestine':30000}
 for j,n in enumerate(names,1):
     m=L==j
     if m.sum()<20: print('skip',n); continue
-    F=nd.gaussian_filter(np.pad(m,3).astype(np.float32),1.0)
-    v,f,_,_=measure.marching_cubes(F,0.5)
-    e=np.sort(np.concatenate([f[:,[0,1]],f[:,[1,2]],f[:,[2,0]]]),1); _,cnt=np.unique(e,axis=0,return_counts=True)
-    if (cnt!=2).any():     # 管どうしが点で触れる所は、面が閉じない。少しぼかし直して離す
-        F=nd.gaussian_filter(np.pad(m,3).astype(np.float32),1.4); v,f,_,_=measure.marching_cubes(F,0.5)
-        e=np.sort(np.concatenate([f[:,[0,1]],f[:,[1,2]],f[:,[2,0]]]),1); _,cnt=np.unique(e,axis=0,return_counts=True)
-        print(n,'marching cubes non-manifold edges after re-blur',int((cnt!=2).sum()))
-    v=lo+(v-3)*VOX
-    v0,f0=v,f
-    for ag in (7,5,3):
-        sp=pyfqmr.Simplify(); sp.setMesh(v0.astype(np.float64),f0.astype(np.int32)); sp.simplify_mesh(target_count=FACES.get(n,4000),aggressiveness=ag,preserve_border=True,verbose=False)
-        v,f,_=sp.getMesh()
-        e=np.sort(np.concatenate([f[:,[0,1]],f[:,[1,2]],f[:,[2,0]]]),1); _,cnt=np.unique(e,axis=0,return_counts=True)
-        if (cnt==2).all(): break
-    else:
+    def closed(f):
+        e=np.sort(np.concatenate([f[:,[0,1]],f[:,[1,2]],f[:,[2,0]]]),1); _,cnt=np.unique(e,axis=0,return_counts=True); return bool((cnt==2).all())
+    ok=False
+    # 管どうしが点で触れる所は、面が閉じない（間引いた後も）。閉じなければ、少しぼかし直して離す（1.0 → 1.4 ボクセル）
+    for sig in (1.0,1.4):
+        F=nd.gaussian_filter(np.pad(m,3).astype(np.float32),sig)
+        v0,f0,_,_=measure.marching_cubes(F,0.5); v0=lo+(v0-3)*VOX
+        if not closed(f0): continue
+        for mul in (1,2,4):                         # 閉じなければ、残す面を 2 倍、4 倍にして試す
+            for ag in (7,5,3):
+                sp=pyfqmr.Simplify(); sp.setMesh(v0.astype(np.float64),f0.astype(np.int32)); sp.simplify_mesh(target_count=FACES.get(n,4000)*mul,aggressiveness=ag,preserve_border=True,verbose=False)
+                v,f,_=sp.getMesh()
+                if closed(f): ok=True; break
+            if ok: break
+        if ok: print(n,'blur',sig,'faces',len(f)); break
+    if not ok:
         v,f=v0,f0                                   # 間引くと閉じなくなるときは、間引かない
     e=np.sort(np.concatenate([f[:,[0,1]],f[:,[1,2]],f[:,[2,0]]]),1); _,cnt=np.unique(e,axis=0,return_counts=True); bad=int((cnt!=2).sum())
     # 外向きに（体積が正）
