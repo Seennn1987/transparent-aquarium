@@ -130,6 +130,8 @@ async function start() {
   // `?specimen=chameleon`: the cleared-and-stained chameleon (specimen-chameleon.js) instead of the squid.
   const specimenKind = query.get("specimen") === "chameleon" ? "chameleon" : "squid";
   const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind });
+  // The chameleon's label hid its face; left off for now (2026-10-13, at the user's request).
+  if (specimenKind === "chameleon") jar.label.visible = false;
   scene.add(jar.root);
   const gallery = createGallery({
     jarRadius: jar.dims.bodyRadius,
@@ -158,8 +160,13 @@ async function start() {
   const galleryJars = createGalleryJars({ jar, specimen, envMap, lens: LENS });
   scene.add(galleryJars.root);
   galleryJars.setQuality(jarQuality(profile));
+  // Turned further than ORBIT_TURN from the default view (the chameleon's full orbit), the row of
+  // jars behind would stand between the camera and the front jar: the row is then left out.
+  let wantedJars = 0;
+  let rowHidden = false;
   function setJarCount(count) {
-    gallery.setBlocks(galleryJars.setCount(count));
+    wantedJars = count;
+    gallery.setBlocks(galleryJars.setCount(rowHidden ? 0 : count));
     loop?.invalidate();
   }
   setJarCount(slotCount(profile));
@@ -221,9 +228,15 @@ async function start() {
     target: CAMERA.target.clone(),
     minDistance: 3.6,
     maxDistance: 14,
-    minAzimuth: ROOM_YAW - ORBIT_TURN,
-    maxAzimuth: ROOM_YAW + ORBIT_TURN,
+    // The chameleon may be walked all the way round (the room's edge then shows; 2026-10-13, at the user's request).
+    ...(specimenKind === "chameleon" ? {} : { minAzimuth: ROOM_YAW - ORBIT_TURN, maxAzimuth: ROOM_YAW + ORBIT_TURN }),
     onChange() {
+      const turn = Math.atan2(camera.position.x - CAMERA.target.x, camera.position.z - CAMERA.target.z) - ROOM_YAW;
+      const hide = Math.abs(THREE.MathUtils.euclideanModulo(turn + Math.PI, Math.PI * 2) - Math.PI) > ORBIT_TURN;
+      if (hide !== rowHidden) {
+        rowHidden = hide;
+        setJarCount(wantedJars);
+      }
       loop?.invalidate();
     },
   });
