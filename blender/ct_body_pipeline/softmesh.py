@@ -6,7 +6,7 @@
 #   出力: soft_mesh.npz（v: CT のボクセル座標（全解像度）、f: 三角形）
 import numpy as np, scipy.ndimage as nd
 from skimage import measure
-V=np.load('ct_ms50726_vol4.npz')['v']; B=np.load('B_h10.npy'); IN=np.load('intruder.npy')
+V=np.load('ct_ms50726_vol4.npz')['v']; B=np.load('B_h11.npy'); IN=np.load('intruder.npy')
 dl,n=nd.label(V>=130); sz=np.bincount(dl.ravel()); sz[0]=0; disc=nd.binary_dilation(dl==sz.argmax(),iterations=4)
 # 軟部は JPEG のざらつきで点々に写る（濃さの低い皮膚・筋肉は半分ほどのボクセルが 0）。
 # 2×2×2 の中の 20 以上の割合を σ 0.4 mm でぼかし、0.12 以上を軟部とする（外側の薄い皮膚の点々まで含める）

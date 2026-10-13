@@ -1,5 +1,5 @@
 # 膜の作り直し 1/2: 軟部の体積を、肋骨を戻した空間（ribrestore）へ移し、骨ごとの持ち主を付ける。
-#   入力: soft_solid_half.npy（softmesh.py の軟部。半分の解像度 0.208 mm、体の中の空洞は埋めてある）、B_h10.npy（骨ラベル）
+#   入力: soft_solid_half.npy（softmesh.py の軟部。半分の解像度 0.208 mm、体の中の空洞は埋めてある）、B_h11.npy（骨ラベル）
 #   1. 軟部の各ボクセルの持ち主 = 戻した空間で、いちばん近い骨のボクセルのラベル（重みと同じ空間で決める）
 #   2. 動き = 近い骨のボクセル（24 点、σ 1 mm）の、肋骨の復元での動きの重み付き平均（softrig.py と同じ）。肋骨以外の骨は動かない
 #   3. 戻した空間の格子へ置き、置いたときのすき間を閉じる
@@ -8,7 +8,7 @@ import numpy as np, scipy.ndimage as nd, json, time
 from scipy.spatial import cKDTree
 import ribrestore
 t0 = time.time()
-S = np.load('soft_solid_half.npy'); B = np.load('B_h10.npy'); names = json.load(open('bone_names.json'))
+S = np.load('soft_solid_half.npy'); B = np.load('B_h11.npy'); names = json.load(open('bone_names.json'))
 P = np.argwhere(B > 0); L = B[tuple(P.T)].astype(np.int32)
 ok = np.array([str(l) in names for l in np.unique(L)]); good = set(np.unique(L)[ok].tolist())
 m = np.isin(L, list(good)); P = P[m]; L = L[m]

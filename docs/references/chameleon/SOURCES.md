@@ -64,3 +64,8 @@
   - 消化管に未消化物が多いときは内臓を取り除く。`06` に褐色の塊が見えないことの説明の候補（確かめてはいない）
 - Griffing, A. H., Gamble, T. & Bauer, A. M. (2020). *BMC Evolutionary Biology* 20:40. https://link.springer.com/article/10.1186/s12862-020-01604-9
   - 昼行性の小型有鱗類の多くは腹膜に色素が多い。*Chamaeleo* の腹膜が黒いかは、Bauer 1997（*Afr. J. Herpetol.* 46:117–123）の本文を読めておらず未確認
+
+## 文献（舌骨、2026-10-13）
+
+- Wainwright, P. C., Kraklau, D. M. & Bennett, A. F. (1991). Kinematics of tongue projection in *Chamaeleo oustaleti*. *J. Exp. Biol.* 159:109–133. https://cob.silverchair.com/jeb/article-pdf/1470645/109.pdf
+  - 正中の大きな舌内突起（entoglossal process）の基部に、骨性の角鰓骨が一対関節する。角舌骨は軟骨で小さく、角鰓骨の前にある。舌骨は喉に吊られている

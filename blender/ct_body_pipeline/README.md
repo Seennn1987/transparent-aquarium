@@ -62,6 +62,7 @@
 | 29 | softmesh.py | → `soft_mesh.npz`、`soft_solid_half.npy` | 皮膚・筋肉の膜の外形（軟部の密度、別の個体と標識を外す）。33 は `soft_solid_half.npy`（中の空洞を埋めた軟部の体積）だけを使う |
 | 30 | softrig.py | → `soft_rigged.npz` | （旧。2026-10-13 に 33・34 へ置き換え）膜の骨への重み、肋骨の復元と同じ変形、離れた骨どうしをつなぐ面を外す |
 | 31 | cartgaps.py | → `cart_gaps.json` | 肋骨の途切れ（骨の濃さに写らない 0.15〜2 mm の隙間、22 か所）の両端と太さ。軟骨の棒にする |
+| 36 | hyoidfix.py B_h10 B_h11 | → `B_h11.npy` | 舌骨（ラベル 2）から、もう 1 体の個体の指の骨（まわり 1 mm に自分の骨が無く intruder がある塊）を外す。B_h11 = 最終（`chameleon_body_labels.npz`）。softmesh.py・softvol2.py・visceramesh.py・finish.sh は B_h11 で回す |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |

@@ -17,7 +17,7 @@ t0 = time.time()
 DENS = float(os.environ.get('VISCERA_DENSITY', '0.3'))
 HULL_IN = 0.5 / 0.104      # 肋骨の凸包から 0.5 mm 内側（肋骨のまわりの筋肉を入れない）
 BELOW_AXIS = 1.0 / 0.104   # 体軸から 1 mm 腹側より下
-V = np.load('ct_ms50726_vol4.npz')['v']; B = np.load('B_h10.npy'); cav = np.load('cavity_half.npy')
+V = np.load('ct_ms50726_vol4.npz')['v']; B = np.load('B_h11.npy'); cav = np.load('cavity_half.npy')
 names = json.load(open('bone_names.json')); SIDE = json.load(open('sides.json'))
 def rename(n): return SIDE.get(n[:2], n[:2]) + n[2:] if n[:2] in SIDE else n
 H = tuple(s // 2 for s in V.shape)
