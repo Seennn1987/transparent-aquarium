@@ -313,7 +313,8 @@ export function createGalleryJars({ jar, specimen, envMap, lens }) {
 
   jar.root.updateMatrixWorld(true);
   const { parts, dims } = jar;
-  const tissue = bakeSpecimen(specimen);
+  // A specimen that cannot be baked (`bakeable: false`, the chameleon) is left out of the mirror copy.
+  const tissue = specimen.bakeable === false ? null : bakeSpecimen(specimen);
   const glass = glassSurface(envMap, "gallery-glass-wall");
   const meniscus = meniscusMaterial(envMap);
   // Slightly rougher than the front jar's: a pinpoint highlight would scatter into specks in
@@ -414,12 +415,14 @@ export function createGalleryJars({ jar, specimen, envMap, lens }) {
   const materials = tissueMaterials(dims.floorHeight, liquidHeight);
   const animal = new THREE.Group();
   animal.matrixAutoUpdate = false;
-  const absorb = new THREE.Mesh(tissue, materials.absorb);
-  absorb.renderOrder = -99;
-  const glow = new THREE.Mesh(tissue, materials.glow);
-  glow.renderOrder = -97;
-  for (const mesh of [absorb, glow]) mesh.frustumCulled = false;
-  animal.add(absorb, glow);
+  if (tissue) {
+    const absorb = new THREE.Mesh(tissue, materials.absorb);
+    absorb.renderOrder = -99;
+    const glow = new THREE.Mesh(tissue, materials.glow);
+    glow.renderOrder = -97;
+    for (const mesh of [absorb, glow]) mesh.frustumCulled = false;
+    animal.add(absorb, glow);
+  }
   front.add(animal);
   root.add(front);
 

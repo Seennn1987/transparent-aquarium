@@ -81,9 +81,12 @@ export function meniscusMaterial(envMap) {
 // The collection's paper label, written by hand and yellowed with the years.
 export const labelLook = { opacity: { value: 1 } };
 // Where it is stuck on: to the left of the default view, low down, clear of most of the squid.
+// The chameleon hangs head down at the left of the jar, so its label is mirrored about the
+// default view (gallery.js ROOM_YAW 0.274 rad) to the right, below the hind feet.
 const LABEL = { angle: 1.9, arc: 0.72, height: 0.36, lift: 0.3 };
+const LABEL_AT = { squid: LABEL, chameleon: { ...LABEL, angle: Math.PI / 2 - (2 * 0.274 - (Math.PI / 2 - LABEL.angle)) } };
 
-function labelTexture() {
+function labelTexture(specimen = "squid") {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 512;
@@ -122,17 +125,30 @@ function labelTexture() {
   };
   const hand = `"Bradley Hand", "Noteworthy", "Segoe Print", cursive`;
   const handJa = `"Klee", "Klee One", "Hiragino Mincho ProN", serif`;
-  write("No. 0417", 760, 108, hand, 44);
-  write("Loligo sp.", 90, 200, hand, 96, "italic");
-  write("ヤリイカ属", 610, 196, handJa, 56);
-  g.strokeStyle = "rgba(35, 28, 62, 0.7)";
-  g.lineWidth = 3;
-  g.beginPath();
-  g.moveTo(90, 228);
-  g.bezierCurveTo(300, 236, 520, 222, 900, 232);
-  g.stroke();
-  write("採集  1987 . 6 . 12   三崎", 90, 318, handJa, 52);
-  write("透明骨格標本  Alcian blue / KOH", 90, 404, `${hand}, ${handJa}`, 46);
+  const underline = () => {
+    g.strokeStyle = "rgba(35, 28, 62, 0.7)";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(90, 228);
+    g.bezierCurveTo(300, 236, 520, 222, 900, 232);
+    g.stroke();
+  };
+  if (specimen === "chameleon") {
+    // Only what is known of this animal: the species of the CT (MorphoSource, see
+    // docs/references/chameleon/SOURCES.md) and the two stains the model draws (chameleon-stain.js).
+    // No collection number, date or place is written, since none is known.
+    write("Chamaeleo calyptratus", 90, 196, hand, 80, "italic");
+    underline();
+    write("エボシカメレオン", 90, 318, handJa, 56);
+    write("透明骨格標本  Alizarin red / Alcian blue", 90, 404, `${hand}, ${handJa}`, 42);
+  } else {
+    write("No. 0417", 760, 108, hand, 44);
+    write("Loligo sp.", 90, 200, hand, 96, "italic");
+    write("ヤリイカ属", 610, 196, handJa, 56);
+    underline();
+    write("採集  1987 . 6 . 12   三崎", 90, 318, handJa, 52);
+    write("透明骨格標本  Alcian blue / KOH", 90, 404, `${hand}, ${handJa}`, 46);
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -140,14 +156,15 @@ function labelTexture() {
   return texture;
 }
 
-function createLabel(dims) {
-  const theta = Math.PI / 2 - LABEL.angle;
+function createLabel(dims, specimen) {
+  const at = LABEL_AT[specimen] ?? LABEL;
+  const theta = Math.PI / 2 - at.angle;
   const geometry = new THREE.CylinderGeometry(
-    dims.bodyRadius * 1.004, dims.bodyRadius * 1.004, LABEL.height, 48, 1, true,
-    theta - LABEL.arc / 2, LABEL.arc,
+    dims.bodyRadius * 1.004, dims.bodyRadius * 1.004, at.height, 48, 1, true,
+    theta - at.arc / 2, at.arc,
   );
   const material = new THREE.MeshStandardMaterial({
-    map: labelTexture(),
+    map: labelTexture(specimen),
     roughness: 0.85,
     metalness: 0,
     transparent: true,
@@ -155,7 +172,7 @@ function createLabel(dims) {
   });
   const label = new THREE.Mesh(geometry, material);
   label.name = "specimen-label";
-  label.position.y = dims.floorHeight + LABEL.lift;
+  label.position.y = dims.floorHeight + at.lift;
   label.onBeforeRender = () => {
     material.opacity = labelLook.opacity.value;
     material.depthWrite = material.opacity > 0.5;
@@ -184,7 +201,8 @@ function readDims(glass) {
   return dims;
 }
 
-export async function createJar({ envMap, lens }) {
+/** `specimen`: whose label the jar carries ("squid" or "chameleon"). */
+export async function createJar({ envMap, lens, specimen = "squid" }) {
   const gltf = await new GLTFLoader().loadAsync(new URL("../assets/jar.glb", import.meta.url).href);
   const root = gltf.scene;
   root.name = "specimen-jar";
@@ -215,7 +233,7 @@ export async function createJar({ envMap, lens }) {
 
   const optics = createJarOptics({ dims, lens });
   for (const mesh of optics.meshes) root.add(mesh);
-  const label = createLabel(dims);
+  const label = createLabel(dims, specimen);
   root.add(label);
 
   // Blended glass leaves no depth, so the depth of field would blur the lid and the foot as if

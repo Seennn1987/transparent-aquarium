@@ -136,21 +136,33 @@ export function applyChameleonTissue(model, reference) {
 const compositeFragment = `
 uniform sampler2D tPath;
 uniform vec3 lightbox;
+uniform float linearOut;
+uniform float alphaScale;
+uniform float pathScale;
 uniform float boneGain, boneT0, cartGain, skinGain;
 uniform float visceraGain;
 uniform vec3 boneSpectrum, cartSpectrum, skinSpectrum, visceraSpectrum;
 varying vec2 vUv;
 void main() {
   vec4 p = max(texture2D(tPath, vUv), 0.);
-  vec3 a = boneGain * boneT0 * (1. - exp(-p.r / boneT0)) * boneSpectrum
-    + cartGain * p.g * cartSpectrum
-    + skinGain * p.b * skinSpectrum
-    + visceraGain * p.a * visceraSpectrum;
-  gl_FragColor = vec4(lightbox * exp(-a), 1.);
+  // The gains are per model unit; a scaled model's paths are given back in model units.
+  vec4 m = p * pathScale;
+  vec3 a = boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum
+    + cartGain * m.g * cartSpectrum
+    + skinGain * m.b * skinSpectrum
+    + visceraGain * m.a * visceraSpectrum;
+  // In the jar the image is a linear light let through over white (jar-optics.js looks it up and the
+  // final pass tone-maps it); the ratios measured on the photo are in display (sRGB) values.
+  if (linearOut > .5) gl_FragColor = vec4(pow(exp(-a), vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
+  else gl_FragColor = vec4(lightbox * exp(-a), 1.);
 }`;
 
-/** The path buffer and the pass that turns it into the lightbox image. */
-export function createLightbox(renderer) {
+/**
+ * The path buffer and the pass that turns it into the lightbox image. `linear`: write the light
+ * let through (over white, linear) for the jar's optics, with the tissue crossed × alphaScale in alpha.
+ * `pathScale`: model units per world unit, when the model is drawn scaled (the jar).
+ */
+export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1 } = {}) {
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
   const target = new THREE.WebGLRenderTarget(1, 1, {
     type: float ? THREE.FloatType : THREE.HalfFloatType,
@@ -171,6 +183,9 @@ export function createLightbox(renderer) {
       skinSpectrum: { value: new THREE.Vector3(...SKIN_SPECTRUM) },
       visceraGain: { value: VISCERA_GAIN },
       visceraSpectrum: { value: new THREE.Vector3(...VISCERA_SPECTRUM) },
+      linearOut: { value: linear ? 1 : 0 },
+      alphaScale: { value: alphaScale },
+      pathScale: { value: pathScale },
     },
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }",
     fragmentShader: compositeFragment,
@@ -186,16 +201,21 @@ export function createLightbox(renderer) {
     precision: float ? "float32" : "float16",
     target,
     setSize(w, h) { target.setSize(w, h); },
-    render(scene, camera) {
+    material,
+    render(scene, camera, output = null) {
       material.uniforms.boneGain.value = BONE_GAIN * chameleonLook.bone.value;
       material.uniforms.cartGain.value = CARTILAGE_GAIN * chameleonLook.cartilage.value;
       material.uniforms.skinGain.value = SKIN_GAIN * chameleonLook.skin.value;
       material.uniforms.visceraGain.value = VISCERA_GAIN * chameleonLook.viscera.value;
+      const clear = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
+      const background = scene.background; scene.background = null;
       renderer.setRenderTarget(target);
       renderer.setClearColor(0x000000, 0);
       renderer.clear();
       renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
+      scene.background = background;
+      renderer.setClearColor(clear, clearAlpha);
+      renderer.setRenderTarget(output);
       renderer.render(screen, flat);
     },
   };

@@ -5,6 +5,7 @@ import { frameRate, qualityName, renderScale } from "../../shared/render-policy.
 import { createOrbit } from "./orbit.js";
 import { createJar } from "./jar.js";
 import { createSpecimen } from "./specimen.js";
+import { createChameleonSpecimen } from "./specimen-chameleon.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
@@ -126,7 +127,9 @@ async function start() {
   const envMap = envFor(look);
   scene.environment = envMap;
   scene.environmentIntensity = 0.6;
-  const jar = await createJar({ envMap, lens: LENS });
+  // `?specimen=chameleon`: the cleared-and-stained chameleon (specimen-chameleon.js) instead of the squid.
+  const specimenKind = query.get("specimen") === "chameleon" ? "chameleon" : "squid";
+  const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind });
   scene.add(jar.root);
   const gallery = createGallery({
     jarRadius: jar.dims.bodyRadius,
@@ -138,11 +141,14 @@ async function start() {
   scene.add(gallery.root);
   // The specimen is only ever seen through the liquid, so it has a scene of its own, drawn
   // over white into the image the jar's optics look up.
-  const specimen = await createSpecimen({
+  const specimenOptions = {
     envMap,
     liquidBounds: jar.liquidBounds,
     facing: CAMERA.position.clone().sub(CAMERA.target).setY(0).normalize(),
-  });
+  };
+  const specimen = specimenKind === "chameleon"
+    ? await createChameleonSpecimen(specimenOptions)
+    : await createSpecimen(specimenOptions);
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);
   specimenScene.add(specimen.object);
@@ -337,8 +343,11 @@ async function start() {
     renderer.setRenderTarget(backgroundImage);
     renderer.render(scene, camera);
     jar.root.visible = true;
-    renderer.setRenderTarget(specimenImage);
-    renderer.render(specimenScene, camera);
+    if (specimen.renderImage) specimen.renderImage(renderer, specimenImage, camera, specimenScene);
+    else {
+      renderer.setRenderTarget(specimenImage);
+      renderer.render(specimenScene, camera);
+    }
 
     renderer.setRenderTarget(post.target);
     renderer.render(scene, camera);
