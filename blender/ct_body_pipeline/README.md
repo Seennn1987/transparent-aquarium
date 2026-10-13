@@ -67,6 +67,8 @@
 | 38 | forefit.py（Blender、rig_chameleon_ct.py と同じフォルダ）→ fit_fore.py | → `fore*.json` → `fore_fit.json` | 前肢の向き（θ, φ）を写真 01 の肘・手首・指先に合わせて解く。頭の 2 点で骨格を 01 に重ねる。`POSE='<json>'` で試しの向きを渡して確かめる（2026-10-13） |
 | 39 | forefit.py（同上、後肢と背骨も書き出す）→ fit_hind.py | → `limbs*.json` → `hind_fit.json` | 後肢の向きを写真 01 の膝・足首・指先に合わせて解く。腰で重ね直す（倍率は頭、向きは腰の背骨、股関節の中点を 01 の股関節へ）（2026-10-13） |
 | 40 | fit_stain01.py <写真01.jpg> <p01.npy> <p01_film.npy> | → 組織ごとの吸光度 | 色の型 "01" を写真 01 から解く。画面の通り道と膜の層の量は `chameleon.html?stain=01` の `chameleonPage.paths()` / `film()` を書き出したもの（2026-10-13） |
+| 41 | organs_cav.py → organs.py → organs_mesh.py → pack_soft.py | pose_jar.npz、skin_posed.npz → `organs_cav.npz` → `organs_lab.npz` → `organs_rigged.npz` → `chameleon_body_soft.npz`（org_<名前>__） | 体腔の臓器。展示の姿勢の膜の内側を入れ物に、Melero et al. 2023 の配置と大きさで置き、面にして椎骨に重みを付け、静止の姿勢へ戻す。`organs_view.py` で配置の図（2026-10-13） |
+| 42 | organcal.py（headless Chromium）→ fit_organs01.py | `cal01.npz`、`lm01.json` → 臓器の色 | 色 "01" の臓器の色を写真 01 の斑から当てはめる（2026-10-13） |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |

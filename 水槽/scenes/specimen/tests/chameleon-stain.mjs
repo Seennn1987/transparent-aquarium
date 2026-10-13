@@ -28,7 +28,11 @@ const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
 nearA(transmitted({ film: 2.91, skin: 0.269 }, { stain: "01" }), [0.333, 0.241, 0.175], 0.02, "01 の青（輪郭）");
 nearA(transmitted({ film: 2.19, skin: 0.391 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
 nearA(transmitted({ bone: 0.1332, film: 2.29, skin: 0.599 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
-nearA(transmitted({ viscera: 0.159, film: 2.62, skin: 0.769 }, { stain: "01" }), [0.693, 0.868, 0.968], 0.03, "01 の内臓");
+// "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the contents).
+nearA(transmitted({ organs: { liver_r: 0.1976 } }, { stain: "01" }), [0.182, 0.254, 0.382], 0.01, "01 の肝臓（C）");
+nearA(transmitted({ organs: { contents: 0.0774 } }, { stain: "01" }), [0.571, 0.574, 0.674], 0.2, "01 の中身（A。A と B の平均なので、ずれは 0.2 まで）");
+nearA(transmitted({ organs: { contents: 0.0654 } }, { stain: "01" }), [0.375, 0.514, 0.718], 0.2, "01 の中身（B）");
+near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 では内臓の一塊を描かない");
 // The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });
 assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);

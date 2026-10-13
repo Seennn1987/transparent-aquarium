@@ -59,6 +59,7 @@
 - Cassel, N. (2014). The Basics of Reptile Radiology. VIN（獣医向けの講演録）. https://www.vin.com/doc/?id=7054882
   - トカゲの肺は嚢状で、肝臓の背側にあり、体腔の背壁に接する
 - Melero, A. et al. (2023). Computed tomography of the coelomic cavity in healthy veiled chameleons (*Chamaeleo calyptratus*) and panther chameleons (*Furcifer pardalis*). *Open Veterinary Journal* 13(9):1071–1081. https://www.openveterinaryjournal.com/?mno=113832
+  - 本文（PMC10576585、https://pmc.ncbi.nlm.nih.gov/articles/PMC10576585/）を 2026-10-13 に読んだ。体腔の臓器（`blender/ct_body_pipeline/organs.py`）の配置は Results の各節、大きさは Table 1（肝臓・胆嚢・脂肪体・腎臓・精巣、エボシカメレオン 17 頭、102.0 ± 16.8 g）と Table 3（心臓の長軸 1.67 cm・短軸 0.91 cm、VHS 4.61）。動物は撮影前に 48 時間絶食（消化管は空）。胃・腸・結腸・膀胱の大きさは書かれていない
   - 本文は未読。臓器の位置関係は、この論文で確かめる
 - Davis, D. D. & Gore, U. R. (1936). Clearing and Staining Skeletons of Small Vertebrates. Field Museum Technique Series 4. https://www.archive.org/download/clearingstaining04davis/clearingstaining04davis_bw.pdf
   - 消化管に未消化物が多いときは内臓を取り除く。`06` に褐色の塊が見えないことの説明の候補（確かめてはいない）

@@ -63,6 +63,7 @@ export const STAINS = {
     skin: { spectrum: SKIN_SPECTRUM, gain: SKIN_GAIN },
     viscera: { spectrum: VISCERA_SPECTRUM, gain: VISCERA_GAIN },
     film: { spectrum: [0, 0, 0], gain: 0 },
+    organs: {},
   },
   // Measured on 01-user-jar-diaphonized.jpg (the user's jar photo, 447 px a side; watermarked, not
   // redistributed, docs/references/chameleon/SOURCES.md), 2026-10-13. Light let through = pixel / the
@@ -91,21 +92,43 @@ export const STAINS = {
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
     skin: { spectrum: [0, 0.474, 1], gain: 0.2298 },
-    viscera: { spectrum: [0.571, 0.861, 1], gain: 4.32 },
+    // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
+    // spectrum 0.571 / 0.861 / 1, gain 4.32.
+    viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
     film: { spectrum: [1, 0.636, 0.34], gain: 0.1145 },
+    // The organs of the body cavity (blender/ct_body_pipeline/organs.py: placed and sized after Melero et al. 2023,
+    // Open Vet J 13:1071, the CT of 17 living veiled chameleons). They replace the one brown mass ("06" keeps it).
+    // Absorbance per model unit of organ crossed, added to the tissue around it. Fitted on photo 01's patches inside
+    // the trunk, by where along the trunk they lie (shoulder → hip = 0 → 1; ct_body_pipeline/fit_organs01.py):
+    //   C (t 0.35, brown mottle) less the screen's skin, film and bone there: 0.182 / 0.254 / 0.382, over the liver's
+    //     median path in that band (0.198)                                      → liver 0.92 / 1.29 / 1.93
+    //   B (t 0.60, brown mottle) 0.375 / 0.514 / 0.718 over the gut contents' path (0.065), A (t 0.85, dark grey)
+    //     0.571 / 0.574 / 0.674 over 0.077; their mean                            → contents 6.56 / 7.64 / 9.84
+    // By where across the trunk they lie the patches do not match: in 01 they sit nearer the spine, where the
+    // living animals' CT has the lungs (> 2/3 of the dorsal coelom, Melero 2023). Not settled.
+    // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys, the gut's wall) are given the cleared
+    // tissue's own absorbance (the skin's volume above, 0 / 0.109 / 0.230) once more: faint, provisional.
+    organs: {
+      liver_r: [0.92, 1.29, 1.93], liver_l: [0.92, 1.29, 1.93],
+      contents: [6.56, 7.64, 9.84],
+      heart: [0, 0.109, 0.23], gallbladder: [0, 0.109, 0.23], fat_r: [0, 0.109, 0.23], fat_l: [0, 0.109, 0.23],
+      kidney_r: [0, 0.109, 0.23], kidney_l: [0, 0.109, 0.23],
+      stomach: [0, 0.109, 0.23], intestine: [0, 0.109, 0.23], colon: [0, 0.109, 0.23],
+    },
   },
 };
 export const stainOf = (name) => STAINS[name] ?? STAINS["06"];
 
 /** Light let through (red, green, blue) for paths through bone, cartilage and skin films. */
-export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0, film = 0 }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1, visceraScale = 1, stain = "06" } = {}) {
+export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0, film = 0, organs = {} }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1, visceraScale = 1, stain = "06" } = {}) {
   const k = stainOf(stain);
   const b = k.bone.gain * boneScale * boneT0 * (1 - Math.exp(-Math.max(bone, 0) / boneT0));
   const c = k.cartilage.gain * cartilageScale * Math.max(cartilage, 0);
   const s = k.skin.gain * skinScale * Math.max(skin, 0);
   const v = k.viscera.gain * visceraScale * Math.max(viscera, 0);
   const f = k.film.gain * Math.max(film, 0);
-  return [0, 1, 2].map((i) => Math.exp(-(b * k.bone.spectrum[i] + c * k.cartilage.spectrum[i] + s * k.skin.spectrum[i] + v * k.viscera.spectrum[i] + f * k.film.spectrum[i])));
+  const o = [0, 1, 2].map((i) => Object.entries(organs).reduce((sum, [n, t]) => sum + (k.organs[n]?.[i] ?? 0) * Math.max(t, 0), 0));
+  return [0, 1, 2].map((i) => Math.exp(-(b * k.bone.spectrum[i] + c * k.cartilage.spectrum[i] + s * k.skin.spectrum[i] + v * k.viscera.spectrum[i] + f * k.film.spectrum[i] + o[i])));
 }
 
 // The heart (chameleon-material.js). No resting heart rate for chameleons was found in the literature

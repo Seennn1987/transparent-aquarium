@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createOrbit } from "./orbit.js";
-import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock } from "./chameleon-material.js";
+import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock, chameleonOrgans, calibrateOrgans } from "./chameleon-material.js";
 import { stainOf } from "./chameleon-stain.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
@@ -114,6 +114,14 @@ async function start() {
         gl.readPixels(x, h - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
         return [px[0], px[1], px[2]];
       });
+    },
+    organs: chameleonOrgans, calibrateOrgans,
+    /** The organ buffer (each organ's absorbance × path, model units), bottom row first. */
+    organ() {
+      const t = lightbox.organTarget;
+      const out = new Float32Array(t.width * t.height * 4);
+      renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, out);
+      return { width: t.width, height: t.height, data: out };
     },
     /** The "01" pattern's film buffer (slant crossings of the skin's surface), bottom row first. */
     film() {

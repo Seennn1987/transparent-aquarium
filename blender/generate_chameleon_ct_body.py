@@ -221,6 +221,23 @@ def viscera_material():
     return mat
 
 
+def build_organs(d, k, coll, rigob):
+    """体腔の臓器を 1 つずつ（ct_body_pipeline/organs.py、organs_mesh.py。配置と大きさは Melero et al. 2023）。
+    chameleon_body_soft.npz の org_<名前>__* から。オブジェクトは CH_Organ_<名前>。"""
+    soft = DATA.replace("chameleon_body_ct.npz", "chameleon_body_soft.npz")
+    if not os.path.exists(soft):
+        return []
+    e = np.load(soft)
+    names = sorted({f[4:].split("__")[0] for f in e.files if f.startswith("org_")})
+    obs = []
+    for n in names:
+        ob = build_skin(e, k, coll, rigob, key=f"org_{n}", name=f"Organ_{n}", material=viscera_material())
+        if ob is not None:
+            ob["chameleon_organ"] = n
+            obs.append(ob)
+    return obs
+
+
 CART_COLOR = (0.35, 0.55, 0.95, 1.0)   # 仮。軟骨（アルシアンブルーで青）。色は手順 A5 で測った通し光に合わせる
 
 
@@ -359,6 +376,7 @@ def build():
     mo.object = rigob
     build_skin(d, k, coll, rigob)
     build_skin(d, k, coll, rigob, key="visc", name="Viscera", material=viscera_material())
+    build_organs(d, k, coll, rigob)
     build_cartilage(d, k, coll, rigob)
     root = bpy.data.objects.new(PREFIX + "Root", None)
     coll.objects.link(root)

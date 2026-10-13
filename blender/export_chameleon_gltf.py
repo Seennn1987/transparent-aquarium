@@ -5,7 +5,8 @@
 骨の形は MorphoSource 000050726（CAS:HERP:135515、In Copyright – Non-Commercial Use Permitted）から作った。
 再配布しないので、書き出し先は git に入れない private/ にする（.gitignore）。
 
-部位はメッシュの custom property `chameleon_part`（Bone / Skin / Cartilage / Viscera）で渡す。
+部位はメッシュの custom property `chameleon_part`（Bone / Skin / Cartilage / Viscera / Organ）で渡す。
+Organ は体腔の臓器で、臓器の名前は `chameleon_organ`。
 読み込み側（chameleon-material.js）は、この名前で組織を選ぶ。
 """
 import math
@@ -65,6 +66,12 @@ def prepare():
         ob["chameleon_part"] = part
         report[part] = closed_report(ob)
         print(f"[Chameleon glb] {part}: 面 {len(ob.data.polygons)}、閉じていない辺 {report[part][0]}、体積 {report[part][1]:.4f}")
+    # 体腔の臓器（generate_chameleon_ct_body.build_organs）: 部位 Organ、臓器の名前は chameleon_organ
+    for ob in bpy.data.objects:
+        if ob.name.startswith("CH_Organ_"):
+            ob["chameleon_part"] = "Organ"
+            r = closed_report(ob)
+            print(f"[Chameleon glb] Organ {ob['chameleon_organ']}: 面 {len(ob.data.polygons)}、閉じていない辺 {r[0]}、体積 {r[1]:.5f}")
     return coll, rigob, frames, report
 
 
@@ -72,7 +79,7 @@ def export(path):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     for ob in bpy.data.objects:
-        if ob.name in PARTS or ob.name in ("CH_Rig", "CH_Root"):
+        if ob.name in PARTS or ob.name.startswith("CH_Organ_") or ob.name in ("CH_Rig", "CH_Root"):
             ob.select_set(True)
     bpy.ops.export_scene.gltf(
         filepath=path,
