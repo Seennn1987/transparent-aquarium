@@ -19,12 +19,13 @@ occ=np.array(M@pb['head'].head); ax=np.array(M@pb['head'].tail)-occ; ax/=np.lina
 snout=H[np.argmax((H-occ)@ax)]
 rr=(H-occ)-np.outer((H-occ)@ax,ax); casque=H[np.argmax(np.linalg.norm(rr,axis=1))]
 out={'snout':snout.tolist(),'casque':casque.tolist()}
-for c in ('fR','fL'):
-    for b in ('upper','lower','hand'):
+for c in ('fR','fL','hL','hR'):
+    for b in (('upper','lower','hand') if c[0]=='f' else ('upper','lower','foot')):
         out[c+'_'+b]=[list(M@pb[c+'_'+b].head),list(M@pb[c+'_'+b].tail)]
 # hand tip: farthest hand vertex from wrist
-for c in ('fR','fL'):
-    Hn=V[gid==[i for i,n in vg.items() if n==c+'_hand'][0]]; w=np.array(out[c+'_hand'][0])
+for c in ('fR','fL','hL','hR'):
+    e=('_hand' if c[0]=='f' else '_foot'); Hn=V[gid==[i for i,n in vg.items() if n==c+e][0]]; w=np.array(out[c+e][0])
     out[c+'_tip']=Hn[np.argmax(np.linalg.norm(Hn-w,axis=1))].tolist()
+out['axial']={b.name:[list(M@b.head),list(M@b.tail)] for b in pb if b.name.startswith('v') or b.name.endswith('_girdle')}
 json.dump(out,open(sys.argv[-1],'w'))
 print('ok')

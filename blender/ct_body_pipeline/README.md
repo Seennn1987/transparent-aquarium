@@ -65,6 +65,7 @@
 | 36 | hyoidfix.py B_h10 B_h11 | → `B_h11.npy` | 舌骨（ラベル 2）から、もう 1 体の個体の指の骨（まわり 1 mm に自分の骨が無く intruder がある塊）を外す。B_h11 = 最終（`chameleon_body_labels.npz`）。softmesh.py・softvol2.py・visceramesh.py・finish.sh は B_h11 で回す |
 | 37 | dump_pose.py（Blender）→ skinloft2.py | → `pose_jar.npz` → `soft_rigged.npz` | 膜の作り直し 3（2026-10-13〜、これが最終の膜）。骨ごとの断面の太さの表（軟部の 90% 点、骨 + 0.3 mm 以上）から、展示の姿勢で一枚に作り、重みを付けて静止の姿勢へ戻す。dump_pose.py は rig_chameleon_ct.py と同じフォルダから走らせる |
 | 38 | forefit.py（Blender、rig_chameleon_ct.py と同じフォルダ）→ fit_fore.py | → `fore*.json` → `fore_fit.json` | 前肢の向き（θ, φ）を写真 01 の肘・手首・指先に合わせて解く。頭の 2 点で骨格を 01 に重ねる。`POSE='<json>'` で試しの向きを渡して確かめる（2026-10-13） |
+| 39 | forefit.py（同上、後肢と背骨も書き出す）→ fit_hind.py | → `limbs*.json` → `hind_fit.json` | 後肢の向きを写真 01 の膝・足首・指先に合わせて解く。腰で重ね直す（倍率は頭、向きは腰の背骨、股関節の中点を 01 の股関節へ）（2026-10-13） |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |
