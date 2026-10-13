@@ -61,3 +61,14 @@ export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0 }, 
   const v = VISCERA_GAIN * visceraScale * Math.max(viscera, 0);
   return [0, 1, 2].map((i) => Math.exp(-(b * BONE_SPECTRUM[i] + c * CARTILAGE_SPECTRUM[i] + s * SKIN_SPECTRUM[i] + v * VISCERA_SPECTRUM[i])));
 }
+
+// The heart (chameleon-material.js). No resting heart rate for chameleons was found in the literature
+// (2026-10-13). Used instead, with the producer's agreement: the agamid Uromastyx microlipes at 30 °C,
+// 40.57 ± 5.68 beats/min (Al-Ghamdi 2005, JKAU Sci 17:21–33, Table 1A; 350–1033 g, heavier than a chameleon).
+// 8 beats in the 12 s loop (CH_Hover) = 40 beats/min. The heart's size and how far it squeezes are not
+// measured: provisional, chosen to be seen.
+export const HEART_PERIOD = 12 / 8;
+export const HEART_RADIUS_MM = 2;
+export const HEART_AMP = 0.12;
+// Model units: the skull, 23.1 mm in the CT, is 1.04 units.
+export const MODEL_UNITS_PER_MM = 1.04 / 23.1;

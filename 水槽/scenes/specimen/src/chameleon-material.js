@@ -2,17 +2,21 @@ import * as THREE from "three";
 import {
   LIGHTBOX, BONE_SPECTRUM, BONE_T0, BONE_GAIN, CARTILAGE_SPECTRUM, CARTILAGE_GAIN,
   SKIN_SPECTRUM, SKIN_GAIN, VISCERA_SPECTRUM, VISCERA_GAIN,
+  HEART_PERIOD, HEART_RADIUS_MM, HEART_AMP, MODEL_UNITS_PER_MM,
 } from "./chameleon-stain.js";
 
 // The cleared-and-stained chameleon on a lightbox (no jar yet). Each tissue's absorbance and
 // where its numbers were measured: chameleon-stain.js.
 
+// The animation clock (seconds into CH_Hover), set by the page each frame.
+export const chameleonClock = { value: 0 };
 export const chameleonLook = {
   bone: { value: 1 },
   boneT0: { value: BONE_T0 },
   cartilage: { value: 1 },
   skin: { value: 1 },
   viscera: { value: 1 },
+  heartAmp: { value: HEART_AMP },
 };
 
 // Where each part's path goes in the path buffer.
@@ -21,6 +25,11 @@ const CHANNEL = { Bone: 0, Cartilage: 1, Skin: 2, Viscera: 3 };
 const pathVertex = `
 #include <common>
 #include <skinning_pars_vertex>
+uniform float uTime;
+uniform vec3 uHeart;
+uniform float uHeartRadius;
+uniform float uHeartAmp;
+uniform float uHeartPeriod;
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
 void main() {
@@ -29,6 +38,12 @@ void main() {
   #include <skinnormal_vertex>
   #include <defaultnormal_vertex>
   #include <begin_vertex>
+  // The heart's beat: the viscera squeeze in toward the heart, strongest at it (uHeartAmp 0 elsewhere).
+  if (uHeartAmp > 0.) {
+    vec3 d = transformed - uHeart;
+    float beat = pow(.5 + .5 * sin(6.2831853 * uTime / uHeartPeriod), 4.);
+    transformed = uHeart + d * (1. - uHeartAmp * beat * exp(-dot(d, d) / (uHeartRadius * uHeartRadius)));
+  }
   #include <skinning_vertex>
   #include <project_vertex>
   vViewPosition = mvPosition.xyz;
@@ -70,6 +85,29 @@ function channelVector(part) {
  * Gives every part of specimen_chameleon.glb its path material. Parts are named by the
  * node extra `chameleon_part` (blender/export_chameleon_gltf.py).
  */
+// Where the heart is: in the most cranial part of the body cavity, within the rib cage (Melero et al. 2023,
+// Open Vet J 13:1071). The viscera mass is not split into organs, so the heart is taken as the part of the
+// mass nearest the head: the mean of its vertices within HEART_RADIUS_MM of the vertex closest to the skull.
+function heartCentre(mesh) {
+  const bones = mesh.skeleton.bones;
+  const i = bones.findIndex((b) => b.name === "head");
+  if (i < 0) return null;
+  const head = new THREE.Vector3().setFromMatrixPosition(mesh.skeleton.boneInverses[i].clone().invert()).applyMatrix4(mesh.bindMatrixInverse);
+  const pos = mesh.geometry.getAttribute("position"), p = new THREE.Vector3();
+  let best = Infinity, near = new THREE.Vector3();
+  for (let k = 0; k < pos.count; k++) {
+    p.fromBufferAttribute(pos, k);
+    const d = p.distanceToSquared(head);
+    if (d < best) { best = d; near.copy(p); }
+  }
+  const r = HEART_RADIUS_MM * MODEL_UNITS_PER_MM, c = new THREE.Vector3(); let n = 0;
+  for (let k = 0; k < pos.count; k++) {
+    p.fromBufferAttribute(pos, k);
+    if (p.distanceTo(near) < r) { c.add(p); n++; }
+  }
+  return n ? c.divideScalar(n) : near;
+}
+
 export function applyChameleonTissue(model, reference) {
   const found = new Set();
   model.traverse((object) => {
@@ -78,7 +116,18 @@ export function applyChameleonTissue(model, reference) {
     if (!(part in CHANNEL)) throw new Error(`specimen_chameleon.glb の部位 ${part ?? object.name} に組織の設定がありません`);
     found.add(part);
     object.frustumCulled = false;
-    object.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channelVector(part) }, reference }, vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD });
+    const heart = part === "Viscera" ? heartCentre(object) : null;
+    object.material = new THREE.ShaderMaterial({
+      uniforms: {
+        channel: { value: channelVector(part) }, reference,
+        uTime: chameleonClock,
+        uHeart: { value: heart ?? new THREE.Vector3() },
+        uHeartRadius: { value: HEART_RADIUS_MM * MODEL_UNITS_PER_MM },
+        uHeartAmp: heart ? chameleonLook.heartAmp : { value: 0 },
+        uHeartPeriod: { value: HEART_PERIOD },
+      },
+      vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD,
+    });
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
   if (missing.length) throw new Error(`specimen_chameleon.glb に部位がありません: ${missing.join(", ")}`);

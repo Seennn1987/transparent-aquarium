@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createOrbit } from "./orbit.js";
-import { applyChameleonTissue, createLightbox, chameleonLook } from "./chameleon-material.js";
+import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock } from "./chameleon-material.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
@@ -37,7 +37,8 @@ async function start() {
   scene.add(holder);
 
   const mixer = new THREE.AnimationMixer(model);
-  mixer.clipAction(clip).play();
+  const action = mixer.clipAction(clip);
+  action.play();
   mixer.update(Number(query.get("t") ?? 0));
   scene.updateMatrixWorld(true);
 
@@ -78,6 +79,7 @@ async function start() {
   function frame() {
     const dt = clock.getDelta();
     if (!paused) mixer.update(dt);
+    chameleonClock.value = action.time;
     // The plane the solid paths are measured from: through the body's centre.
     view.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -view.z;

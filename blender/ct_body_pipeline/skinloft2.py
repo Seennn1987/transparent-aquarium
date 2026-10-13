@@ -10,7 +10,7 @@
 #   中身の少ない升は近くの升で埋め、軸に沿って σ 1 mm、角の向きに σ 2 升でぼかす
 #   展示の姿勢（POSE_JAR、dump_pose.py の変形）で「軸からの距離 − 太さ」を並べ、なめらかな最小（幅 0.4 mm）で一つにして面にする。
 #   CT で胴に押し付けられていた手足も、展示の姿勢で離れた形で作られる。面は外さない
-#   重み: 体軸は断面の位置で前後の椎骨に分ける。手足は部位の距離の差で、つながる骨だけを混ぜる
+#   重み: 体軸は断面の位置で前後の椎骨に分け、近い肋骨にも分ける（呼吸用）。手足は部位の距離の差で、つながる骨だけを混ぜる
 #   静止の形: 頂点を重みで混ぜた変形の逆で静止の姿勢へ戻す
 #   出力: soft_rigged.npz（v は CT の mm、f、w_idx、w_val、names）、skin_posed.npz（展示の姿勢の形）
 import numpy as np, scipy.ndimage as nd, json, os, time
@@ -222,6 +222,19 @@ WB = np.zeros((len(v), len(bones)), np.float32)
 ia, ib_, wb_ = va[jv], vb[jv], wb[jv]
 np.add.at(WB, (np.arange(len(v)), ia), W[:, 0] * (1 - wb_)); np.add.at(WB, (np.arange(len(v)), ib_), W[:, 0] * wb_)
 for c, nme in enumerate(cols[1:], 1): WB[:, len(J) + c - 1] += W[:, c]
+# 胴の膜は、近い肋骨にも重みを分ける（呼吸で肋骨が動くと胴の膜も動く）。肋骨から 2 mm で半分ほど
+ribn = sorted({n for n in owb if n.startswith('rib')})
+bones += ribn
+WB = np.concatenate([WB, np.zeros((len(v), len(ribn)), np.float32)], 1)
+selr = np.array([n.startswith('rib') for n in owb])
+Xr = Xb[selr][::3]; Lr_ = owb[selr][::3]
+Mr = {n: Mof(n) for n in ribn}
+Xr_p = np.concatenate([apply(Mr[n], Xr[Lr_ == n]) for n in ribn]); Lr_p = np.concatenate([np.full(int((Lr_ == n).sum()), i) for i, n in enumerate(ribn)])
+dr, jr = cKDTree(Xr_p).query(v, workers=-1)
+wr = 0.7 * np.exp(-0.5 * (dr / (2.0 * MM)) ** 2) * W[:, 0] / np.maximum(W.sum(1), 1e-9)   # 体軸の分の中だけ
+axs = WB[:, :len(J)].sum(1); keep = 1 - wr
+WB[:, :len(J)] *= keep[:, None]
+np.add.at(WB, (np.arange(len(v)), len(J) + len(tubes) + Lr_p[jr]), wr * np.maximum(axs, 1e-9))
 top = np.argsort(-WB, 1)[:, :3]; tw = np.take_along_axis(WB, top, 1); tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)
 Ms = np.array([Mof(b) for b in bones])
 Mv = np.einsum('vk,vkij->vij', tw, Ms[top])

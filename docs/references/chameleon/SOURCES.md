@@ -69,3 +69,15 @@
 
 - Wainwright, P. C., Kraklau, D. M. & Bennett, A. F. (1991). Kinematics of tongue projection in *Chamaeleo oustaleti*. *J. Exp. Biol.* 159:109–133. https://cob.silverchair.com/jeb/article-pdf/1470645/109.pdf
   - 正中の大きな舌内突起（entoglossal process）の基部に、骨性の角鰓骨が一対関節する。角舌骨は軟骨で小さく、角鰓骨の前にある。舌骨は喉に吊られている
+
+## 文献（呼吸・心拍、2026-10-13。カメレオンの値は見つからず、近いトカゲの値を仮に使う）
+
+- Milsom, W. K. (1984). The interrelationship between pulmonary mechanics and the spontaneous breathing pattern in the Tokay lizard, *Gekko gecko*. *J. Exp. Biol.* 113:203–214. https://cob.silverchair.com/jeb/article-pdf/113/1/203/2424329/jexbio_113_1_203.pdf
+  - 24 °C で約 9 ± 2 回/分（Table 1。PDF の抽出で表が崩れていて、列の対応は推定）。体温が上がると、息を止める時間が短くなって呼吸が増える（要旨）
+- Al-Ghamdi, M. S. A. D. (2005). Effect of temperature on the heart and ventilation rates in the agamid lizard *Uromastyx microlipes*. *JKAU: Sci.* 17:21–33. https://admission.kau.edu.sa/Files/320/Researches/52172_22479.pdf
+  - 30 °C（加温時）で 40.57 ± 5.68 回/分（Table 1A）。体重 350〜1033 g、n = 7。本文と表に不整合あり
+- Brainerd, E. L. & Owerkowicz, T. (2006). Functional morphology and evolution of aspiration breathing in tetrapods. *Respir. Physiol. Neurobiol.* 154:73–88. https://www.brown.edu/Departments/EEB/brainerd_lab/pdf/Brainerd_and_Owerkowicz_2006.pdf
+  - 有鱗類では肋間筋が肋骨を頭の側・外へ回す（p.75）
+- Melero, A. et al. (2023). *Open Vet. J.* 13(9):1071–1081. https://www.openveterinaryjournal.com/?mno=113832
+  - 心臓は体腔のいちばん前、肋骨のかごの中。肝臓は心臓の後ろ・肺の腹側で腹壁に接する。肺は体腔の背側の 2/3 以上
+- 鎖骨・間鎖骨の有無: 出典は見つからず（未確認）

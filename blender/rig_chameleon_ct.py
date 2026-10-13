@@ -223,6 +223,15 @@ TAIL_TIGHTEN_DEG = 30.0       # 尾全体で足す巻きの最大量（仮）
 HAND_SWAY_DEG = 4.0           # 仮
 FOOT_SWAY_DEG = 3.0           # 仮
 HEAD_NOD_DEG = 1.0            # 仮
+# 呼吸（肋骨）: カメレオンの安静時の呼吸数は文献で見つからなかった（2026-10-13）。体重の近いトッケイヤモリ
+# （Gekko gecko、36〜151 g）の 24 °C で約 9 回/分（Milsom 1984, J Exp Biol 113:203–214, Table 1）を仮に使う
+# （プロデューサー了承）。12 秒のループに収めるため 2 回/12 秒 = 10 回/分にする（表の 9 ± 2 の中）。
+# トカゲは肋骨を頭の側・外へ回して吸う（Brainerd & Owerkowicz 2006, Respir Physiol Neurobiol 154:73–88, p.75）。
+# 体温が上がると、息を止める時間が短くなって呼吸が増える（Milsom 1984）。吸う・吐くのあとに止める時間を置く。
+# 回す角と、吸う・吐く・止める時間の割り振りは、見た目で決めた仮の値
+BREATHS_PER_LOOP = 2
+RIB_BREATH_DEG = 4.0          # 仮
+BREATH_SHAPE = (0.3, 0.3)     # 1 回の呼吸のうち、吸う・吐くの割合（残りは止める）。仮
 ACTION_NAME = "CH_Hover"
 LATERAL = Vector((0.0, 1.0, 0.0))     # +Y まわりの正の回転 = θ が減る = 腹側へ巻く
 
@@ -233,6 +242,34 @@ def bump(t, period, phase=0.0):
 
 def wave(t, period, phase=0.0):
     return math.sin(2 * math.pi * (t / period + phase))
+
+
+def breath(t):
+    """0 → 1（吸い切り）→ 0、そのあと止める。"""
+    period = LOOP_SEC / BREATHS_PER_LOOP
+    u = (t % period) / period
+    a, b = BREATH_SHAPE
+    sm = lambda x: x * x * (3 - 2 * x)
+    if u < a: return sm(u / a)
+    if u < a + b: return sm(1 - (u - a) / b)
+    return 0.0
+
+
+def rib_axes(rigob):
+    """肋骨ごとの、吸うときの回転軸（骨の局所座標）。肋骨を頭の側と外側の間へ回す（Brainerd & Owerkowicz 2006）。"""
+    out = {}
+    for pb in rigob.pose.bones:
+        if not pb.name.startswith("rib"):
+            continue
+        vb = pb.parent
+        d = (pb.tail - pb.head).normalized()
+        c = -(vb.tail - vb.head).normalized()                 # 頭の側
+        o = Vector((0.0, 1.0 if d.y >= 0 else -1.0, 0.0))    # 外側（展示の姿勢の面の法線の向き）
+        ax = d.cross((c + o).normalized())
+        if ax.length < 1e-6:
+            continue
+        out[pb.name] = (pb.matrix.to_3x3().inverted() @ ax.normalized()).normalized()
+    return out
 
 
 def write_hover(rigob):
@@ -257,6 +294,9 @@ def write_hover(rigob):
         if f"{c}_lower" in names:
             ch.append((f"{c}_lower", amp * 0.3, lambda t, ph=ph: wave(t, 6.0, ph + 0.2)))
     ch.append(("head", HEAD_NOD_DEG, lambda t: wave(t, LOOP_SEC)))
+    for n, ax in rib_axes(rigob).items():
+        axis[n] = ax
+        ch.append((n, RIB_BREATH_DEG, breath))
     rigob.animation_data_create()
     old = bpy.data.actions.get(ACTION_NAME)
     if old:
