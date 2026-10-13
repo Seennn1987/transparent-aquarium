@@ -20,4 +20,18 @@ near(transmitted({ skin: 0.56 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
 // The viscera at its thickest side-on, behind the skin: the jar photo 01's brown mass, blue 0.38.
 assert.ok(Math.abs(transmitted({ viscera: 0.15, skin: 0.45 })[2] - 0.38) < 0.06, "内臓の褐色が瓶写真 01 と合わない");
 near(transmitted({}), [1, 1, 1], 1e-9, "空");
+
+// "01" (the jar photo 01): the four classes it was fitted on (chameleon-stain.js). Green and blue are met;
+// red is not met in the blue class (0.333 against 0.477) and the pale class (0.251 against 0.213).
+const ab = (t) => t.map((v) => -Math.log(v));
+const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
+nearA(transmitted({ film: 2.91, skin: 0.269 }, { stain: "01" }), [0.333, 0.241, 0.175], 0.02, "01 の青（輪郭）");
+nearA(transmitted({ film: 2.19, skin: 0.391 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
+nearA(transmitted({ bone: 0.1332, film: 2.29, skin: 0.599 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
+nearA(transmitted({ viscera: 0.159, film: 2.62, skin: 0.769 }, { stain: "01" }), [0.693, 0.868, 0.968], 0.03, "01 の内臓");
+// The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
+const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });
+assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);
+// "06" stays as it was when no stain is named.
+near(transmitted({ skin: 0.56 }, { stain: "06" }), transmitted({ skin: 0.56 }), 1e-12, "06 の既定");
 console.log("chameleon-stain: ok");

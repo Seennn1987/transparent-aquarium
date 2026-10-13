@@ -46,9 +46,9 @@ export function jarEnlargement(size, liquidBounds) {
  * `facing`: horizontal direction toward the viewer. The animal hangs as in photo 01 (head down,
  * its left side, the model's +Z, toward the viewer). The tissue is drawn by the lightbox passes
  * (chameleon-material.js) into the image the jar's optics look up: `renderImage` takes the place
- * of drawing the specimen scene over white.
+ * of drawing the specimen scene over white. `stain`: the colour pattern (chameleon-stain.js STAINS).
  */
-export async function createChameleonSpecimen({ liquidBounds, facing }) {
+export async function createChameleonSpecimen({ liquidBounds, facing, stain = "06" }) {
   const gltf = await new GLTFLoader().loadAsync(CHAMELEON_URL);
   const model = gltf.scene;
   const reference = { value: 0 };
@@ -115,7 +115,7 @@ export async function createChameleonSpecimen({ liquidBounds, facing }) {
     },
     /** Draws the light let through the animal (over white, linear) into `target`. */
     renderImage(renderer, target, camera, scene) {
-      lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: jar });
+      lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: jar, stain });
       if (lightbox.target.width !== target.width || lightbox.target.height !== target.height)
         lightbox.setSize(target.width, target.height);
       chameleonClock.value = action.time;

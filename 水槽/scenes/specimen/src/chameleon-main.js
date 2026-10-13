@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createOrbit } from "./orbit.js";
 import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock } from "./chameleon-material.js";
+import { stainOf } from "./chameleon-stain.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
@@ -18,7 +19,10 @@ async function start() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, preserveDrawingBuffer: true });
   if (!renderer.capabilities.isWebGL2) throw new Error("WebGL2 が使えないため表示できません");
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  const lightbox = createLightbox(renderer);
+  // `stain=01`: the colour pattern measured on the user's jar photo 01 (chameleon-stain.js STAINS).
+  const stain = query.get("stain") === "01" ? "01" : "06";
+  const lightbox = createLightbox(renderer, { stain });
+  document.body.style.background = `rgb(${stainOf(stain).lightbox.map((v) => Math.round(v * 255)).join(",")})`;
 
   const gltf = await new GLTFLoader().loadAsync(CHAMELEON_URL);
   const model = gltf.scene;
@@ -88,7 +92,7 @@ async function start() {
   }
   orbit.update();
   frame();
-  status.textContent = `${lightbox.precision}`;
+  status.textContent = `${lightbox.precision} · stain ${stain}`;
   document.body.dataset.ready = "1";
 
   // For measuring the screen against the photo: sRGB 0–255 at canvas pixels (from the top-left).
@@ -110,6 +114,13 @@ async function start() {
         gl.readPixels(x, h - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
         return [px[0], px[1], px[2]];
       });
+    },
+    /** The "01" pattern's film buffer (slant crossings of the skin's surface), bottom row first. */
+    film() {
+      const t = lightbox.filmTarget;
+      const out = new Float32Array(t.width * t.height * 4);
+      renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, out);
+      return { width: t.width, height: t.height, data: out };
     },
     setPaused(v) { paused = Boolean(v); },
     seek(t) { mixer.setTime(t); },

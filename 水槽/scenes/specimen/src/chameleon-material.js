@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import {
-  LIGHTBOX, BONE_SPECTRUM, BONE_T0, BONE_GAIN, CARTILAGE_SPECTRUM, CARTILAGE_GAIN,
-  SKIN_SPECTRUM, SKIN_GAIN, VISCERA_SPECTRUM, VISCERA_GAIN,
+  BONE_T0, stainOf,
   HEART_PERIOD, HEART_RADIUS_MM, HEART_AMP, MODEL_UNITS_PER_MM,
 } from "./chameleon-stain.js";
 
@@ -16,6 +15,7 @@ export const chameleonLook = {
   cartilage: { value: 1 },
   skin: { value: 1 },
   viscera: { value: 1 },
+  film: { value: 1 },
   heartAmp: { value: HEART_AMP },
 };
 
@@ -61,6 +61,22 @@ void main() {
   float d = -vViewPosition.z - reference;
   gl_FragColor = channel * (gl_FrontFacing ? -d : d);
 }`;
+
+// The blue film of the "01" pattern (chameleon-stain.js STAINS["01"].film): a thin stained layer at the
+// skin's surface. Each crossing of the skin's surface adds the layer's slant path, 1 / |cos| of the angle
+// between the surface and the view, counted in layer thicknesses (the gain holds the thickness). The cos is
+// kept above filmMinCos: a layer d thick on a body R in radius is crossed at most 2·sqrt(2Rd) at the outline.
+const filmFragment = `
+uniform float filmMinCos;
+varying vec3 vViewPosition;
+varying vec3 vViewNormal;
+void main() {
+  float c = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
+  gl_FragColor = vec4(1. / max(c, filmMinCos), 0., 0., 0.);
+}`;
+// 0.2 (at most 5 thicknesses per crossing): at 0.1 the creases where the skin's tubes meet (tail base,
+// elbows, knees) showed as dark rings; the colours fitted on photo 01 are the same at either (chameleon-stain.js).
+export const chameleonFilm = { minCos: { value: 0.2 } };
 
 const ADD = {
   transparent: true,
@@ -128,6 +144,12 @@ export function applyChameleonTissue(model, reference) {
       },
       vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD,
     });
+    object.userData.pathMaterial = object.material;
+    object.userData.filmMaterial = part === "Skin" ? new THREE.ShaderMaterial({
+      uniforms: { filmMinCos: chameleonFilm.minCos, uTime: chameleonClock, uHeart: { value: new THREE.Vector3() },
+        uHeartRadius: { value: 1 }, uHeartAmp: { value: 0 }, uHeartPeriod: { value: 1 } },
+      vertexShader: pathVertex, fragmentShader: filmFragment, ...ADD,
+    }) : null;
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
   if (missing.length) throw new Error(`specimen_chameleon.glb に部位がありません: ${missing.join(", ")}`);
@@ -135,6 +157,9 @@ export function applyChameleonTissue(model, reference) {
 
 const compositeFragment = `
 uniform sampler2D tPath;
+uniform sampler2D tFilm;
+uniform float filmGain;
+uniform vec3 filmSpectrum;
 uniform vec3 lightbox;
 uniform float linearOut;
 uniform float alphaScale;
@@ -150,7 +175,8 @@ void main() {
   vec3 a = boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum
     + cartGain * m.g * cartSpectrum
     + skinGain * m.b * skinSpectrum
-    + visceraGain * m.a * visceraSpectrum;
+    + visceraGain * m.a * visceraSpectrum
+    + filmGain * max(texture2D(tFilm, vUv).r, 0.) * filmSpectrum;
   // In the jar the image is a linear light let through over white (jar-optics.js looks it up and the
   // final pass tone-maps it); the ratios measured on the photo are in display (sRGB) values.
   if (linearOut > .5) gl_FragColor = vec4(pow(exp(-a), vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
@@ -161,8 +187,10 @@ void main() {
  * The path buffer and the pass that turns it into the lightbox image. `linear`: write the light
  * let through (over white, linear) for the jar's optics, with the tissue crossed × alphaScale in alpha.
  * `pathScale`: model units per world unit, when the model is drawn scaled (the jar).
+ * `stain`: the colour pattern (chameleon-stain.js STAINS, "06" or "01").
  */
-export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1 } = {}) {
+export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06" } = {}) {
+  const k = stainOf(stain);
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
   const target = new THREE.WebGLRenderTarget(1, 1, {
     type: float ? THREE.FloatType : THREE.HalfFloatType,
@@ -170,19 +198,26 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
     depthBuffer: false,
     samples: 4,
   });
+  const film = k.film && k.film.gain > 0 ? k.film : null;
+  const filmTarget = new THREE.WebGLRenderTarget(1, 1, {
+    type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4,
+  });
   const material = new THREE.ShaderMaterial({
     uniforms: {
       tPath: { value: target.texture },
-      lightbox: { value: new THREE.Vector3(...LIGHTBOX) },
-      boneGain: { value: BONE_GAIN },
+      tFilm: { value: filmTarget.texture },
+      filmGain: { value: film ? film.gain : 0 },
+      filmSpectrum: { value: new THREE.Vector3(...(film ? film.spectrum : [0, 0, 0])) },
+      lightbox: { value: new THREE.Vector3(...k.lightbox) },
+      boneGain: { value: k.bone.gain },
       boneT0: chameleonLook.boneT0,
-      cartGain: { value: CARTILAGE_GAIN },
-      skinGain: { value: SKIN_GAIN },
-      boneSpectrum: { value: new THREE.Vector3(...BONE_SPECTRUM) },
-      cartSpectrum: { value: new THREE.Vector3(...CARTILAGE_SPECTRUM) },
-      skinSpectrum: { value: new THREE.Vector3(...SKIN_SPECTRUM) },
-      visceraGain: { value: VISCERA_GAIN },
-      visceraSpectrum: { value: new THREE.Vector3(...VISCERA_SPECTRUM) },
+      cartGain: { value: k.cartilage.gain },
+      skinGain: { value: k.skin.gain },
+      boneSpectrum: { value: new THREE.Vector3(...k.bone.spectrum) },
+      cartSpectrum: { value: new THREE.Vector3(...k.cartilage.spectrum) },
+      skinSpectrum: { value: new THREE.Vector3(...k.skin.spectrum) },
+      visceraGain: { value: k.viscera.gain },
+      visceraSpectrum: { value: new THREE.Vector3(...k.viscera.spectrum) },
       linearOut: { value: linear ? 1 : 0 },
       alphaScale: { value: alphaScale },
       pathScale: { value: pathScale },
@@ -200,19 +235,34 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
   return {
     precision: float ? "float32" : "float16",
     target,
-    setSize(w, h) { target.setSize(w, h); },
+    filmTarget,
+    setSize(w, h) { target.setSize(w, h); filmTarget.setSize(w, h); },
     material,
     render(scene, camera, output = null) {
-      material.uniforms.boneGain.value = BONE_GAIN * chameleonLook.bone.value;
-      material.uniforms.cartGain.value = CARTILAGE_GAIN * chameleonLook.cartilage.value;
-      material.uniforms.skinGain.value = SKIN_GAIN * chameleonLook.skin.value;
-      material.uniforms.visceraGain.value = VISCERA_GAIN * chameleonLook.viscera.value;
+      material.uniforms.boneGain.value = k.bone.gain * chameleonLook.bone.value;
+      material.uniforms.cartGain.value = k.cartilage.gain * chameleonLook.cartilage.value;
+      material.uniforms.skinGain.value = k.skin.gain * chameleonLook.skin.value;
+      material.uniforms.visceraGain.value = k.viscera.gain * chameleonLook.viscera.value;
+      material.uniforms.filmGain.value = film ? film.gain * chameleonLook.film.value : 0;
       const clear = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
       const background = scene.background; scene.background = null;
       renderer.setRenderTarget(target);
       renderer.setClearColor(0x000000, 0);
       renderer.clear();
       renderer.render(scene, camera);
+      if (film) {
+        // The film pass: only the skin, with its film material.
+        const swapped = [];
+        scene.traverse((o) => {
+          if (!o.isMesh || !o.userData.pathMaterial) return;
+          swapped.push([o, o.visible]);
+          if (o.userData.filmMaterial) o.material = o.userData.filmMaterial; else o.visible = false;
+        });
+        renderer.setRenderTarget(filmTarget);
+        renderer.clear();
+        renderer.render(scene, camera);
+        for (const [o, v] of swapped) { o.material = o.userData.pathMaterial; o.visible = v; }
+      }
       scene.background = background;
       renderer.setClearColor(clear, clearAlpha);
       renderer.setRenderTarget(output);

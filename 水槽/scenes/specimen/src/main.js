@@ -147,7 +147,7 @@ async function start() {
     facing: CAMERA.position.clone().sub(CAMERA.target).setY(0).normalize(),
   };
   const specimen = specimenKind === "chameleon"
-    ? await createChameleonSpecimen(specimenOptions)
+    ? await createChameleonSpecimen({ ...specimenOptions, stain: query.get("stain") === "01" ? "01" : "06" })
     : await createSpecimen(specimenOptions);
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);

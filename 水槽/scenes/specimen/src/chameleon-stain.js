@@ -53,13 +53,59 @@ export const SKIN_GAIN = 0.66;
 export const VISCERA_SPECTRUM = [0.71, 0.9, 1];
 export const VISCERA_GAIN = 4.8;
 
+// The colour patterns. "06" is the one above (photo 06); "01" is the user's jar photo, below.
+// Pages pick one with `?stain=01` (chameleon.html and the jar page); without it, "06".
+export const STAINS = {
+  "06": {
+    lightbox: LIGHTBOX,
+    bone: { spectrum: BONE_SPECTRUM, gain: BONE_GAIN },
+    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
+    skin: { spectrum: SKIN_SPECTRUM, gain: SKIN_GAIN },
+    viscera: { spectrum: VISCERA_SPECTRUM, gain: VISCERA_GAIN },
+    film: { spectrum: [0, 0, 0], gain: 0 },
+  },
+  // Measured on 01-user-jar-diaphonized.jpg (the user's jar photo, 447 px a side; watermarked, not
+  // redistributed, docs/references/chameleon/SOURCES.md), 2026-10-13. Light let through = pixel / the
+  // clear liquid beside the animal (224, neutral grey: median of three clear patches 223–227).
+  // In 01 the blue lies at the outline (throat, back, limbs, tail) and the middle of the trunk is pale,
+  // so the blue is drawn as a thin stained layer at the skin's surface (the film, chameleon-material.js:
+  // each crossing of the surface adds 1 / |cos|, kept under 5), over a faint cleared tissue (the skin's
+  // volume, as for "06"). The photo's pixels were sorted by colour (inside the jar, off the grey liquid):
+  //   blue (b > r + 20 and g > r + 5), 38.8 % of the animal: absorbance median 0.477 / 0.241 / 0.175
+  //   pale (neither, mean above 150),      17.6 %:            0.213 / 0.202 / 0.175
+  //   red  (r > b + 15 and r > g + 30),    3.7 %:             0.868 / 1.46 / 1.178
+  //   the brown mass (as for "06" above):                      0.693 / 0.868 / 0.968
+  // On screen (chameleon.html?stain=01, the default head-down view, the same side as 01) the same shares
+  // of the animal were taken from the path and film buffers: of the pixels with no bone, the 38.8 % with
+  // the most film (film 2.91, skin 0.269) and the 17.6 % with the least (film 2.19, skin 0.391); the 3.7 %
+  // with the most bone (bone 0.040 after the saturation, film 2.29, skin 0.599); the viscera at its
+  // thickest (0.159; film 2.62, skin 0.769). Per colour, each tissue's absorbance per unit was solved from
+  // those four (non-negative least squares, relative errors):
+  //   film 0.1145 / 0.0728 / 0.0389, skin 0 / 0.109 / 0.230, bone 15.1 / 30.5 / 23.6, viscera 2.47 / 3.72 / 4.32
+  // Green and blue meet all four. Red cannot: the blue class comes out 0.333 against 0.477 (paler than
+  // the photo's outline) and the pale class 0.251 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
+  // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
+  "01": {
+    lightbox: [224 / 255, 224 / 255, 224 / 255],
+    bone: { spectrum: [0.493, 1, 0.774], gain: 30.54 },
+    // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
+    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
+    skin: { spectrum: [0, 0.474, 1], gain: 0.2298 },
+    viscera: { spectrum: [0.571, 0.861, 1], gain: 4.32 },
+    film: { spectrum: [1, 0.636, 0.34], gain: 0.1145 },
+  },
+};
+export const stainOf = (name) => STAINS[name] ?? STAINS["06"];
+
 /** Light let through (red, green, blue) for paths through bone, cartilage and skin films. */
-export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0 }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1, visceraScale = 1 } = {}) {
-  const b = BONE_GAIN * boneScale * boneT0 * (1 - Math.exp(-Math.max(bone, 0) / boneT0));
-  const c = CARTILAGE_GAIN * cartilageScale * Math.max(cartilage, 0);
-  const s = SKIN_GAIN * skinScale * Math.max(skin, 0);
-  const v = VISCERA_GAIN * visceraScale * Math.max(viscera, 0);
-  return [0, 1, 2].map((i) => Math.exp(-(b * BONE_SPECTRUM[i] + c * CARTILAGE_SPECTRUM[i] + s * SKIN_SPECTRUM[i] + v * VISCERA_SPECTRUM[i])));
+export function transmitted({ bone = 0, cartilage = 0, skin = 0, viscera = 0, film = 0 }, { boneScale = 1, boneT0 = BONE_T0, cartilageScale = 1, skinScale = 1, visceraScale = 1, stain = "06" } = {}) {
+  const k = stainOf(stain);
+  const b = k.bone.gain * boneScale * boneT0 * (1 - Math.exp(-Math.max(bone, 0) / boneT0));
+  const c = k.cartilage.gain * cartilageScale * Math.max(cartilage, 0);
+  const s = k.skin.gain * skinScale * Math.max(skin, 0);
+  const v = k.viscera.gain * visceraScale * Math.max(viscera, 0);
+  const f = k.film.gain * Math.max(film, 0);
+  return [0, 1, 2].map((i) => Math.exp(-(b * k.bone.spectrum[i] + c * k.cartilage.spectrum[i] + s * k.skin.spectrum[i] + v * k.viscera.spectrum[i] + f * k.film.spectrum[i])));
 }
 
 // The heart (chameleon-material.js). No resting heart rate for chameleons was found in the literature
