@@ -39,9 +39,10 @@ export const CARTILAGE_SPECTRUM = [1, 0.1, 0.05];
 export const CARTILAGE_GAIN = 27;
 // Cleared tissue, yellowish: the neck absorbs 0.105 : 0.139 : 0.371 (0.28 : 0.37 : 1).
 export const SKIN_SPECTRUM = [0.28, 0.37, 1];
-// Per model unit of tissue crossed (the skin's baked depth). On screen the neck behind the skull
-// crosses about 0.38 units side-on; the photo's neck absorbs 0.371 in blue.
-export const SKIN_GAIN = 0.98;
+// Per model unit of tissue crossed side-on. The skin is a closed shell (ct_body_pipeline/skinloft2.py);
+// on screen the neck behind the skull crosses about 0.56 units side-on (view=photo06), and the photo's
+// neck absorbs 0.371 in blue. (Before the skin was rebuilt from the thickness tables, 0.38 and 0.98.)
+export const SKIN_GAIN = 0.66;
 
 // The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
 // only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,

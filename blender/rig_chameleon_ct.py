@@ -51,12 +51,20 @@ POSE_JAR = {
     "tail_start": 107.6,          # 尾の付け根（仙椎の後ろ）[mm]
     "tail_lift": 6.0,             # 尾の付け根で背側へ起こす角
     "head_dir": -57.0,            # 頭骨（後頭顆→吻端）の向き。01 のかぶと→吻端の向き（約 -33°）に合わせて決めた
-    # 四肢: 骨ごとの向き（面内の角 θ[度]、外へ開く角 φ[度]）。01 では 4 本とも腹側（+X）へほぼ水平に出る
+    # 肩帯（肩甲骨〜関節窩）の、体軸の前向きからの角（横から見た角）[度]。06 で肩甲骨は背骨から関節窩へ、
+    # 体軸の頭の向きから 48° 下がる（背骨の接線 (3700,1640)→(3900,1800)、肩甲骨 (3810,1760)→(3825,2005)、原寸の画素）。
+    # CT の個体は 16〜19° で、関節窩が頸の 1〜2 番目の椎骨の下まで前へ倒れていた（保存の変形と読む）。肩帯の背の端を中心に起こす
+    "girdle_tilt": {"fR": 48.0, "fL": 48.0},
+    # 四肢: 骨ごとの向き（面内の角 θ[度]、外へ開く角 φ[度]）。θ は 01 で測った（1 辺 447px、画素は 01 の座標）:
+    #   前肢 上腕 (215,270)→(265,255) で尾側へ +17°、前腕 →(305,250) で +7°、手は水平
+    #   後肢 大腿 (165,190)→(230,175) で +13°、下腿 →(280,170) で +6°、足は水平
+    #   以前の値（上腕 −25° など）は符号が逆で、上腕が頭の側（あごの方）へ向いていた（2026-10-13 の指摘「肩の関節の位置が変」）
+    #   φ（外へ開く角）は 01 の正面から読めないので、以前の値のまま
     "limbs": {
-        "fR_upper": (-25.0, 35.0), "fR_lower": (15.0, 10.0), "fR_hand": (-10.0, 0.0),
-        "fL_upper": (-25.0, 35.0), "fL_lower": (15.0, 10.0), "fL_hand": (-10.0, 0.0),
-        "hL_upper": (-10.0, 35.0), "hL_lower": (20.0, 10.0), "hL_foot": (-5.0, 0.0),
-        "hR_upper": (-10.0, 35.0), "hR_lower": (20.0, 10.0), "hR_foot": (-5.0, 0.0),
+        "fR_upper": (17.0, 35.0), "fR_lower": (7.0, 10.0), "fR_hand": (0.0, 0.0),
+        "fL_upper": (17.0, 35.0), "fL_lower": (7.0, 10.0), "fL_hand": (0.0, 0.0),
+        "hL_upper": (13.0, 35.0), "hL_lower": (6.0, 10.0), "hL_foot": (0.0, 0.0),
+        "hR_upper": (13.0, 35.0), "hR_lower": (6.0, 10.0), "hR_foot": (0.0, 0.0),
     },
 }
 
@@ -115,6 +123,9 @@ def limb_sides(arm, axis_at, J, n, step):
     return out
 
 
+GIRDLE_LOG = {}
+
+
 def build_pose(rigob, d, k, pose):
     ct = lambda p: Vector((p[1], -p[2], -p[0])) * k
     ctd = lambda p: Vector((p[1], -p[2], -p[0]))
@@ -157,13 +168,30 @@ def build_pose(rigob, d, k, pose):
             T1 = rot2(pose["head_dir"])
             D1 = rot2(pose["head_dir"] - 90.0)
             R[name] = frame(T1, D1) @ frame(T0, D0).inverted()
-    # 四肢: 肢帯は親の椎骨と一緒に動く。上腕・大腿から先は、目標の向きへ最小の回転で向ける（ねじれは親から引き継ぐ）
+    # 四肢: 肢帯は親の椎骨と一緒に動き、girdle_tilt があれば背の端を中心に起こす。
+    # 上腕・大腿から先は、目標の向きへ最小の回転で向ける（ねじれは親から引き継ぐ）
     side = limb_sides(arm, axis_at, J, n, step)
+    GIRDLE_LOG.clear()
     for b in sorted(arm.bones, key=lambda x: len(x.parent_recursive)):
         if b.name in R:
             continue
         Rp = R[b.parent.name] if b.parent is not None else Matrix.Identity(3)
         tgt = pose["limbs"].get(b.name)
+        c = b.name.split("_")[0]
+        if b.name.endswith("_girdle") and c in pose.get("girdle_tilt", {}):
+            best, bs = 1e9, 0.0
+            for i in range(0, n, 5):
+                q, _, _ = axis_at(i * step)
+                if (q - b.head_local).length < best:
+                    best, bs = (q - b.head_local).length, i * step
+            F = -rot2(theta(bs)); Vn = -rot2(theta(bs) + 90.0)
+            g = Rp @ (b.tail_local - b.head_local)
+            phi = math.degrees(math.atan2(g.dot(Vn), g.dot(F)))
+            A = F.cross(Vn).normalized()
+            delta = pose["girdle_tilt"][c] - phi
+            R[b.name] = Matrix.Rotation(math.radians(delta), 3, A) @ Rp
+            GIRDLE_LOG[c] = (round(phi, 1), round(delta, 1))
+            continue
         if tgt is None:
             R[b.name] = Rp.copy()
             continue
@@ -316,7 +344,7 @@ def main():
         build_pose(rigob, d, k, POSE_JAR)
         print("[Chameleon CT] 瓶の姿勢を付けました")
         bpy.context.view_layer.update()
-        trim_skin()
+        # 膜は体積のうちに切り離して作ったので、伸びた面を外さない（ct_body_pipeline/softmesh2.py。trim_skin は以前の膜用）
     if argv and argv[0] == "--hover":
         import json
         frames = write_hover(rigob)
