@@ -75,6 +75,11 @@
 | 46 | ribdepth.py（→ ribmodel2.py → hyoid_relabel.py → ribbottom.py を 6 回） | → `dv_override.json`、`chameleon_body_ct.npz` | 肋骨の向きと腹の深さを生体の横向き X 線に合わせる（2026-10-14）。背側は腹へ 1 で後ろへ 0.57、腹側は前へ 1.3（V 字、Williston 1925）、曲がり目は 0.54。腹の端の深さ ÷ 頭骨の長さ（肩 → 股 t 0.19〜1.0）0.97・1.14・1.22・1.22・1.13・1.00・0.86 − 膜 − 軟骨の半径。読み取りは目測で仮 |
 | 47 | hyoid_relabel.py、hyoid_pose.py | `chameleon_body_ct.npz` → 同じ（v05 → hyoid）、`pose_jar.npz` → `hyoid_pose.json` | 舌骨の左の角が CT のラベルの誤りで v05 に入っていた（2,571 頂点）のを舌骨へ移す。舌骨の姿勢: 頭について回したあと、舌骨の頭のまわりに 27.6° 回し、角が CT での胴との位置を保つ（Kabsch、仮）。回転は `rig_chameleon_ct.py` の HYOID_EXTRA |
 | 48 | skinbody.py | `chameleon_body_ct.npz`、`pose_jar.npz`、`soft2_vol.npz`（尾の肉の厚みだけ） → `soft_rigged.npz`、`skin_posed.npz` | 膜の作り直し 5（2026-10-14、これが最終の膜。43 の skinloft3.py を置き換え）。CT の軟部を形に使わない。吻端 → 後頭顆 → 体軸 → 尾の先の 1 本の軸の断面ごとに、前後の骨（頭骨・舌骨・椎骨・肋骨・軟骨・肢帯）の凸包 + 膜（胴 0.6 mm・頭 0.4 mm、仮）。尾は尾椎の凸包 + CT の尾で測った肉の厚み（0.7〜0.9 mm）。手足は skinloft3 と同じ。骨の点は必ず膜の内側（足りない所だけ σ 1 mm の山で上げる） |
+| 49 | girdle_ventral.py → ribdepth.py（2 回目） | → `girdle_ventral.json`、`dv_override.json`（[深さ, 腹側の向き]） | 前の肋骨の腹の端を胸骨（肩帯の腹の端の後ろ）で止める。t < 0.19 の深さは肩帯の腹の端から X 線へ直線。腹側の肋骨は骨、軟骨は正中の手前 1.2 mm（RIB_CART_TIP） |
+| 50 | strip_strays.py | `chameleon_body_ct.npz` → 同じ | 腹の中の v16 のラベルの棒 2 本を消す（骨格に当てはまらない） |
+| 51 | eyes.py → eyes_mesh.py（organs_mesh.py の後） | `chameleon_body_ct.npz` → `eyes.json` → `organs_rigged.npz` に eye_r/l・lens_r/l | 目: 強膜輪の中心、眼窩の半径の球。重みは頭骨 |
+| 52 | skinbody.py（6） | 同上 + `eyes.json` | 膜の作り直し 6: 頭の膜と胴の膜を別に作り、後頭部でつなぐ（トサカと背中の間に膜を張らない）。背のとげの列 |
+| 53 | fit_eyes01.py | 写真 01、`cal01.npz` → 目の色 | 色 01 の眼球・レンズの色 |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |

@@ -61,6 +61,8 @@ def prepare():
     report = {}
     for name, part in PARTS.items():
         ob = bpy.data.objects.get(name)
+        if ob is None and part == "Viscera":
+            continue   # 内臓の一塊は書き出さなくなった（2026-10-14、臓器に置き換え）
         if ob is None:
             raise RuntimeError(f"{name} がありません")
         ob["chameleon_part"] = part

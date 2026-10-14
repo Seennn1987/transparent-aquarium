@@ -96,19 +96,25 @@ F['stomach']=tube(pts(lambda t: st0+(st1-st0)*t, lambda t: 1.0+0.2*(Vwu(st0+(st1
 # 腸: 尾腹側の、肝臓（頭側）・肺（頭背側）・腎臓と骨盤（尾背側）の間（Melero 2023）。腸の区分は CT でも分けられない（同）。
 #   標本では肺が縮み（Klaver 1973）、参考写真 5 枚（docs/chameleon_ct_body/organs_ref_compare の出典）の塊は
 #   肩→股の t 0.20〜0.95、背→腹の深さ 0〜0.86（中央値）。腸はその範囲の、肝臓の後ろから腎臓の手前までを
-#   うねる 16 本の管（太さ 1.3 mm、仮）で、深さ 0.12〜0.66 の 4 層 × 左右 4 列に埋める（層と列の位置は仮）
+#   曲がりくねる管（太さ 1.3 mm、仮）で埋める
 i0=liver_end-3; i1=kid_end-10
 # うねりは決まった種のなめらかな乱数（規則正しい波だと作り物に見える）。振れ幅と細かさは仮
 rng_i=np.random.default_rng(2023)
 def wander(n, amp, corr):
     w=nd.gaussian_filter1d(rng_i.standard_normal(n),corr,mode='nearest'); return amp*w/np.abs(w).max()
+# 腸のうねり（2026-10-14 の 2 回目）: 体軸に沿う 16 本の管は、画面で規則正しい縞に見えた（写真 01 はまだらの塊）。
+#   腸は曲がりくねる管なので、前後・背腹・左右の 3 つの向きに周期の違う波（リサージュ）で折り返す 6 本の管にする。
+#   周期・振れ幅・本数は仮（出典に腸の道筋は無い）
 paths=[]
-for fv in (0.12,0.30,0.48,0.66):
-    for dr in (-4.0,-1.3,1.3,4.0):
-        n=600; uu_=np.linspace(i0,i1,n)
-        # 管は前後にも折り返す（u にも小さな戻り）
-        du=wander(n,2.5,25); dvv=wander(n,1.6,18); drr=wander(n,1.6,22)
-        paths.append(np.stack([uu_+du, 1.0+fv*(Vwu(uu_)-1.0)+dvv, dr+drr],1))
+for k_ in range(8):
+    n=3000; s_=np.linspace(0,1,n); ph=rng_i.uniform(0,2*np.pi,3)
+    fu_,fv_,fr_=rng_i.uniform(2.5,4.0), rng_i.uniform(7,11), rng_i.uniform(5,9)
+    # 管ごとに範囲を少しずつ変える（同じ箱を埋めると、塊の縁が四角くなった）
+    uc_=rng_i.uniform(0.40,0.60); ua_=rng_i.uniform(0.25,0.45); vc_=rng_i.uniform(0.28,0.50); va_=rng_i.uniform(0.12,0.30); ra_=rng_i.uniform(2.5,4.8)
+    uu_=i0+(i1-i0)*(uc_+ua_*np.sin(2*np.pi*fu_*s_+ph[0])+wander(n,0.05,60))
+    fvv=vc_+va_*np.sin(2*np.pi*fv_*s_+ph[1])+wander(n,0.05,40)
+    rr_=ra_*np.sin(2*np.pi*fr_*s_+ph[2])+wander(n,0.6,40)
+    paths.append(np.stack([uu_, 1.0+fvv*(Vwu(uu_)-1.0), rr_],1))
 F['intestine']=np.minimum.reduce([tube(p_,1.3) for p_ in paths])
 F['intestine']=np.where((frac>=0.03)&(frac<=0.88),F['intestine'],9.0)
 # 結腸: 腸の尾端から骨盤（総排泄腔）へ。結腸は中身があると見分けられる（Melero 2023）。太さ 2 mm と道筋は仮

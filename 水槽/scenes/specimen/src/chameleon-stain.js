@@ -89,20 +89,24 @@ export const STAINS = {
   // Refitted again after the skin was built from the bones (ct_body_pipeline/skinbody.py, 2026-10-14: the body is
   // deeper, so more skin is crossed; screen rows: blue film 2.76, skin 0.311; pale 2.16, 0.687; red bone 0.0402
   // after the saturation, film 2.26, skin 0.733):
-  //   film 0.1168 / 0.0840 / 0.0539, skin 0 / 0.0298 / 0.0854, bone 15.0 / 31.1 / 24.7 (used below)
-  // Green and blue meet all four. Red cannot: the blue class comes out 0.322 against 0.477 (paler than
-  // the photo's outline) and the pale class 0.253 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
+  //   film 0.1168 / 0.0840 / 0.0539, skin 0 / 0.0298 / 0.0854, bone 15.0 / 31.1 / 24.7
+  // And again after the head was given a skin of its own, eyes, coiled gut and red ventral ribs (skinbody.py 6,
+  // 2026-10-14). The one viscera mass is no longer drawn, so three classes: blue film 2.96, skin 0.309; pale 2.13,
+  // 0.701; red bone 0.0403 after the saturation, film 2.32, skin 0.685:
+  //   film 0.1173 / 0.0751 / 0.0484, skin 0 / 0.0606 / 0.1031, bone 14.8 / 30.9 / 24.7 (used below)
+  // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
+  // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.484, 1, 0.795], gain: 31.07 },
+    bone: { spectrum: [0.479, 1, 0.799], gain: 30.86 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.348, 1], gain: 0.08545 },
+    skin: { spectrum: [0, 0.588, 1], gain: 0.1031 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.719, 0.461], gain: 0.1168 },
+    film: { spectrum: [1, 0.640, 0.413], gain: 0.1173 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -112,23 +116,31 @@ export const STAINS = {
     // source) fills that range from behind the liver to the kidneys (provisional). They replace the one brown mass
     // ("06" keeps it). Absorbance per model unit of organ crossed, added to the tissue around it, fitted on photo 01
     // (ct_body_pipeline/fit_organs01.py), each patch less the screen's skin, film and bone there:
-    //   C (t 0.35, brown mottle) 0.159 / 0.235 / 0.420 over the liver's median path in that band (0.228)
-    //                                                                            → liver 0.70 / 1.03 / 1.84
-    //   A (t 0.85, dark grey) 0.568 / 0.589 / 0.697 and B (t 0.60, brown mottle) 0.439 / 0.621 / 0.807; mean
-    //     0.503 / 0.605 / 0.752. 01's trunk bends unlike the model's, so the same places on screen catch only the
-    //     mass's edge (gut path A 0.049, B none); matched by share instead, as for the film and bone above: over the
-    //     median gut path of the screen's gut pixels (0.136)                     → gut 3.71 / 4.45 / 5.54
-    //   (values after the skin was built from the bones, skinbody.py, 2026-10-14)
+    //   C (t 0.35, brown mottle) 0.172 / 0.271 / 0.442 over the liver's median path in that band (0.231)
+    //                                                                            → liver 0.75 / 1.17 / 1.91
+    //   A (t 0.85, dark grey) 0.567 / 0.593 / 0.695 and B (t 0.60, brown mottle) 0.440 / 0.629 / 0.806; mean
+    //     0.503 / 0.611 / 0.750. 01's trunk bends unlike the model's, so the same places on screen do not catch the
+    //     gut; matched by share instead, as for the film and bone above: over the median gut path of the screen's
+    //     gut pixels (0.165)                                                     → gut 3.06 / 3.71 / 4.55
+    //   (values after the head skin, eyes and coiled gut, skinbody.py 6, 2026-10-14)
+    // The eyes (blender/ct_body_pipeline/eyes.py: a ball in each orbit, centred on the scleral ring, radius the
+    // orbit's 2.94 mm; the lens a ball of 0.45 of that inside): photo 01's eye (centre x 243, y 368) lets through a
+    // ring (r 7–10 px) of absorbance 1.135 / 1.48 / 1.48 and a darker middle (r < 4 px) 1.24 / 1.70 / 1.89. Over the
+    // screen's eye-only pixels, less the skin, film and bone there, by the median eye path (0.172)
+    //                                                                            → eye 3.82 / 4.19 / 5.16
+    // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
+    // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.0298 / 0.0854) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.0606 / 0.1031) once more: faint, provisional.
     organs: {
-      liver_r: [0.70, 1.03, 1.84], liver_l: [0.70, 1.03, 1.84],
+      liver_r: [0.75, 1.17, 1.91], liver_l: [0.75, 1.17, 1.91],
       contents: [0, 0, 0],
-      heart: [0, 0.0298, 0.0854], gallbladder: [0, 0.0298, 0.0854], fat_r: [0, 0.0298, 0.0854], fat_l: [0, 0.0298, 0.0854],
-      kidney_r: [0, 0.0298, 0.0854], kidney_l: [0, 0.0298, 0.0854],
-      stomach: [3.71, 4.45, 5.54], intestine: [3.71, 4.45, 5.54], colon: [3.71, 4.45, 5.54],
+      heart: [0, 0.0606, 0.1031], gallbladder: [0, 0.0606, 0.1031], fat_r: [0, 0.0606, 0.1031], fat_l: [0, 0.0606, 0.1031],
+      kidney_r: [0, 0.0606, 0.1031], kidney_l: [0, 0.0606, 0.1031],
+      stomach: [3.06, 3.71, 4.55], intestine: [3.06, 3.71, 4.55], colon: [3.06, 3.71, 4.55],
+      eye_r: [3.82, 4.19, 5.16], eye_l: [3.82, 4.19, 5.16], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
     },
   },
 };

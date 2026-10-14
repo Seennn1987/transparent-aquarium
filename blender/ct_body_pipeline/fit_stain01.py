@@ -19,12 +19,15 @@ free=an&(F<1e-3)&(visc<1e-4)&(cart<1e-4)
 idx=np.where(free.ravel())[0]; o=np.argsort(f.ravel()[idx])
 nB=int(sh['blue']*N); nP=int(sh['pale']*N)
 cls={'B':idx[o[-nB:]],'P':idx[o[:nP]],'R':np.where((an&(F>=np.percentile(F[an],100-100*sh['red']))).ravel())[0],'V':np.where((an&(visc>=0.13)&(F<1e-3)).ravel())[0]}
-rows={k:[float(np.median(v.ravel()[ii])) for v in (f,skin,F,visc)] for k,ii in cls.items()}
-M=np.array([rows[k] for k in 'BPRV']); G=[]; pred=[]
+# 内臓の一塊（V）を書き出さなくなった（2026-10-14）: その組が空なら、膜の層・膜・骨の 3 つを 3 組（B・P・R）で解く
+KEYS='BPRV' if len(cls['V']) else 'BPR'
+NC=4 if KEYS=='BPRV' else 3
+rows={k:[float(np.median(v.ravel()[ii])) for v in (f,skin,F,visc)][:NC] for k,ii in cls.items() if len(ii)}
+M=np.array([rows[k] for k in KEYS]); G=[]; pred=[]
 for c in range(3):
-    bb=np.array([Aph[k][c] for k in 'BPRV']); w=1/np.maximum(bb,0.05)
+    bb=np.array([Aph[k][c] for k in KEYS]); w=1/np.maximum(bb,0.05)
     xx,_=nnls(M*w[:,None],bb*w); G.append(xx); pred.append(M@xx)
 G=np.array(G).T; pred=np.array(pred).T
 print('rows',{k:[round(v,4) for v in r] for k,r in rows.items()})
-for k,pp in zip('BPRV',pred): print(k,'pred',pp.round(3),'photo',Aph[k].round(3))
-for nm,row in zip(('film','skin','bone','visc'),G): print(nm,row.round(4))
+for k,pp in zip(KEYS,pred): print(k,'pred',pp.round(3),'photo',Aph[k].round(3))
+for nm,row in zip(('film','skin','bone','visc')[:NC],G): print(nm,row.round(5), (row/row.max()).round(3))

@@ -93,6 +93,7 @@ WMAX=8.5
 WPROF=[(0.0,0.72),(0.3,0.88),(0.6,1.0),(0.8,0.97),(1.0,0.80)]
 DPROF=[(0.0,20.0),(0.3,26.5),(0.6,29.0),(0.85,26.0),(1.0,18.0)]
 SLOPES=[float(x) for x in os.environ['RIB_SLOPES'].split(',')] if os.environ.get('RIB_SLOPES') else None
+CART_TIP=float(os.environ['RIB_CART_TIP']) if os.environ.get('RIB_CART_TIP') else None
 DV_OVR=json.load(open(os.environ['DV_JSON'])) if os.environ.get('DV_JSON') else {}
 def prof(tab,u):
     t=(u-U0)/(UHIP-U0); x,y=zip(*tab); return float(np.interp(t,x,y))
@@ -129,7 +130,8 @@ for i in idx:
         if n not in meas: continue
         j=meas[n]['j']; o=AP[j]; u=float(us[j])
         Wh=WMAX*prof(WPROF,u); Dv=prof(DPROF,u)
-        if str(i) in DV_OVR: Dv=float(DV_OVR[str(i)])          # 生体の X 線の腹の線に合わせた深さ（ribdepth.py）
+        ovr=DV_OVR.get(str(i))
+        if ovr is not None: Dv=float(ovr[0] if isinstance(ovr,list) else ovr)   # 生体の X 線の腹の線に合わせた深さ（ribdepth.py）
         hd=HDS[i]; th_t,v_top,r_h=hd[0],max(hd[1],0.5),max(hd[2],0.8)
         if r_h>=Wh*0.95: r_h=Wh*0.5
         bv=(Dv-v_top)/2; vc=(Dv+v_top)/2
@@ -140,10 +142,13 @@ for i in idx:
         rd=ratio(DTS,i,0.4); rv=ratio({x:y for x,y in VTS.items() if (Lv.get(x) or 0)>2},i,-0.5)
         if SLOPES:                                          # 生体の X 線の肋骨の向き（ribdepth.py の説明）
             rd,rv,bf=SLOPES; vb=v_top+bf*(Dv-v_top)
+            if isinstance(ovr,list) and len(ovr)>1: rv=float(ovr[1])   # 胸骨より前へ出ないよう、肋骨ごとに腹側の向きを弱める（ribdepth.py）
         tt_=np.where(vv_<=vb, th_t+rd*(vv_-v_top), th_t+rd*(vb-v_top)+rv*(vv_-vb))
         pts=o+tt_[:,None]*MM*T[j]+vv_[:,None]*MM*AV[j]+(side*rr_)[:,None]*MM*AR[j]
         sl_=np.r_[0,np.cumsum(np.linalg.norm(np.diff(pts,axis=0),axis=1))]/MM
-        Lb=LB[i]; nb=int(np.searchsorted(sl_,Lb))
+        Lb=LB[i]
+        if CART_TIP is not None: Lb=max(Lb,sl_[-1]-CART_TIP)   # 腹側の肋骨は骨（写真 01 では腹の縁まで赤、X 線にも写る）。軟骨は正中の手前 CART_TIP mm だけ（仮）
+        nb=int(np.searchsorted(sl_,Lb))
         bone=pts[:max(nb,2)][::4] if nb>8 else pts[:max(nb,2)]
         rad=RADS[i]*MM
         v,f=tube(bone,rad)

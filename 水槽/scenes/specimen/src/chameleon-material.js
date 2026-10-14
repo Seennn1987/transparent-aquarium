@@ -23,7 +23,9 @@ export const chameleonLook = {
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
 // blender/ct_body_pipeline/organs.py) has a buffer of its own: each organ adds its own colour of absorbance.
 const CHANNEL = { Bone: 0, Cartilage: 1, Skin: 2, Viscera: 3, Organ: -1 };
-const REQUIRED = ["Bone", "Cartilage", "Skin", "Viscera"];
+// The one viscera mass (Viscera) is no longer exported (2026-10-14): the organs (Organ_*) took its place, and it stuck
+// out of the skin built from the bones. Older files that still carry it are drawn as before.
+const REQUIRED = ["Bone", "Cartilage", "Skin"];
 // Each organ's absorbance per model unit (red, green, blue), by the organ's name (node extra chameleon_organ).
 // Set from the colour pattern (chameleon-stain.js STAINS[...].organs) by createLightbox.
 export const chameleonOrgans = {};
