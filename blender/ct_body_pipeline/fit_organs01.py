@@ -14,7 +14,7 @@ R=np.array([[math.cos(ang),-math.sin(ang)],[math.sin(ang),math.cos(ang)]])
 T=lambda q: s*R@(np.asarray(q,float)-ph_g)+sc_g
 print('photo->screen scale',round(s,3),'rot',round(math.degrees(ang),1))
 # "01" の膜・膜の層・骨（chameleon-stain.js STAINS["01"]）
-G={'film':np.array([0.1145,0.0728,0.0389]),'skin':np.array([0,0.109,0.230]),'bone':np.array([15.07,30.54,23.64])}
+G={'film':np.array([0.118,0.0744,0.0393]),'skin':np.array([0,0.1139,0.2374]),'bone':np.array([14.98,30.43,23.47])}   # fit_stain01.py（膜の作り直し 4 の後、2026-10-14）
 t0=0.042; F=t0*(1-np.exp(-paths[...,0]/t0))
 base=film[...,None]*G['film']+paths[...,2][...,None]*G['skin']+F[...,None]*G['bone']
 H,W=film.shape

@@ -42,8 +42,9 @@ xa=(tri[...,a]-lo[a])/VOX; xb=(tri[...,b]-lo[b])/VOX; xz=(tri[...,ax]-lo[ax])/VO
 hits=[[] for _ in range(shape[a]*shape[b])]
 ia0=np.floor(xa.min(1)).astype(int); ia1=np.ceil(xa.max(1)).astype(int); ib0=np.floor(xb.min(1)).astype(int); ib1=np.ceil(xb.max(1)).astype(int)
 HA=[];HB=[];HZ=[]
-for da in range(0,8):
-    for db in range(0,8):
+NA=int((ia1-ia0).max())+1; NB=int((ib1-ib0).max())+1      # 三角形の広がり（升）。大きい三角形も漏らさない
+for da in range(0,NA):
+    for db in range(0,NB):
         ca=ia0+da; cb=ib0+db; ok=(ca<=ia1)&(cb<=ib1)
         if not ok.any(): continue
         idx=np.where(ok)[0]; pa=ca[idx]+0.0; pb=cb[idx]+0.0      # 列の中心は整数（格子点）
@@ -55,7 +56,6 @@ for da in range(0,8):
         HA.append(pa[inside].astype(int));HB.append(pb[inside].astype(int));HZ.append(z[inside])
 HA=np.concatenate(HA);HB=np.concatenate(HB);HZ=np.concatenate(HZ)
 okk=(HA>=0)&(HA<shape[a])&(HB>=0)&(HB<shape[b]); HA,HB,HZ=HA[okk],HB[okk],HZ[okk]
-assert (ia1-ia0).max()<8 and (ib1-ib0).max()<8, 'triangles too large'
 order=np.lexsort((HZ,HB,HA)); HA,HB,HZ=HA[order],HB[order],HZ[order]
 inside=np.zeros(shape,bool)
 key=HA*shape[b]+HB; u_,st,cn=np.unique(key,return_index=True,return_counts=True)

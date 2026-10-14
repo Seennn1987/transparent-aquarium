@@ -25,12 +25,12 @@ near(transmitted({}), [1, 1, 1], 1e-9, "空");
 // red is not met in the blue class (0.333 against 0.477) and the pale class (0.251 against 0.213).
 const ab = (t) => t.map((v) => -Math.log(v));
 const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
-nearA(transmitted({ film: 2.91, skin: 0.269 }, { stain: "01" }), [0.333, 0.241, 0.175], 0.02, "01 の青（輪郭）");
-nearA(transmitted({ film: 2.19, skin: 0.391 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
-nearA(transmitted({ bone: 0.1332, film: 2.29, skin: 0.599 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
+nearA(transmitted({ film: 2.83, skin: 0.270 }, { stain: "01" }), [0.334, 0.241, 0.175], 0.02, "01 の青（輪郭）");
+nearA(transmitted({ film: 2.13, skin: 0.386 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
+nearA(transmitted({ bone: 0.1323, film: 2.26, skin: 0.615 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
 // "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the gut).
-nearA(transmitted({ organs: { liver_r: 0.1976 } }, { stain: "01" }), [0.182, 0.254, 0.382], 0.01, "01 の肝臓（C）");
-nearA(transmitted({ organs: { intestine: 0.1307 } }, { stain: "01" }), [0.473, 0.544, 0.696], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
+nearA(transmitted({ organs: { liver_r: 0.2073 } }, { stain: "01" }), [0.130, 0.194, 0.326], 0.01, "01 の肝臓（C）");
+nearA(transmitted({ organs: { intestine: 0.1263 } }, { stain: "01" }), [0.475, 0.546, 0.690], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
 near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 では内臓の一塊を描かない");
 // The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });

@@ -97,3 +97,8 @@
 - 角のあるカメレオン（別種、種名不明）: Pinterest https://jp.pinterest.com/pin/558024210055732218/ （画像 https://i.pinimg.com/736x/ce/e4/08/cee40876e1a9a94e9131aa5f4f75e656.jpg、元の作り手は不明）— t 0.12〜1.00、深さ 0.25〜0.94（黄緑）
 - 内臓を抜いた（または見えない）もの: Nighttime Nicholas https://www.nighttimenicholas.com/past-pieces/2021/1/27/suspended-veiled-chameleon 、Chameleon Forums https://www.chameleonforums.com/threads/diaphonized-chameleon-pictures.195479/ の数枚、sorarikuworld https://sorarikuworld.up.seesaa.net/image/IMG_70221.jpg 。数に入れない
 - 上の 5 枚（標本 3 を除く）の中央値: t 0.20〜0.95、深さ 0〜0.86
+
+## 文献（手足の指、2026-10-13）
+
+- Diaz, R. E. Jr. & Trainor, P. A. (2015). Hand/foot splitting and the 're-evolution' of mesopodial skeletal elements during the evolution and radiation of chameleons. *BMC Evolutionary Biology* 15:184. https://pmc.ncbi.nlm.nih.gov/articles/PMC4574539/
+  - 手は指 I・II・III と IV・V、足は指 I・II と III・IV・V が、それぞれ束（syndactylous）になる（Figure 1 の説明）。束は指の間の組織を残す（Introduction）。膜の作り直し 4（`skinloft3.py`）で手足の形を見る目安

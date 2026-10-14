@@ -116,7 +116,7 @@ export async function createChameleonSpecimen({ liquidBounds, facing, stain = "0
     /** Draws the light let through the animal (over white, linear) into `target`. */
     renderImage(renderer, target, camera, scene) {
       lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: jar, stain });
-      if (lightbox.target.width !== target.width || lightbox.target.height !== target.height)
+      if (lightbox.size.width !== target.width || lightbox.size.height !== target.height)
         lightbox.setSize(target.width, target.height);
       chameleonClock.value = action.time;
       // The plane the solid paths are measured from: through the animal's middle.

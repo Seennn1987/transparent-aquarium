@@ -210,17 +210,24 @@ uniform float pathScale;
 uniform float boneGain, boneT0, cartGain, skinGain;
 uniform float visceraGain;
 uniform vec3 boneSpectrum, cartSpectrum, skinSpectrum, visceraSpectrum;
+uniform vec2 tap;
 varying vec2 vUv;
+// The signed paths, averaged over the output pixel's fine texels and the ring round them
+// (weights 1-3-3-1), before anything is clamped.
+vec4 signedAt(sampler2D t) {
+  return .25 * (texture2D(t, vUv + vec2(-tap.x, -tap.y)) + texture2D(t, vUv + vec2(tap.x, -tap.y))
+    + texture2D(t, vUv + vec2(-tap.x, tap.y)) + texture2D(t, vUv + vec2(tap.x, tap.y)));
+}
 void main() {
-  vec4 p = max(texture2D(tPath, vUv), 0.);
+  vec4 p = max(signedAt(tPath), 0.);
   // The gains are per model unit; a scaled model's paths are given back in model units.
   vec4 m = p * pathScale;
   vec3 a = boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum
     + cartGain * m.g * cartSpectrum
     + skinGain * m.b * skinSpectrum
     + visceraGain * m.a * visceraSpectrum
-    + filmGain * max(texture2D(tFilm, vUv).r, 0.) * filmSpectrum
-    + organGain * max(texture2D(tOrgan, vUv).rgb * pathScale, 0.);
+    + filmGain * max(signedAt(tFilm).r, 0.) * filmSpectrum
+    + organGain * max(signedAt(tOrgan).rgb * pathScale, 0.);
   // In the jar the image is a linear light let through over white (jar-optics.js looks it up and the
   // final pass tone-maps it); the ratios measured on the photo are in display (sRGB) values.
   if (linearOut > .5) gl_FragColor = vec4(pow(exp(-a), vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
@@ -232,8 +239,14 @@ void main() {
  * let through (over white, linear) for the jar's optics, with the tissue crossed × alphaScale in alpha.
  * `pathScale`: model units per world unit, when the model is drawn scaled (the jar).
  * `stain`: the colour pattern (chameleon-stain.js STAINS, "06" or "01").
+ * `supersample`: the passes are drawn at this many times the output's width and height. Ribs and
+ * the casque's edges are thinner than a pixel; there the faces turned toward and away from the
+ * camera do not land in the same pixel, so a pixel's path came out negative (taken as 0: a white
+ * dot) next to one too large. The composite reads the finer buffers with linear filtering at the
+ * output pixel's centre, which averages the 2 × 2 signed paths before anything is clamped, so the
+ * two cancel (measured on chameleon.html?stain=01, ct_body_pipeline/README.md).
  */
-export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06" } = {}) {
+export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06", supersample = 2 } = {}) {
   const k = stainOf(stain);
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
   const target = new THREE.WebGLRenderTarget(1, 1, {
@@ -272,6 +285,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       linearOut: { value: linear ? 1 : 0 },
       alphaScale: { value: alphaScale },
       pathScale: { value: pathScale },
+      tap: { value: new THREE.Vector2() },
     },
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }",
     fragmentShader: compositeFragment,
@@ -290,7 +304,17 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
     organTarget,
     /** Whether this pattern draws the organs (and so renders their pass). */
     organs,
-    setSize(w, h) { target.setSize(w, h); filmTarget.setSize(w, h); organTarget.setSize(w, h); },
+    /** The output's size; the passes are `supersample` times finer. */
+    size: { width: 1, height: 1 },
+    supersample,
+    setSize(w, h) {
+      this.size.width = w; this.size.height = h;
+      const W = Math.max(1, Math.round(w * supersample)), H = Math.max(1, Math.round(h * supersample));
+      target.setSize(W, H); filmTarget.setSize(W, H); organTarget.setSize(W, H);
+      // Four bilinear taps 0.75 fine texel either side of the output pixel's centre (a texel corner):
+      // 4 × 4 fine texels, weights 1-3-3-1 along each axis.
+      if (supersample > 1) material.uniforms.tap.value.set(0.75 / W, 0.75 / H); else material.uniforms.tap.value.set(0, 0);
+    },
     material,
     render(scene, camera, output = null) {
       material.uniforms.boneGain.value = k.bone.gain * chameleonLook.bone.value;

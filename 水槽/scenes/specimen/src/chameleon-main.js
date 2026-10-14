@@ -21,7 +21,9 @@ async function start() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   // `stain=01`: the colour pattern measured on the user's jar photo 01 (chameleon-stain.js STAINS).
   const stain = query.get("stain") === "01" ? "01" : "06";
-  const lightbox = createLightbox(renderer, { stain });
+  // ?ss=1 draws the passes at the screen's own size (the calibrations read the buffers pixel for pixel).
+  const ss = Number(new URLSearchParams(location.search).get("ss")) || 2;
+  const lightbox = createLightbox(renderer, { stain, supersample: ss });
   document.body.style.background = `rgb(${stainOf(stain).lightbox.map((v) => Math.round(v * 255)).join(",")})`;
 
   const gltf = await new GLTFLoader().loadAsync(CHAMELEON_URL);

@@ -69,6 +69,8 @@
 | 40 | fit_stain01.py <写真01.jpg> <p01.npy> <p01_film.npy> | → 組織ごとの吸光度 | 色の型 "01" を写真 01 から解く。画面の通り道と膜の層の量は `chameleon.html?stain=01` の `chameleonPage.paths()` / `film()` を書き出したもの（2026-10-13） |
 | 41 | organs_cav.py → organs.py → organs_mesh.py → pack_soft.py | pose_jar.npz、skin_posed.npz → `organs_cav.npz` → `organs_lab.npz` → `organs_rigged.npz` → `chameleon_body_soft.npz`（org_<名前>__） | 体腔の臓器。展示の姿勢の膜の内側を入れ物に、Melero et al. 2023 の前後の順と大きさで置き、面にして椎骨に重みを付け、静止の姿勢へ戻す。肺は縮んだとみなし（Klaver 1973）、胃は背側、腸は参考写真の塊の範囲（`organs_ref_layout.py` が図）を埋める。`organs_view.py` で配置の図（2026-10-13） |
 | 42 | organcal.py（headless Chromium）→ fit_organs01.py | `cal01.npz`、`lm01.json` → 臓器の色 | 色 "01" の臓器の色を写真 01 の斑から当てはめる。腸は A・B の平均を画面の腸の通り道の中央値でそろえる（2026-10-13） |
+| 43 | skinloft3.py | `soft2_vol.npz`、`pose_jar.npz` → `soft_rigged.npz`、`skin_posed.npz` | 膜の作り直し 4（2026-10-14、これが最終の膜。37 の skinloft2.py を置き換え）。展示の姿勢の骨で太さの表の下限を決め直し（トサカ・肋骨・骨盤・舌骨を包む）、体軸の表は左右対称にして σ 4 mm でならし（どちらも仮）、尾は先へ細くなる一方。手足は骨の表面から厚み（`limb_thick.py`: CT の軟部の、骨の表面からの距離の 75% 点を左右で平均）の所。その後 41（臓器）と 42（色）を回し直す |
+| 44 | diag_all.sh（diag_inside.py → diag_bones.py → diag_profile.py）、xray.py | `skin_posed.npz` → 内側の升、骨のはみ出し、太さの表の図 | 膜の自己検証（2026-10-13）。骨ごとに膜の外へ出た長さ、体軸に沿った 8 方向の太さ |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |

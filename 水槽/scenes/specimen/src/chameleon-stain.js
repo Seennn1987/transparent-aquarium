@@ -83,19 +83,22 @@ export const STAINS = {
   // thickest (0.159; film 2.62, skin 0.769). Per colour, each tissue's absorbance per unit was solved from
   // those four (non-negative least squares, relative errors):
   //   film 0.1145 / 0.0728 / 0.0389, skin 0 / 0.109 / 0.230, bone 15.1 / 30.5 / 23.6, viscera 2.47 / 3.72 / 4.32
+  // Refitted the same way on the rebuilt skin (ct_body_pipeline/skinloft3.py, 2026-10-14; screen rows: blue film 2.83,
+  // skin 0.270; pale 2.13, 0.386; red bone 0.0402 after the saturation, film 2.26, skin 0.615):
+  //   film 0.118 / 0.0744 / 0.0393, skin 0 / 0.1139 / 0.2374, bone 15.0 / 30.4 / 23.5 (used below)
   // Green and blue meet all four. Red cannot: the blue class comes out 0.333 against 0.477 (paler than
   // the photo's outline) and the pale class 0.251 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.493, 1, 0.774], gain: 30.54 },
+    bone: { spectrum: [0.492, 1, 0.771], gain: 30.43 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.474, 1], gain: 0.2298 },
+    skin: { spectrum: [0, 0.480, 1], gain: 0.2374 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.636, 0.34], gain: 0.1145 },
+    film: { spectrum: [1, 0.631, 0.333], gain: 0.118 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -105,22 +108,23 @@ export const STAINS = {
     // source) fills that range from behind the liver to the kidneys (provisional). They replace the one brown mass
     // ("06" keeps it). Absorbance per model unit of organ crossed, added to the tissue around it, fitted on photo 01
     // (ct_body_pipeline/fit_organs01.py), each patch less the screen's skin, film and bone there:
-    //   C (t 0.35, brown mottle) 0.182 / 0.254 / 0.382 over the liver's median path in that band (0.198)
-    //                                                                            → liver 0.92 / 1.29 / 1.93
-    //   A (t 0.85, dark grey) 0.571 / 0.575 / 0.674 and B (t 0.60, brown mottle) 0.375 / 0.514 / 0.718; mean
-    //     0.473 / 0.544 / 0.696. 01's trunk bends unlike the model's, so the same places on screen catch only the
+    //   C (t 0.35, brown mottle) 0.130 / 0.194 / 0.326 over the liver's median path in that band (0.207)
+    //                                                                            → liver 0.63 / 0.94 / 1.57
+    //   A (t 0.85, dark grey) 0.576 / 0.572 / 0.652 and B (t 0.60, brown mottle) 0.374 / 0.519 / 0.729; mean
+    //     0.475 / 0.546 / 0.690. 01's trunk bends unlike the model's, so the same places on screen catch only the
     //     mass's edge (gut path A 0.054, B 0.030); matched by share instead, as for the film and bone above: over the
-    //     median gut path of the screen's gut pixels (0.131)                     → gut 3.62 / 4.17 / 5.33
+    //     median gut path of the screen's gut pixels (0.126)                     → gut 3.76 / 4.32 / 5.47
+    //   (values after the skin was rebuilt, skinloft3.py, 2026-10-14)
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.109 / 0.230) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.114 / 0.237) once more: faint, provisional.
     organs: {
-      liver_r: [0.92, 1.29, 1.93], liver_l: [0.92, 1.29, 1.93],
+      liver_r: [0.63, 0.94, 1.57], liver_l: [0.63, 0.94, 1.57],
       contents: [0, 0, 0],
-      heart: [0, 0.109, 0.23], gallbladder: [0, 0.109, 0.23], fat_r: [0, 0.109, 0.23], fat_l: [0, 0.109, 0.23],
-      kidney_r: [0, 0.109, 0.23], kidney_l: [0, 0.109, 0.23],
-      stomach: [3.62, 4.17, 5.33], intestine: [3.62, 4.17, 5.33], colon: [3.62, 4.17, 5.33],
+      heart: [0, 0.114, 0.237], gallbladder: [0, 0.114, 0.237], fat_r: [0, 0.114, 0.237], fat_l: [0, 0.114, 0.237],
+      kidney_r: [0, 0.114, 0.237], kidney_l: [0, 0.114, 0.237],
+      stomach: [3.76, 4.32, 5.47], intestine: [3.76, 4.32, 5.47], colon: [3.76, 4.32, 5.47],
     },
   },
 };
