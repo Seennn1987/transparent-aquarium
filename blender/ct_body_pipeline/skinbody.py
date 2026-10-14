@@ -125,6 +125,22 @@ hP = apply(Mh, h0[None])[0]; tP = Mh[:3, :3] @ th_
 HYOID_SPLIT_MM = -3.0
 sh_hy = (PX['hyoid'] - hP) @ tP / MM
 HY_FRONT = PX['hyoid'][sh_hy >= HYOID_SPLIT_MM]; HY_BACK = PX['hyoid'][sh_hy < HYOID_SPLIT_MM]
+# 第 1 角鰓骨（舌骨の角、左右 1 本ずつ、長さ 約 14 mm）: CT では頭骨のメッシュの部品で、上の端が頭骨の後ろに触れ、下の端は
+#   喉の中の舌骨の体へ向かう（Digimorph の Chamaeleo calyptratus: 舌を引いたときの第 1 角鰓骨は前背側へ向く）。展示の姿勢で
+#   下の端が下あごの後ろより 3 mm 下に出て、頭の膜がその先だけを鉤のように包んだ。喉は下あごから角の下の端までなめらかな面に
+#   なるように、角の点は頸の膜にも入れ、頭の膜の後ろの断面は窓を広げて下あごとつなぐ
+import scipy.sparse as _sp
+from scipy.sparse.csgraph import connected_components as _cc
+_f = d['head__f']; _n = len(d['head__v'])
+_A = _sp.coo_matrix((np.ones(3 * len(_f)), (_f[:, [0, 1, 2]].ravel(), _f[:, [1, 2, 0]].ravel())), shape=(_n, _n))
+_nc, _lab = _cc(_A, directed=False); _sz = np.bincount(_lab)
+_r = rest['head']; CB_mask = np.zeros(_n, bool)
+for _c in np.argsort(-_sz)[1:12]:
+    _m = _lab == _c; _x = _r[_m] / MM
+    _L = np.ptp((_x - _x.mean(0)) @ np.linalg.svd(_x - _x.mean(0), full_matrices=False)[2][0])
+    if 2000 <= _sz[_c] <= 8000 and _L > 10: CB_mask |= _m
+CERATO = PX['head'][:len(_r)][CB_mask]
+print('first ceratobranchials (from the skull mesh): %d points' % len(CERATO), flush=True)
 # 眼球（eyes.py）: 球の面の点
 EY = json.load(open('eyes.json'))
 def sphere_pts(c, r, n=800):
@@ -188,7 +204,7 @@ Dc = nd.gaussian_filter1d(np.concatenate([Dp, np.repeat(Dp[-1:], len(ext), 0)]),
 Dc = Dc - Tc * (Dc * Tc).sum(1, keepdims=True); Dc /= np.linalg.norm(Dc, axis=1, keepdims=True)
 NSC = (len(Cc) + SEC - 1) // SEC
 trunk_names = [n for n in PX if n not in ('head', 'hyoid')]
-xa = np.concatenate([PX[n] for n in trunk_names] + [HY_BACK]); na_ = np.concatenate([np.full(len(PX[n]), n) for n in trunk_names] + [np.full(len(HY_BACK), 'hyoid')])
+xa = np.concatenate([PX[n] for n in trunk_names] + [HY_BACK, CERATO]); na_ = np.concatenate([np.full(len(PX[n]), n) for n in trunk_names] + [np.full(len(HY_BACK), 'hyoid'), np.full(len(CERATO), 'ceratobranchial')])
 T0 = Body(Cc, Tc, Dc, np.zeros((NSC, NTH)))
 jj, a_, b_, _ = T0.frame(xa); sec = jj // SEC
 win = int(round(HULL_WIN_MM / secmm))
@@ -262,6 +278,11 @@ DH = np.repeat(dh[None], len(CH), 0)
 H0 = Body(CH, TH, DH, np.zeros(((len(CH) + SEC - 1) // SEC, NTH)))
 jh, ah, bh, _ = H0.frame(xh); NSH = H0.RA.shape[0]
 RH = fill_zero(hull_table(ah, bh, jh // SEC, NSH, 2))
+# 後頭顆より後ろ（と前 3 mm まで）の断面は窓を ±3 mm に広げ、下あごの後ろの端と角の下の端を一つの喉の面にする
+RHw = fill_zero(hull_table(ah, bh, jh // SEC, NSH, int(round(3.0 / secmm))))
+s_sec = (s_hi - (np.arange(NSH) + 0.5) * SEC * dstep) / MM           # 断面の、後頭顆からの頭骨の軸の位置 [mm]
+wr_ = np.clip((3.0 - s_sec) / 3.0, 0, 1)[:, None]                    # 後頭顆の前 3 mm から後ろで広い窓へ
+RH = np.maximum(RH, wr_ * RHw)
 RH = sm_above(RH, 0.7, secmm) + HEAD_WALL_MM * MM
 RH = cover(RH, ah, bh, jh, nh_, 'head')
 HEAD = Body(CH, TH, DH, RH)
@@ -331,8 +352,59 @@ g = grid_pts(cbase.min(0) - 2 * MM, cbase.max(0) + 2 * MM)
 for c0 in range(0, len(g), 4_000_000):
     gg = g[c0:c0 + 4_000_000]; dd = crest_dist(gmin + gg * vox); m = dd < 30 * kS; add(accT, dd[m], gg[m])
 print('limbs and crest added', f'{time.time()-t0:.0f}s', flush=True)
+# 骨から遠い膜を切る（2026-10-14 の 3 回目）: 断面ごとの凸包は、断面の平面の中で離れた骨どうしを結ぶので、トサカの後ろの角・
+#   尾の付け根と後肢の間・喉の下に、中に骨の無い膜が張られた（diag_excess.py で 145 mm²、右から）。
+#   頭の膜と頸（体軸 NECK_CUT_MM まで）の膜は、骨（軟骨・眼球を含む）から BONE_REACH_MM より遠くへ出さない:
+#   場 = なめらかな最大（場、骨からの距離 − BONE_REACH_MM）。BONE_REACH_MM = 3.0 mm（仮）。
+#   胴全体に掛けると肋骨の間で膜がへこみ、やせた体に見えたので、胴（肋骨の輪）と尾には掛けない
+BONE_REACH_MM = float(os.environ.get('BONE_REACH_MM', '3.0'))
+occ = np.zeros(shape, bool)
+allb = np.concatenate([PX[n] for n in PX] + [posed(n) for n in limbs] + [EYE_PTS])
+gi = np.clip(np.round((allb - gmin) / vox).astype(int), 0, np.array(shape) - 1); occ[tuple(gi.T)] = True
+ov = int(np.ceil((BONE_REACH_MM + 1.0) * MM / vox)) + 2
+ax_ = int(np.argmax(shape)); Dist = np.empty(shape, np.float32)
+for c0 in range(0, shape[ax_], 100):
+    lo_ = max(c0 - ov, 0); hi_ = min(c0 + 100 + ov, shape[ax_])
+    sl = [slice(None)] * 3; sl[ax_] = slice(lo_, hi_)
+    e = nd.distance_transform_edt(~occ[tuple(sl)]).astype(np.float32) * vox
+    keep = [slice(None)] * 3; keep[ax_] = slice(c0 - lo_, c0 - lo_ + min(100, shape[ax_] - c0))
+    dst = [slice(None)] * 3; dst[ax_] = slice(c0, min(c0 + 100, shape[ax_]))
+    Dist[tuple(dst)] = np.minimum(e[tuple(keep)], (BONE_REACH_MM + 1.0) * MM)
+del occ
+G2 = Dist - BONE_REACH_MM * MM; del Dist
+kc = 0.3 * MM
+def smax(A, B):
+    mx = np.maximum(A, B); return mx + kc * np.log(np.exp((A - mx) / kc) + np.exp((B - mx) / kc))
+print('cut at %.1f mm from the bones' % BONE_REACH_MM, f'{time.time()-t0:.0f}s', flush=True)
 FT = -kS * np.log(np.maximum(accT, 1e-30)); del accT
 FH = -kS * np.log(np.maximum(accH, 1e-30)); del accH
+# 頭: 3 次元の骨からの距離で切ると、トサカの枠（頭頂の稜と鱗状骨）の中の穴（側頭窓）まで膜がへこんだ。生体ではトサカの横は
+#   皮膚と筋肉で埋まり、輪郭は骨の枠に沿う。頭の膜は、横から写した頭骨・眼球の像（穴を埋め、半径 HEAD_CLOSE_MM で閉じる）の
+#   外へ出さない（像の外形 + HEAD_WALL_MM で、横向きに押し出した形と重ねる）。上・前から写した像も同じ
+HEAD_CLOSE_MM = 2.0
+lat = np.array(EY['eye_r']['centre_model']) - np.array(EY['eye_l']['centre_model']); lat /= np.linalg.norm(lat)
+e1 = tP - lat * (tP @ lat); e1 /= np.linalg.norm(e1); e2 = np.cross(lat, e1)
+hp = np.concatenate([PX['head'], EYE_PTS])
+hb = grid_pts(np.min([CH.min(0), hp.min(0)], 0) - HEAD.RA.max() - MM, np.max([CH.max(0), hp.max(0)], 0) + HEAD.RA.max() + MM)
+xq = gmin + hb * vox; ih_ = tuple(hb.T)
+# 横・上・前の 3 つの向きから写した像の外へ出さない（3 つの像を押し出した形の重なり。横だけだと頬が頭骨より 1.5〜3 mm 外へ出た）
+for (u1, u2, nm_) in ((e1, e2, 'side'), (e1, lat, 'top'), (lat, e2, 'front')):
+    H2 = np.c_[hp @ u1, hp @ u2] / MM
+    px2 = 0.1; lo2 = H2.min(0) - 6; sh2 = tuple(np.ceil((H2.max(0) + 6 - lo2) / px2).astype(int) + 1)
+    im2 = np.zeros(sh2, bool); g2 = ((H2 - lo2) / px2).round().astype(int); im2[tuple(g2.T)] = True
+    im2 = nd.distance_transform_edt(~im2) * px2 <= HEAD_CLOSE_MM + 0.15          # 閉じる（ふくらませて戻す）
+    im2 = nd.distance_transform_edt(im2) * px2 > HEAD_CLOSE_MM
+    im2 = nd.binary_fill_holes(im2)
+    sd2 = (nd.distance_transform_edt(~im2) - nd.distance_transform_edt(im2)) * px2   # 外が正（mm）
+    q2 = (np.c_[xq @ u1, xq @ u2] / MM - lo2) / px2
+    dq = nd.map_coordinates(sd2, [q2[:, 0], q2[:, 1]], order=1, mode='nearest') - HEAD_WALL_MM
+    FH[ih_] = smax(FH[ih_], (dq * MM).astype(np.float32))
+del hb, xq, q2, dq, ih_
+print('head kept within its side, top and front outlines (closed %.1f mm)' % HEAD_CLOSE_MM, flush=True)
+NECK_CUT_MM = 12.0
+nb = grid_pts(Cc[:int(NECK_CUT_MM / step)].min(0) - rmax, Cc[:int(NECK_CUT_MM / step)].max(0) + rmax)
+jn = TRUNK.kd.query(gmin + nb * vox, workers=-1)[1]; nb = nb[jn * step < NECK_CUT_MM]
+iv = tuple(nb.T); FT[iv] = smax(FT[iv], G2[iv]); del G2, nb, jn
 kJ = JOIN_MM * MM
 m_ = np.minimum(FT, FH)
 F = m_ - kJ * np.log(np.exp(-(FT - m_) / kJ) + np.exp(-(FH - m_) / kJ)); del FT, FH, m_
