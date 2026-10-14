@@ -102,3 +102,15 @@
 
 - Diaz, R. E. Jr. & Trainor, P. A. (2015). Hand/foot splitting and the 're-evolution' of mesopodial skeletal elements during the evolution and radiation of chameleons. *BMC Evolutionary Biology* 15:184. https://pmc.ncbi.nlm.nih.gov/articles/PMC4574539/
   - 手は指 I・II・III と IV・V、足は指 I・II と III・IV・V が、それぞれ束（syndactylous）になる（Figure 1 の説明）。束は指の間の組織を残す（Introduction）。膜の作り直し 4（`skinloft3.py`）で手足の形を見る目安
+
+## 生体の体の形（胸郭と膜、2026-10-14）
+
+どれも比べるためだけに見て、リポジトリには入れない（画面写しも入れない）。数値は画面写しから目測した値で仮。ページの URL は控えていない（サイトだけ）。
+
+- veterinaryradiology.net（https://www.veterinaryradiology.net）のエボシカメレオンの X 線
+  - 横向き: 腹の深さ ÷ 頭骨の長さ（吻端 → 後頭顆 72 px）を肩 → 股の t 0.19〜1.0 で 0.97・1.14・1.22・1.22・1.13・1.00・0.86。肋骨は V 字で、背側は腹へ 1 で後ろへ約 0.57、腹側は前へ約 1.3、曲がり目は椎骨から腹までの約 0.54（ribdepth.py）
+  - 背腹: 胴のいちばん広い所の幅 ÷ 頭骨の長さ 0.80
+- lbah.com（https://www.lbah.com）のカメレオンの背腹 X 線: 胴の幅 ÷ 頭骨の長さ 0.82
+- Digimorph, *Chamaeleo calyptratus*, TNHC 62768（凍結標本の CT。http://digimorph.org）: 肋骨は平行にそろい、背側と腹側（胸骨側）の部分が曲がり目でつながる。舌骨は顎の後ろの喉の中
+- Williston, S. W. (1925). *The Osteology of the Reptiles*. Harvard University Press: カメレオンの腹肋は V 字で、ふつう軟骨
+- madcham.de（https://www.madcham.de）: ほとんどの肋骨は胸骨か反対側の肋骨の軟骨につながり、仙椎の近くまで並ぶ

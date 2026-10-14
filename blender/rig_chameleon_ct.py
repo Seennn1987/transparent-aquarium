@@ -136,6 +136,12 @@ def limb_sides(arm, axis_at, J, n, step):
 GIRDLE_LOG = {}
 
 
+# 舌骨の追加の回転（モデル座標、hyoid_pose.py の出力 hyoid_pose.json の R_extra_model）
+HYOID_EXTRA = Matrix(((0.891976, -0.25863, -0.370795),
+                      (0.298643, 0.952848, 0.053796),
+                      (0.339397, -0.15872, 0.927156)))
+
+
 def build_pose(rigob, d, k, pose):
     ct = lambda p: Vector((p[1], -p[2], -p[0])) * k
     ctd = lambda p: Vector((p[1], -p[2], -p[0]))
@@ -212,11 +218,28 @@ def build_pose(rigob, d, k, pose):
         T1 = (rot2(th) * math.cos(math.radians(ph)) + Vector((0.0, sg * math.sin(math.radians(ph)), 0.0))).normalized()
         T0 = Rp @ (b.tail_local - b.head_local).normalized()
         R[b.name] = T0.rotation_difference(T1).to_matrix() @ Rp
+    # 舌骨は頭骨と一緒に動かす（CT の個体での頭骨との位置関係を保つ）。骨組みの親は頸の v02 なので、そのままだと
+    # 頭を下へ向けたときに舌骨だけ頸に残り、角（角鰓骨）が胸の横で体の外へ出ていた（2026-10-14 の指摘）。
+    # 凍結標本の CT（Digimorph TNHC 62768）でも、舌骨は顎の後ろの喉の中にある
+    FOLLOW_HEAD = {"hyoid"}
+    for nm in FOLLOW_HEAD:
+        if nm in R and "head" in R:
+            R[nm] = R["head"].copy()
+    # ただし頭と一緒に回すだけだと、後ろへ伸びる角（CT では胸の腹側まで届く）が展示の姿勢で胸の下へ 8 mm 出て、
+    # 骨から作る膜の腹が平らな箱形になった（2026-10-14）。舌骨の頭（前の端）のまわりに HYOID_EXTRA だけ回し、
+    # 角が CT の静止の形での胴との位置を保つようにする（ct_body_pipeline/hyoid_pose.py で最小二乗、27.6°、仮）。
+    # 回転はモデル（ワールド）座標。骨組みの座標へは rigob の向きで直す
+    if "hyoid" in R:
+        Wr = rigob.matrix_world.to_3x3()
+        R["hyoid"] = Wr.inverted() @ HYOID_EXTRA @ Wr @ R["hyoid"]
     # 根から順に位置をつなぐ
     head_t = {}
     for b in sorted(arm.bones, key=lambda x: len(x.parent_recursive)):
         if b.parent is None:
             head_t[b.name] = b.head_local.copy()
+        elif b.name in FOLLOW_HEAD and "head" in head_t:
+            hb = arm.bones["head"]
+            head_t[b.name] = head_t["head"] + R["head"] @ (b.head_local - hb.head_local)
         else:
             p = b.parent
             head_t[b.name] = head_t[p.name] + R[p.name] @ (b.head_local - p.head_local)
