@@ -1,0 +1,9 @@
+{
+ "photo_scale_mm_per_px": 1.162,
+ "fin_len_mm": 90.4,
+ "base_len_mm": 82.7,
+ "photo_sweep_deg_from_lateral": 20.1,
+ "surface_from_base_mm": 30.0,
+ "cartilage_outside_membrane_vox": 0,
+ "faces": 75282
+}

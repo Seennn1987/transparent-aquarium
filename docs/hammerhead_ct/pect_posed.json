@@ -1,0 +1,38 @@
+{
+ "swept_deg": 35,
+ "down_deg": 15,
+ "base_right_uzv": [
+  17.9,
+  232.7,
+  38.6
+ ],
+ "mirror_max_err_mm": 0.0,
+ "fin_points": 14553,
+ "dropped_cross_midline": 31,
+ "fin_reach_mm": 94.8,
+ "left_bbox": [
+  -93.5,
+  220.1,
+  29.7,
+  -4.1,
+  290.1,
+  71.0
+ ],
+ "right_bbox": [
+  4.1,
+  220.1,
+  29.7,
+  93.5,
+  290.1,
+  71.0
+ ],
+ "girdle_bbox": [
+  -36.0,
+  161.0,
+  -11.7,
+  36.0,
+  231.5,
+  67.0
+ ],
+ "girdle_points": 20994
+}

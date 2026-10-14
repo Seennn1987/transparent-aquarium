@@ -1,0 +1,26 @@
+{
+ "dfin1": {
+  "label": 1546,
+  "n": 28038,
+  "base_u_mm": -12.2,
+  "base_v_mm": -18.5,
+  "lean_deg": -15.8,
+  "lean_after_deg": -0.33
+ },
+ "dfin2": {
+  "label": 4513,
+  "n": 377,
+  "base_u_mm": -4.0,
+  "base_v_mm": -26.3,
+  "lean_deg": 2.2,
+  "lean_after_deg": -0.32
+ },
+ "anal": {
+  "label": 4302,
+  "n": 1209,
+  "base_u_mm": 8.6,
+  "base_v_mm": 28.4,
+  "lean_deg": 12.9,
+  "lean_after_deg": 1.57
+ }
+}

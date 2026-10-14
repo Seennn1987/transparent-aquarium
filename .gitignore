@@ -18,3 +18,9 @@ docs/references/chameleon/ペースト済み*
 blender/private/
 # MorphoSource の全身 CT から書き出したカメレオン（非商用・再配布しない）
 水槽/scenes/specimen/assets/private/
+
+# シュモクザメ: ライセンス未確認の参考図
+docs/references/hammerhead/*.jpg
+blender/ct_hammerhead/mesh/
+# シュモクザメ: CT 処理の中間ファイル（数百 MB〜1 GB）
+blender/ct_hammerhead/work/
