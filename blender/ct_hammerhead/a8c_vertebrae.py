@@ -42,7 +42,7 @@ def frame(z):
     t = np.array([1.0, 0.0, dv]); t /= np.linalg.norm(t)
     d = np.array([dv, 0.0, -1.0]); d /= np.linalg.norm(d)            # 背側
     return t, np.array([0.0, 1.0, 0.0]), d
-VV = {'c': [], 'a': []}; FF = {'c': [], 'a': []}
+VV = {'c': [], 'a': [], 'r': [], 'cr': []}; FF = {'c': [], 'a': [], 'r': [], 'cr': []}
 def add(key, V, F):
     n = sum(len(v) for v in VV[key]); VV[key].append(V); FF[key].append(F + n)
 NT, NA = 28, 7
@@ -92,7 +92,15 @@ for i in range(len(mid)):
     if not ARCH: continue
     # 背の弓（三角の板）と、腹側（胴は小さな突起、尾は腹の弓）
     AH = float(os.environ.get('HH_VERT_ARCHH', 1.2)); SOFT = os.environ.get('HH_VERT_SOFT') == '1'
-    for side, hgt in ((1, AH * r), (-1, (AH * 0.83 if zc > 520 else 0.45) * r)):
+    # 2026-10-16 案（プロデューサー「尾の骨（血道弓・尾びれの鰭条・肋骨）の案を…作って」）: HH_VERT_HAEMAL=1 で、腹側の弓を、肛門のすぐ後ろ
+    #  （腹びれの付け根 464 mm の後ろ、HH_VERT_HAEMAL_Z 既定 490 mm）から 60 mm で HH_VERT_HAEMAL_H 倍（既定 1.4）の高さの血道弓にする
+    #  （Griffin 1922・Goodrich 1930: 尾の椎骨の血道弓は左右の板が腹側で合わさり、尾では腹側へ伸びる血道棘になる。ピサの骨格標本の写真でも腹びれから尾びれまで並ぶ）。
+    #  前は 520 mm より後ろで 0.66 倍（AH 0.8 × 0.83）
+    if os.environ.get('HH_VERT_HAEMAL') == '1':
+        _a = np.clip((zc - float(os.environ.get('HH_VERT_HAEMAL_Z', 490))) / 60, 0, 1); _vh = (0.45 * (1 - _a) + float(os.environ.get('HH_VERT_HAEMAL_H', 1.4)) * _a) * r
+    else:
+        _vh = (AH * 0.83 if zc > 520 else 0.45) * r
+    for side, hgt in ((1, AH * r), (-1, _vh)):
         w = 0.35 * r; base = 0.75 * r; hl = (0.5 * L_ + GAP / 2) if SOFT else 0.45 * L_
         if SOFT:   # 2026-10-15 案 C: 付け根を隣とつなぎ（すき間なし）、先を丸めた山（6 点の外形）
             hgt = hgt * (1 + 0.15 * J * NH[i] / 2); w = w * (1 + 0.15 * J * NW[i] / 2)
@@ -109,6 +117,55 @@ for i in range(len(mid)):
         F = np.array(F)
         if side < 0: F = F[:, ::-1]
         add('a', P, F)
+
+# 2026-10-16 案: 肋骨と尾びれの鰭条（どちらも CT に写らず、文献と骨格標本の写真から作る。部品名に「推定」を付ける: a6a_export_gltf.py の Rib・CaudalRay）
+#  板の棒（断面は横 0.9 mm × 前後 0.6 × 椎骨の長さ、先へ細る）を、椎体の表面から外へ置く
+def rod(key, p0, p1, wa, wb, side_v, fore_v):
+    """p0 → p1 の細る棒。wa・wb: 根元・先の半幅（side_v 方向、mm）。前後の半幅は fore_v の長さ"""
+    P = []
+    for p, k in ((p0, 1.0), (p1, 0.45)):
+        for a, b_ in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            P.append(p + a * (wa if k == 1.0 else wb) * side_v + b_ * k * fore_v)
+    F = np.array([[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]])
+    V = np.array(P)
+    n_ = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]); cen = V.mean(0)
+    if (np.einsum('ij,ij->i', n_, V[F].mean(1) - cen) < 0).sum() > 6: F = F[:, ::-1]   # 外向きにそろえる
+    add(key, V, F)
+# 肋骨（HH_VERT_RIBS=1）: 胴の椎骨（胸びれの付け根 233 mm の後ろ 250 mm 〜 肛門の前 480 mm）の左右に 1 本ずつ。ツノザメ類の肋骨は短い軟骨の棒で、
+#  椎体の腹側寄りの横から外・下・後ろへ伸びる（Griffin 1922、Goodrich 1930）。長さ HH_VERT_RIB_L（椎体の半径の倍、既定 2.5）、下へ 35°・後ろへ 25°（向きは推定）
+if os.environ.get('HH_VERT_RIBS') == '1':
+    RL = float(os.environ.get('HH_VERT_RIB_L', 2.5))
+    for i in range(len(mid)):
+        zc = mid[i]
+        if not 250 <= zc <= 480: continue
+        r = R[i]; L_ = B[i + 1] - B[i]; t, s_, d = frame(zc); c = np.array([zc, 0.0, vc(zc)])
+        for sg in (1, -1):
+            out = sg * s_ * np.cos(np.radians(35)) - d * np.sin(np.radians(35)); out = out * np.cos(np.radians(25)) + t * np.sin(np.radians(25)); out /= np.linalg.norm(out)
+            base = c + 0.85 * r * (sg * s_ * np.cos(np.radians(35)) - d * np.sin(np.radians(35)))
+            fore = t - out * (t @ out); fore /= np.linalg.norm(fore); side = np.cross(out, fore)
+            rod('r', base, base + RL * r * out, 0.5, 0.3, side, 0.25 * L_ * fore)
+# 尾びれの鰭条（HH_VERT_RADIALS=1）: 尾びれの前（737 mm）〜背骨の終わりの椎骨ごとに、背骨の上と下に 1 本ずつ。後ろへ 40° 寝かせ（向きは推定）、
+#  長さは、椎体の表面から体の膜（a5_S.npy、正中の面 u = 0）の縁までの HH_VERT_RAD_F 倍（既定 0.7）。2 mm より短いものは置かない。
+#  ピサの骨格標本の写真で、尾びれの中に長い棒が背骨の上下にすき間なく並ぶ（計画書 第 9 節「胴の形と長さ、尾の腹側の骨の検証」）
+if os.environ.get('HH_VERT_RADIALS') == '1':
+    SK = np.load('a5_S.npy', mmap_mode='r'); RF = float(os.environ.get('HH_VERT_RAD_F', 0.7)); nrad = 0
+    def to_skin(c, u):
+        k = int(round(c[0] / VX)); last = 0.0
+        for st in np.arange(0, 160, 0.5):
+            p = c + st * u; k = int(round(p[0] / VX)); iv = int(round((p[2] - V0) / VX)); iu = int(round((0 - U0) / VX))
+            if not (0 <= k < SK.shape[0] and 0 <= iv < SK.shape[1]) or not SK[k, iv, iu]: return st
+        return 160.0
+    for i in range(len(mid)):
+        zc = mid[i]
+        if zc < 737: continue
+        r = R[i]; L_ = B[i + 1] - B[i]; t, s_, d = frame(zc); c = np.array([zc, 0.0, vc(zc)])
+        for sd in (1, -1):
+            u = sd * d * np.cos(np.radians(40)) + t * np.sin(np.radians(40)); u /= np.linalg.norm(u)
+            e = to_skin(c, u); ln = RF * (e - r)
+            if ln < 2: continue
+            fore = t - u * (t @ u); fore /= np.linalg.norm(fore)
+            rod('cr', c + r * u, c + (r + ln) * u, 0.45, 0.25, s_, 0.3 * L_ * fore); nrad += 1
+    print('caudal radials', nrad)
 def signed_vol(V, F):
     a, b_, c_ = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
     return np.einsum('ij,ij->i', a, np.cross(b_, c_)).sum() / 6
@@ -116,7 +173,7 @@ info = dict(source='BIODIDAC Squalus sp. trunk vertebrae photo (J. Houseman, CC 
             vertebrae=int(len(mid)), z_mm=[round(float(B[0]), 1), round(float(B[-1]), 1)], bounds_mm=[round(float(x), 2) for x in B],
             spine_v_mm={str(int(z)): round(float(vc(z)), 2) for z in range(0, 1001, 5)}, length_median_mm=round(float(np.median(np.diff(B))), 2),
             radius_mm={str(z): round(float(np.interp(z, mid, R)), 1) for z in (150, 300, 500, 700, 900)}, gap_mm=GAP, arches=ARCH, jitter=J, seed=20261015)
-for key, name in (('c', 'HH_vert_centra'), ('a', 'HH_vert_arches')):
+for key, name in (('c', 'HH_vert_centra'), ('a', 'HH_vert_arches'), ('r', 'HH_vert_ribs'), ('cr', 'HH_vert_radials')):
     if not VV[key]: continue
     V = np.concatenate(VV[key]); F = np.concatenate(FF[key])
     Vb = np.stack([V[:, 0], V[:, 1], -V[:, 2]], 1) / 1000.0         # Blender の座標（v を反転すると向きも反転する）

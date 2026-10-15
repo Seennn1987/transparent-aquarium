@@ -47,6 +47,9 @@ if os.path.exists(f"{MESH}/HH_vert_arches.ply"):
         PARTS["Arch"] = (["HH_vert_arches"], 20000)
     else:
         PARTS["Cartilage"] = (PARTS["Cartilage"][0] + ["HH_vert_arches"], 130000)
+# 2026-10-16 案: 肋骨と尾びれの鰭条（a8c_vertebrae.py の HH_VERT_RIBS・HH_VERT_RADIALS。CT に無く文献から作るので、名前に「推定」）
+for _p, _f, _n in (("Rib", "HH_vert_ribs", 8000), ("CaudalRay", "HH_vert_radials", 12000)):
+    if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000),   # 案 2（a8b_viscera_organs.py）
                    # B5 心臓（推定、b5b_heart.py）。HeartLarge・HeartSmall は見比べの案（試しの glb だけ）
                    ("Heart", "HH_heart", 20000), ("HeartLarge", "HH_heart_large", 20000), ("HeartSmall", "HH_heart_small", 20000)):
@@ -60,11 +63,30 @@ for ob in list(coll.objects):
     if me and me.users == 0: bpy.data.meshes.remove(me)
 bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[coll.name]
 report = {}
+# 2026-10-16 案（胴の長さと幅）: 胴を縮める（hh_warp.py、HH_BODY_SHRINK）。胸びれ・腹びれ（軟骨と膜）は形を変えず、付け根の位置だけ動かし、
+#  胴の幅の案（a5a_shell.py の a5_trunk_width.json）があれば、胴の幅の増えた分（片側）だけ外へずらす。ほかの面は頂点ごとに縮める
+import numpy as _np, json as _json, hh_warp
+_RIGID = {"HH_pect_L", "HH_pect_R", "HH_pectmem_L", "HH_pectmem_R", "HH_pelv_L", "HH_pelv_R", "HH_pelvmem_L", "HH_pelvmem_R"}
+_twp = os.path.join(hh_paths.WORK, "a5_trunk_width.json"); _TW = _json.load(open(_twp)) if os.path.exists(_twp) else None
+def _body_warp(o, n):
+    if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID): return
+    me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
+    x = co[:, 0] * 1000
+    if n in _RIGID:
+        ay = _np.abs(co[:, 1]); bx = float(x[ay < ay.min() + 0.010].mean())   # 付け根（体の中心にいちばん近い所）
+        co[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000
+        if _TW is not None:
+            dy = (_np.interp(bx, _TW["z_mm"], _TW["width_new_mm"]) - _np.interp(bx, _TW["z_mm"], _TW["width_old_mm"])) / 2 / 1000
+            co[:, 1] += _np.sign(co[:, 1].mean()) * dy
+    else:
+        co[:, 0] = hh_warp.warp_mm(x) / 1000
+    me.vertices.foreach_set("co", co.ravel()); me.update()
 for part, (names, target) in PARTS.items():
     objs = []
     for n in names:
         bpy.ops.wm.ply_import(filepath=f"{MESH}/{n}.ply")
         o = bpy.context.selected_objects[0]; o.name = f"tmp_{n}"; objs.append(o)
+        _body_warp(o, n)
         # B1 骨組み（2026-10-15）: ひれの膜とひれの軟骨は、まとめる前に出どころの頂点グループを付ける（b1_rig.py が、体の膜ではなくひれだけをひれの骨に付けるため）
         if os.environ.get("HH_RIG") == "1" and n in ("HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R", "HH_pect_L", "HH_pect_R", "HH_pelv_L", "HH_pelv_R", "HH_jaw_lower", "HH_teeth_lower"):   # B5: 下あご・下の歯は口の骨へ
             o.vertex_groups.new(name=f"src_{n}").add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
@@ -73,7 +95,7 @@ for part, (names, target) in PARTS.items():
     bpy.context.view_layer.objects.active = objs[0]
     if len(objs) > 1: bpy.ops.object.join()
     ob = bpy.context.view_layer.objects.active; ob.name = f"HH_{part}"; ob.data.name = f"HH_{part}"
-    if part.startswith("Heart"): ob.name = f"HH_{part}_推定"   # CT に無く、図から作った部品（CLAUDE.md）
+    if part.startswith("Heart") or part in ("Rib", "CaudalRay"): ob.name = f"HH_{part}_推定"   # CT に無く、図から作った部品（CLAUDE.md）
     bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6); bm.to_mesh(ob.data); bm.free()
     n0 = len(ob.data.polygons)
     if n0 > target:

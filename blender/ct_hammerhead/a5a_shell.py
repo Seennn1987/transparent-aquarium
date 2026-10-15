@@ -93,6 +93,27 @@ if _os.environ.get('HH_TRUNK_WIDTH', 'max') == 'max':
     _K[_in]=np.minimum(_K[_in],np.maximum(_cap[_in],1.0))
     _K=np.where(_zk<120,_K,ndi.gaussian_filter1d(_K,2))   # 段を消す（2 mm）
 kfac_raw=kfac
+# 2026-10-16 案（プロデューサー「胴の幅（第 1 背びれのあたりを一番太く）と後ろ半分の長さの案…を作って」）: HH_TRUNK_PROFILE=photo で、
+#  上から見た胴の幅（ひれの膜なし）を、いただいた背中からの写真を目で読んだ全長比の幅（計画書 第 9 節「胴の形と長さ…の検証」、
+#  a9_body_shape_check.jpg の青の点）に合わせる: 0.19 で 0.111、0.33 で 0.130（第 1 背びれのすぐ後ろでいちばん広い）、0.42 で 0.112、
+#  0.56 で 0.092、0.65 で 0.057（ここはいまのモデルとほぼ同じ）。間は単調な 3 次（PCHIP）でつなぐ。
+#  全長比は縮めた後の全長（hh_warp.py の HH_BODY_SHRINK）で数える。頭のすぐ後ろ 125 mm はいまの幅（102 mm）から始め、0.65 より後ろは前の倍率へ 30 mm で戻す
+_old=_K.copy()
+if _os.environ.get('HH_TRUNK_PROFILE')=='photo':
+    import hh_warp
+    from scipy.interpolate import PchipInterpolator
+    TLf=hh_warp.TL; _zf=hh_warp.warp_mm(_zk)
+    _fr=np.array([0.19,0.33,0.42,0.56,0.65]); _wf=np.array([0.111,0.130,0.112,0.092,0.057])
+    _W=PchipInterpolator(np.r_[125.0,_fr*TLf],np.r_[TW,_wf*TLf])(np.clip(_zf,125.0,0.65*TLf))
+    _kp=np.clip(_W/np.maximum(np.interp(_zk,zmm,ct_w),1),0.7,2.4)
+    _zE=float(hh_warp.unwarp_mm(0.65*TLf))
+    _a=np.clip((_zk-115)/10,0,1); _b=np.clip((_zk-_zE)/30,0,1)
+    _K=np.where(_zk<125,(1-_a)+_a*_kp,np.where(_zk<_zE,_kp,(1-_b)*_kp+_b*_old))
+    _K=np.where(_zk<115,_old,ndi.gaussian_filter1d(_K,3))
+    if STAGE=='2':
+        _w=np.interp(_zk,zmm,ct_w)
+        json.dump(dict(z_mm=_zk[::5].tolist(),width_old_mm=np.round((_w*_old)[::5],2).tolist(),width_new_mm=np.round((_w*_K)[::5],2).tolist(),
+                       tl_mm=TLf,source='photo profile (a9_body_shape_check)'),open('a5_trunk_width.json','w'))
 def kfac(z): return float(np.interp(z,_zk,_K))
 if STAGE=='2':
     S=np.lib.format.open_memmap('a5_S.npy',mode='w+',dtype=np.bool_,shape=(NZ,NV,NU))

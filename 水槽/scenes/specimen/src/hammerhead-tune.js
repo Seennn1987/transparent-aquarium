@@ -31,6 +31,7 @@ const GROUPS = [
   ["骨・軟骨", [
     { channel: "spine", note: "椎骨（CT の殻・椎体・弓）。石灰化してアリザリンで赤紫" },
     { part: "Centrum", label: "　椎体（背骨の中の濃さ）", max: 5 }, { part: "Arch", label: "　弓（背骨の中の濃さ）", max: 5 },
+    { part: "Rib", label: "　肋骨（推定）", max: 5 }, { part: "CaudalRay", label: "　尾びれの鰭条（推定）", max: 5 },
     { channel: "head", note: "頭骨（厚い軟骨、アルシアンで青）" },
     { channel: "jaw" }, { channel: "teeth" }, { channel: "gill" },
     { channel: "fin", note: "胸びれ・背びれ・尾・肩帯・腰帯の放射軟骨" },

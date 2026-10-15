@@ -28,18 +28,21 @@ from mathutils.bvhtree import BVHTree
 _work = os.environ.get("HH_WORK") or os.path.join(hh_paths.HERE, "work")
 VJ = json.load(open(os.path.join(_work, "a8_vertebrae.json")))
 B = np.array(VJ["bounds_mm"]); SV = {int(k): v for k, v in VJ["spine_v_mm"].items()}
+# 2026-10-16 案: 胴を縮めた glb（hh_warp.py、HH_BODY_SHRINK）では、骨の位置も同じ写像で縮める。xmm は縮めた後の長さ
+import hh_warp
 def spine_z(xmm):                       # 背骨の中心の Blender z（m）
-    ks = np.array(sorted(SV)); return -float(np.interp(xmm, ks, [SV[k] for k in ks])) / 1000.0
+    ks = np.array(sorted(SV)); return -float(np.interp(float(hh_warp.unwarp_mm(xmm)), ks, [SV[k] for k in ks])) / 1000.0
 # ひれの付け根: a3d・a3f が作業フォルダに書く（docs/hammerhead_ct/ の同じ名前の写しは古い作り方のもの。作り直しの通しでは作業フォルダのものを使う）
 _posed = lambda n: os.path.join(_work, n) if os.path.exists(os.path.join(_work, n)) else os.path.join(hh_paths.DOCS, n)
 PE = json.load(open(_posed("pect_posed.json"))); PV = json.load(open(_posed("pelvic_posed.json")))
-cuts = [0.0] + [float(B[i]) for i in range(5, len(B), 5)] + [1024.0]
+cuts = [0.0] + [float(hh_warp.warp_mm(B[i])) for i in range(5, len(B), 5)] + [hh_warp.TL]
 cuts = sorted(set([round(c, 2) for c in cuts]))
 names = ["head"] + [f"spine_{i:02d}" for i in range(len(cuts) - 3)] + ["tail"]
 assert len(names) == len(cuts) - 1
 
 # --- 骨組み ---
 arm_data = bpy.data.armatures.new("HH_Rig"); arm = bpy.data.objects.new("HH_Rig", arm_data); coll.objects.link(arm)
+arm["hh_length_m"] = round(hh_warp.TL / 1000, 4)   # 全長（標本ページの hammerhead-path.js の HH_BODY.length が読む。胴を縮めた案で変わる）
 bpy.context.view_layer.objects.active = arm; bpy.ops.object.select_all(action="DESELECT"); arm.select_set(True)
 bpy.ops.object.mode_set(mode="EDIT")
 eb = {}
@@ -54,6 +57,13 @@ for i, nm in enumerate(names):
 def seg_of(xmm): return names[max(0, min(len(names) - 1, int(np.searchsorted(cuts, xmm, side="right") - 1)))]
 fins = {}
 bu, bz, bv = PE["base_right_uzv"]; pu, pz, pv = PV["base_right_uzv"]
+# 胴の幅の案（a5a_shell.py の HH_TRUNK_PROFILE=photo）: 胸びれ・腹びれは a6a_export_gltf.py で胴の幅の増えた分（片側）だけ外へずらしたので、付け根も同じに
+_tw = os.path.join(_work, "a5_trunk_width.json")
+_dy = (lambda z: 0.0)
+if os.path.exists(_tw):
+    _T = json.load(open(_tw)); _dy = lambda z: float(np.interp(z, _T["z_mm"], _T["width_new_mm"]) - np.interp(z, _T["z_mm"], _T["width_old_mm"])) / 2
+bu, pu = bu + _dy(bz), pu + _dy(pz)
+bz, pz = float(hh_warp.warp_mm(bz)), float(hh_warp.warp_mm(pz))
 for side, sg in (("R", 1), ("L", -1)):
     for nm, (u, z, v, du) in (("pect", (bu, bz, bv, 70)), ("pelv", (pu, pz, pv, 40))):
         e = arm_data.edit_bones.new(f"{nm}_{side}")

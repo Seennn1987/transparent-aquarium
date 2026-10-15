@@ -113,6 +113,19 @@ async function start() {
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0,1") { q.delete("gillbone"); q.delete("gillcart"); } else { q.set("gillbone", b); q.set("gillcart", c); } })],
     ], "頭の幅: 資料（ICCAT）では全長の 26〜29%、CT の個体は 33%。胴の幅（102 mm）は変えず、頭だけ広げる。エラの骨: いまは胚の鰓弓の濃い紺。鰓条の縞も同じ色に合わせて変わる");
   }
+  // ?pick=body: 胴の幅・長さの案と尾の骨の案（glb を読み直す）、弓の色（?archbone= ?arch=）（2026-10-16、プロデューサー「胴の幅（第 1 背びれのあたりを一番太く）と
+  //  後ろ半分の長さの案、尾の骨（血道弓・尾びれの鰭条・肋骨）の案を両方作って、ブラウザで並べて見せて」）。案の glb は試しのページだけに置く
+  if (query.get("pick") === "body") {
+    const reload = (set) => { const q = new URLSearchParams(location.search); set(q); location.search = q.toString(); };
+    const arch = `${query.get("archbone") ?? 0.3},${query.get("arch") ?? 0.08}`;
+    pickerPanel([
+      ["案", [["いま", "specimen_hammerhead"], ["幅を写真に", "specimen_hammerhead_w1"], ["幅＋胴 6% 短く", "specimen_hammerhead_w1s94"],
+        ["幅＋胴 11.5% 短く", "specimen_hammerhead_w1s885"], ["尾の骨を足す", "specimen_hammerhead_t1"]], () => GLB_NAME,
+        (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
+      ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
+        (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
+    ], "幅: 背中からの写真の胴の幅（全長比、第 1 背びれのすぐ後ろ 0.33 で 0.13 がいちばん広い）。短く: 頭の後ろ（150 mm）〜尾びれの前を縮める（11.5% で尾びれの前が全長の 0.70、全長 957 mm）。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
+  }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
     ["胴の色", [["A 前の色", "A"], ["B 胴の真ん中", "B"], ["C 胴全体", "C"], ["D 胴全体（画面で合わせる、決定）", "D"]], () => query.get("tissue") ?? "D",

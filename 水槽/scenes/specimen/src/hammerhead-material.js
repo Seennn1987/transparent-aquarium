@@ -22,14 +22,17 @@ const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE
   Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0.3), Number(new URLSearchParams(location.search).get("arch") ?? 0.08), 0, 0] };   // 既定 骨 0.3・軟骨 0.08（同「H1」）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
 const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（推定、b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
 for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描く
-const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", ...HEARTS]);   // 2026-10-15 前の glb には無い
+// 2026-10-16 案: 肋骨と尾びれの鰭条（推定、a8c_vertebrae.py）。ひれの軟骨と同じ層に、?rib= ?ray= 倍（既定 1、ひれの放射軟骨と同じ青）
+CHANNEL.Rib = [0, Number(new URLSearchParams(location.search).get("rib") ?? 1), 0, 0];
+CHANNEL.CaudalRay = [0, Number(new URLSearchParams(location.search).get("ray") ?? 1), 0, 0];
+const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", "Rib", "CaudalRay", ...HEARTS]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 // 2026-10-15 色の層を 8 つにした（hammerhead-lightbox.js）。部品ごとの、層 A（背骨・ひれの軟骨・肉・頭骨）と層 B（顎・エラの骨・腹びれの軟骨・歯）への重み。
 //  顎・エラの骨の色の混ぜ方（?jawbone=・?gillbone=・?gillcart=）は、層の色（HH_CHANNELS）の方に入る。腹びれの軟骨と膜は別の部品にした（a6a_export_gltf.py）
 CHANNEL.PelvicCartilage = 1; CHANNEL.PelvicSkin = 2;
 const LAYERS = {
-  Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: CHANNEL.Arch }, Cartilage: { a: [0, 1, 0, 0] },
+  Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: CHANNEL.Arch }, Rib: { a: CHANNEL.Rib }, CaudalRay: { a: CHANNEL.CaudalRay }, Cartilage: { a: [0, 1, 0, 0] },
   Skin: { a: [0, 0, 1, 0] }, PelvicSkin: { a: [0, 0, 1, 0] }, HeadCartilage: { a: [0, 0, 0, 1] },
   Jaw: { b: [1, 0, 0, 0] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
 };

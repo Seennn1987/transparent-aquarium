@@ -40,9 +40,11 @@ export const heartLook = { show: Q.get("heart") ?? "large", bpm: Number(Q.get("h
 for (const [k, q] of [["heart", "heartamt"], ["mouth", "mouthamt"], ["gill", "gillamt"]]) if (Q.has(q)) hhOrganLook[k].value = Number(Q.get(q));
 export const gillLook = { hz: Number(Q.get("gillhz") ?? 0), amp: 0.06 };
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
-const L = HH_BODY.length;   // 全長（m）。b1_rig.py の尾の骨の終わり
 
 export function createSwim(model) {
+  // 全長（m）。glb の骨組みに書いた値（b1_rig.py の hh_length_m、胴を縮めた案で変わる）があれば、それをうねりの式（hammerhead-path.js）にも使う
+  model.traverse((o) => { if (o.userData.hh_length_m) HH_BODY.length = o.userData.hh_length_m; });
+  const L = HH_BODY.length;
   let skeleton = null;
   model.traverse((o) => { if (o.isSkinnedMesh && !skeleton) skeleton = o.skeleton; });
   if (!skeleton) return null;
