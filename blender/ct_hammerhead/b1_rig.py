@@ -13,8 +13,10 @@ a6a_export_gltf.py が組織ごとの部品（HH_Bone など）を作ったあ�
 重み（手順書: いちばん近い骨や重みの和で決めず、体積で切り分けたときの持ち主にする）:
   体軸（x）に沿って骨ごとの区間に切り分け、その区間の骨を持ち主にする。区間の中心と中心の間だけ、隣の骨と直線で混ぜる
   （頭は 100 mm までが頭の骨だけ、100〜140 mm で最初の背骨の骨へ）。
-  ひれの骨: 胸びれの付け根の近くの範囲で、体の中心から外へ 40→55 mm でひれの骨へなめらかに移す。腹びれは背骨の重みのまま
-  （腹びれの骨は作るが重みは付けない。HH_RIG_PELV=1 で 22→32 mm）。頭は 125 mm まで頭の骨だけ。
+  ひれの骨: 胸びれの膜と軟骨だけ（まとめる前の出どころの頂点グループで見分ける。体の膜は付けない）を、体の中心から外へ 45→80 mm で
+  ひれの骨へなめらかに移す（fin_weight）。腹びれは背骨の重みのまま（腹びれの骨は作るが重みは付けない）。頭は 125 mm まで頭の骨だけ。
+  まっすぐ泳ぐときは、胸びれの骨は付け根の区間の背骨の骨の子のまま動かさない（Kajiura 2003、Wilga & Lauder 2000）。
+試しの旋回（HH_RIG_TURN、+ で右へ）: 体が通り道の円（半径 0.374 L）に沿うとして首から曲げ（推定）、内側の胸びれを引く（tuck、Hoffmann & Porter 2019）。
 環境変数 HH_RIG_TEST=1 のとき: 試しのうねりの姿勢を 4 つ作って、骨が膜から出る量と膜の面の伸びを数え、
   b1_rig_test.json と投影図の点（b1_rig_proj.npz）を HH_WORK に書き、書き出しをせずに終わる。
 """
@@ -66,28 +68,33 @@ def spine_weights(xmm):
     j = int(np.searchsorted(centers, xmm) - 1); t = (xmm - centers[j]) / (centers[j + 1] - centers[j])
     return [(names[j], 1 - t), (names[j + 1], t)]
 def smooth(a, b, x): t = min(max((x - a) / (b - a), 0.0), 1.0); return t * t * (3 - 2 * t)
-def fin_weight(p_mm):
-    """(x, y, z) mm → [(骨, 重み)]: ひれの骨へ移す分"""
-    x, y, z = p_mm; out = []
-    for (nm, side), (bzm, bum, bvm) in fins.items():
-        sg = 1 if side == "R" else -1
-        if sg * y <= 0: continue
-        if nm == "pelv" and os.environ.get("HH_RIG_PELV") != "1": continue   # 腹びれは背骨の重みのまま（付け根の区間だけで動かすと、後ろの膜が伸びた）
-        lat = abs(y)
-        if nm == "pect": w = smooth(40, 55, lat) * smooth(bzm - 40, bzm - 25, x) * (1 - smooth(bzm + 70, bzm + 90, x)) * smooth(-z - 10, -z, bvm - 25)
-        else: w = smooth(22, 32, lat) * smooth(bzm - 15, bzm - 5, x) * (1 - smooth(bzm + 60, bzm + 75, x)) * smooth(-z, -z + 10, bvm - 15)
-        if w > 0: out.append((f"{nm}_{side}", w))
-    return out
+def fin_weight(p_mm, src):
+    """(x, y, z) mm と出どころ（ひれの膜・ひれの軟骨の頂点グループの名前）→ [(骨, 重み)]: ひれの骨へ移す分。
+    2026-10-15 B4: 体の膜（HH_body）は、ひれの付け根の近くでもひれの骨に付けない（旋回で内側のひれを引くと、体の横腹が引きずられて 1.8 倍まで伸びた）。
+    ひれの膜・軟骨は、体の中心から外へ PECT_LAT（既定 45→80 mm。40→55 mm では引いたひれの前の付け根が 4.8 倍まで伸びた。ひれの骨の回る中心は
+    体の中の 17.9 mm にあるので、移す幅を広くとる）でひれの骨へなめらかに移す。腹びれは既定で背骨の重みのまま（HH_RIG_PELV=1 で 22→32 mm、
+    ひれの骨に付けると、旋回で下の体が曲がったとき 1.8 倍まで伸びた）"""
+    if src is None: return []
+    nm, side = ("pect" if "pect" in src else "pelv"), src[-1]
+    if nm == "pelv" and os.environ.get("HH_RIG_PELV", "0") != "1": return []
+    lat = abs(p_mm[1])
+    w = smooth(*PECT_LAT, lat) if nm == "pect" else smooth(*PELV_LAT, lat)
+    return [(f"{nm}_{side}", w)] if w > 0 else []
+PECT_LAT = tuple(float(v) for v in os.environ.get("HH_RIG_PECTLAT", "45,80").split(","))
+PELV_LAT = tuple(float(v) for v in os.environ.get("HH_RIG_PELVLAT", "22,32").split(","))
 for ob in [o for o in coll.objects if o.type == "MESH"]:
     me = ob.data; M = ob.matrix_world
     groups = {nm: ob.vertex_groups.new(name=nm) for nm in names + [f"{a}_{s}" for a in ("pect", "pelv") for s in ("L", "R")]}
+    srcg = {g.index: g.name[4:] for g in ob.vertex_groups if g.name.startswith("src_")}
     for v in me.vertices:
         p = M @ v.co; pm = (p.x * 1000, p.y * 1000, p.z * 1000)
-        ws = spine_weights(pm[0]); fw = fin_weight(pm)
+        src = next((srcg[g.group] for g in v.groups if g.group in srcg and g.weight > 0.5), None)
+        ws = spine_weights(pm[0]); fw = fin_weight(pm, src)
         f = min(1.0, sum(w for _, w in fw))
         for nm, w in ws:
             if w * (1 - f) > 1e-4: groups[nm].add([v.index], w * (1 - f), "REPLACE")
         for nm, w in fw: groups[nm].add([v.index], w / max(sum(x for _, x in fw), 1e-9) * f, "REPLACE")
+    for gi in sorted(srcg, reverse=True): ob.vertex_groups.remove(ob.vertex_groups[gi])   # 出どころのグループは書き出さない
     ob.parent = arm; mod = ob.modifiers.new("Armature", "ARMATURE"); mod.object = arm
 print("rig: bones", len(arm_data.bones), "spine segments", len(names))
 
@@ -96,12 +103,16 @@ if os.environ.get("HH_RIG_TEST") == "1":
     L = 1.024; A_tail = float(os.environ.get("HH_RIG_AMP", 0.12)) * L     # 尾の先の片側の振れ（m）
     lam = float(os.environ.get("HH_RIG_WAVE", 0.9)) * L
     deps = bpy.context.evaluated_depsgraph_get()
+    TURN = float(os.environ.get("HH_RIG_TURN", 0))
     def pose(phase):
         bpy.context.view_layer.objects.active = arm; bpy.ops.object.mode_set(mode="POSE")
         for pb in arm.pose.bones: pb.rotation_mode = "QUATERNION"; pb.rotation_quaternion = (1, 0, 0, 0)
         # 体軸に沿った横のずれ y(s) = A(s) sin(2π(s/λ − phase))、A(s) は頭 0.15、尾 1 の 2 次。各骨はそのずれの傾きの差だけ回す
         s = np.linspace(0, L, 400); A = A_tail * (0.15 + 0.85 * (s / L) ** 2); y = A * np.sin(2 * np.pi * (s / lam - phase))
         ang = np.arctan(np.gradient(y, s))
+        # 旋回（HH_RIG_TURN、+ で体の右へ）: 体が自分の通り道の円（半径 0.374 L、Hoffmann & Porter 2019 のボンネットヘッドのふだんの旋回）に
+        #  沿うとして、向きの角を吻端からの長さに比例して足す（推定）
+        ang = ang + TURN * float(os.environ.get("HH_RIG_TURNBEND", 1)) * np.maximum(s - centers[0] / 1000, 0) / (0.374 * L)   # 首（頭の骨だけの終わり）から曲げる。HH_RIG_TURNBEND: 体の曲げの割合（試し）
         prev_world = 0.0
         for nm in names:
             pb = arm.pose.bones[nm]; bone = pb.bone
@@ -109,14 +120,25 @@ if os.environ.get("HH_RIG_TEST") == "1":
             d = a_mid - prev_world; prev_world = a_mid
             axis_local = (bone.matrix_local.to_3x3().inverted() @ Vector((0, 0, 1))).normalized()
             pb.rotation_quaternion = Quaternion(axis_local, d)
+        if TURN != 0 and os.environ.get("HH_RIG_TUCK", "1") == "1": tuck(TURN)
         bpy.ops.object.mode_set(mode="OBJECT"); bpy.context.view_layer.update()
+    def tuck(turn):
+        # 旋回の内側の胸びれを引く（Hoffmann & Porter 2019、ボンネットヘッド: 前へ 8.5°、ひれの長さの軸のまわり 5.0°、下へ 10.4°、合計 24 ± 2.3°）。
+        #  軸は体の向き（Blender の x 前後・y 左右・z 背）。前へ = 背の軸のまわりに先を吻端側へ、下へ = 前後の軸のまわりに先を腹側へ、
+        #  長さの軸のまわり = 前のふちを背側へ（論文の中で回外・回内の呼び方がそろっていないので、向きは推定）
+        side = "R" if turn > 0 else "L"; sg = 1 if side == "R" else -1; k = abs(turn)
+        pb = arm.pose.bones[f"pect_{side}"]; inv = pb.bone.matrix_local.to_3x3().inverted()
+        q = Quaternion((inv @ Vector((0, 0, 1))).normalized(), sg * math.radians(8.5) * k)
+        q = q @ Quaternion((inv @ Vector((0, 1, 0))).normalized(), math.radians(5.0) * k)
+        q = q @ Quaternion((inv @ Vector((1, 0, 0))).normalized(), -sg * math.radians(10.4) * k)
+        pb.rotation_quaternion = q
     def world_verts(ob):
         ev = ob.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
         V = np.array([ob.matrix_world @ v.co for v in me.vertices]); F = np.array([list(p.vertices) for p in me.polygons]); ev.to_mesh_clear(); return V, F
     skin = coll.objects.get("HH_Skin"); rigid = [coll.objects.get(n) for n in ("HH_Bone", "HH_Centrum", "HH_Arch", "HH_Cartilage", "HH_HeadCartilage", "HH_Gill", "HH_Jaw", "HH_Teeth") if coll.objects.get(n)]
     organs = [coll.objects.get(n) for n in ("HH_Liver", "HH_Gut", "HH_Spiral") if coll.objects.get(n)]
     DIAG = []; diag = {}
-    rep = {"tail_amp_m": A_tail, "wave_m": lam, "bones": len(arm_data.bones), "poses": {}}; proj = {}
+    rep = {"tail_amp_m": A_tail, "wave_m": lam, "turn": TURN, "bones": len(arm_data.bones), "poses": {}}; proj = {}
     def outside_flags(obs, SV, SF, step=7):
         # 膜（体とひれの膜が重なる）のいちばん近い面の外向きの側へ 0.5 mm より外か。重なりで曲げる前から外と出る点があるので、
         # 曲げる前の判定と比べて「新しく外へ出た点」を数える
