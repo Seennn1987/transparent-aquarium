@@ -37,14 +37,20 @@ export const HH_LIGHTBOX = [253 / 255, 247 / 255, 251 / 255];
 // head part's own path): fin radials 0.40 / 0.96 / 0.92, head 0.04 / 0.46 / 0.42, tissue 0.79 / 0.66 / 0.57 (all at
 // the embryo's values); the vertebral column 0.39 / 0.11 / 0.31 (bone 9.1 mm, skin 97 mm), darker than 0.42–0.48 /
 // 0.12–0.18 / 0.34–0.37, so its gain was taken down × 0.80 (239 → 191) to put its bone absorbance at the target's.
+// 2026-10-15 測り直し（顎・歯・エラの骨を頭骨から分け、エラの骨を案 B にした glb。view=top、ss=1、1000 × 500。
+//  blender/ct_hammerhead/measure_colors.py の分け方。値は光の通り ÷ ライトボックス）:
+//   頭の軟骨 0.08 / 0.55 / 0.51（頭の道のり 3.1 mm、膜 20 mm。顎を分けて道のりが 4.0 → 3.1 mm に減った）→ 前にある膜の分を引いて
+//     目標 0.04 / 0.47 / 0.43 に要る吸い方は 1.28〜1.33 倍 → 利得 780 × 1.30 = 1014
+//   椎骨の列 0.40 / 0.12 / 0.35（骨 11.1 mm、膜 75 mm）。赤が目標 0.42〜0.48 より暗い → 膜の分を引いて 0.83〜0.97 倍 → 191 × 0.87 = 166
+//   ひれの放射軟骨 0.40 / 0.96 / 0.92、体の組織 0.79 / 0.66 / 0.58 は目標どおりなので変えない
 export const HH_BONE_SPECTRUM = [0.37, 1, 0.28];
 export const HH_CARTILAGE_SPECTRUM = [1, 0.01, 0.04];
 export const HH_HEAD_SPECTRUM = [1, 0.19, 0.20];
 export const HH_SKIN_SPECTRUM = [0.42, 0.74, 1];
 export const HH_BONE_T0 = 0.02;      // the bone's path saturates as in the chameleon (t0, metres)
-export const HH_BONE_GAIN = 191;
+export const HH_BONE_GAIN = 166;   // 2026-10-15 191 → 166（上の注）
 export const HH_CARTILAGE_GAIN = 408;
-export const HH_HEAD_GAIN = 780;
+export const HH_HEAD_GAIN = 1014;  // 2026-10-15 780 → 1014（上の注）
 export const HH_SKIN_GAIN = 7.0;
 
 STAINS.hammerhead = {
