@@ -75,7 +75,7 @@ const ADD = {
 //  膜の表面を横切るたびに、点の上なら 1 / |cos|（表面と視線の角）を足す。強さは ?dent=（既定 1、2026-10-15 決定）、間隔は ?dentcell= mm（既定 1.2）
 const DENT_Q = new URLSearchParams(location.search);
 // A8 左右差（ASYM_GLSL）: 翼の先の高さ ?asymwing= mm、ひれの角度 ?asymfin= °（2026-10-15 に分けた）。?asym= は両方をまとめて（1 で 3 mm・4°）
-export const asymLook = { amount: { value: Number(DENT_Q.get("asym") ?? 0) }, wingMM: { value: Number(DENT_Q.get("asymwing") ?? 0) }, finDeg: { value: Number(DENT_Q.get("asymfin") ?? 0) } };
+export const asymLook = { amount: { value: Number(DENT_Q.get("asym") ?? 0) }, wingMM: { value: Number(DENT_Q.get("asymwing") ?? 15) }, finDeg: { value: Number(DENT_Q.get("asymfin") ?? 4) } };   // 既定 翼 15 mm・ひれ 4°（2026-10-15 プロデューサー決定）
 export const denticleLook = {
   cell: { value: Number(DENT_Q.get("dentcell") ?? 1.2) / 1000 },
   radius: { value: Number(DENT_Q.get("dentsize") ?? 0.28) },   // 点の半径 ÷ 間隔
