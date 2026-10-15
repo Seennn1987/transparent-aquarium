@@ -36,7 +36,10 @@ RIM_ROUND = 0.012 * WALL / 0.045
 RIM_Z = 2 * 0.725
 LIQUID_TOP = RIM_Z - 0.05
 LIQUID_GAP = 0.004
-MENISCUS = 0.018
+# 液の縁（メニスカス）: 瓶では蓋の下に隠れるが、蓋の無い器では上から白い帯がガラスの二重のように見えた（2026-10-15、プロデューサー「ガラス部分が二重になっていないでしょうか？」）。
+#  DISH_MENISCUS（高さ、既定 0.018）・DISH_MENISCUS_W（幅、既定 0.07。液の面の縁の曲がりは幅の 6/7）で案を作る
+MENISCUS = float(os.environ.get("DISH_MENISCUS", 0.018))
+MENISCUS_W = float(os.environ.get("DISH_MENISCUS_W", 0.07))
 
 
 def arc(cx, cz, r, a0, a1, steps):
@@ -81,17 +84,17 @@ def liquid_profile():
     pts += [(inner_r, LIQUID_TOP + MENISCUS)]
     for i in range(1, 9):
         t = i / 8
-        pts.append((inner_r - 0.06 * t, LIQUID_TOP + MENISCUS * (1 - t) ** 2.2))
+        pts.append((inner_r - MENISCUS_W * 6 / 7 * t, LIQUID_TOP + MENISCUS * (1 - t) ** 2.2))
     pts += [(0.0, LIQUID_TOP)]
     return pts
 
 
 def meniscus_profile():
     inner_r = BODY_R - WALL - LIQUID_GAP * 0.5
-    pts = [(inner_r - 0.07, LIQUID_TOP + 0.0005)]
+    pts = [(inner_r - MENISCUS_W, LIQUID_TOP + 0.0005)]
     for i in range(1, 9):
         t = i / 8
-        pts.append((inner_r - 0.07 * (1 - t), LIQUID_TOP + MENISCUS * t ** 2.2 + 0.0015))
+        pts.append((inner_r - MENISCUS_W * (1 - t), LIQUID_TOP + MENISCUS * t ** 2.2 + 0.0015))
     return pts
 
 
