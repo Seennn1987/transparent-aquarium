@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { chameleonOrgans } from "./chameleon-material.js";
 
 // The path materials for specimen_hammerhead.glb (blender/ct_hammerhead/a6a_export_gltf.py): each part is a
 // closed solid, and its path along the view ray is the depth of the faces turned away minus the depth of the
@@ -86,6 +87,39 @@ function denticleMaterial() {
   });
 }
 
+// A8 まだら: 体の膜の表面に、体に貼り付いた大きなむら（数 cm）を足す。chameleon-material.js の内臓の通り道（organ、色を自由に
+//  決められる RGB の吸い方）を使い、膜の表面を横切るたびに「むら × 1 / |cos|」× 色を足す（皮歯と同じ考え方）。
+//  むらは体の座標の 3 次元のなめらかな乱数（2 段、決まった種）。色は hammerhead-stain.js の organs.mottle。強さは ?mottle=（既定 0）、
+//  むらの大きさは ?mottlecell= mm（既定 40）
+// 輪郭（表面を斜めに見る所）で色がたまらないよう、1 / |cos| の上限を ?mottlecos=（既定 0.6 = 最大 1.7 倍）で抑える（0.2 では輪郭が茶色く縁取られた）
+export const mottleLook = { cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };
+const mottleFragment = `
+uniform float cell;
+uniform vec3 organAbs;
+uniform float filmMinCos;
+varying vec3 vRest;
+varying vec3 vViewPosition;
+varying vec3 vViewNormal;
+float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float vnoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+  return mix(mix(mix(h(i), h(i + vec3(1, 0, 0)), f.x), mix(h(i + vec3(0, 1, 0)), h(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h(i + vec3(0, 0, 1)), h(i + vec3(1, 0, 1)), f.x), mix(h(i + vec3(0, 1, 1)), h(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+void main() {
+  vec3 q = vRest / cell + 17.3;
+  float n = .65 * vnoise(q) + .35 * vnoise(q * 2.7 + 5.1);
+  float m = smoothstep(.45, .75, n);
+  float cs = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
+  gl_FragColor = vec4(organAbs * m / max(cs, filmMinCos), 0.);
+}`;
+function mottleMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { cell: mottleLook.cell, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos },
+    vertexShader: denticleVertex, fragmentShader: mottleFragment, ...ADD,
+  });
+}
+
 export function applyHammerheadTissue(model, reference) {
   const found = new Set();
   model.traverse((o) => {
@@ -98,7 +132,7 @@ export function applyHammerheadTissue(model, reference) {
     if (Array.isArray(CHANNEL[part])) channel.set(...CHANNEL[part]); else channel.setComponent(CHANNEL[part], WEIGHT[part] ?? 1);
     o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
     o.userData.pathMaterial = o.material;
-    if (part === "Skin") o.userData.filmMaterial = denticleMaterial();
+    if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
   if (missing.length) throw new Error(`specimen_hammerhead.glb に部位がありません: ${missing.join(", ")}`);

@@ -62,5 +62,7 @@ STAINS.hammerhead = {
   // A8 皮歯（hammerhead-material.js の denticleMaterial）。色は椎骨と同じアリザリンの赤紫（胚で皮歯は赤紫）。
   //  強さはページの ?dent=（chameleonLook.film に入る。既定 1（2026-10-15 決定））。利得 0.25 は「?dent=1 で点の上の吸い方が緑で約 0.25」
   film: { spectrum: HH_BONE_SPECTRUM, gain: 0.25 },
-  organs: {},
+  // A8 まだら（hammerhead-material.js の mottleMaterial）: 体の組織と同じ吸い方の色。1 回横切るごとの吸い方（?mottle=1 のとき）。
+  //  0.12 は「むらの濃い所で、体の組織の青の吸い方（80 mm で 0.56）が 1 割ほど増える」くらいからの出発（2026-10-15）。強さはページの ?mottle=（既定 0）
+  organs: { mottle: [0.42 * 0.12, 0.74 * 0.12, 1 * 0.12] },
 };
