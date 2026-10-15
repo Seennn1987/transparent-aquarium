@@ -119,12 +119,13 @@ async function start() {
     const reload = (set) => { const q = new URLSearchParams(location.search); set(q); location.search = q.toString(); };
     const arch = `${query.get("archbone") ?? 0.3},${query.get("arch") ?? 0.08}`;
     pickerPanel([
-      ["案", [["いま", "specimen_hammerhead"], ["幅を写真に", "specimen_hammerhead_w1"], ["幅＋胴 6% 短く", "specimen_hammerhead_w1s94"],
-        ["幅＋胴 11.5% 短く", "specimen_hammerhead_w1s885"], ["尾の骨を足す", "specimen_hammerhead_t1"]], () => GLB_NAME,
+      // 2026-10-16 参考の図（FMIB の幅・Raver の高さ）に合わせた案を足した。前の「幅を写真に」の 3 案は、幅が高さを超えて文献と逆の形なので外した（glb は試しのページに残る）
+      ["案", [["いま", "specimen_hammerhead"], ["胴: 中間", "specimen_hammerhead_r05"], ["胴: 参考の図に合わせた", "specimen_hammerhead_r1"],
+        ["尾の骨を足す", "specimen_hammerhead_t1"]], () => GLB_NAME,
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
       ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
-    ], "幅: 背中からの写真の胴の幅（全長比、第 1 背びれのすぐ後ろ 0.33 で 0.13 がいちばん広い）。短く: 頭の後ろ（150 mm）〜尾びれの前を縮める（11.5% で尾びれの前が全長の 0.70、全長 957 mm）。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
+    ], "胴: 幅は FMIB の図、高さは Raver の図（どちらもパブリックドメイン）に合わせ、首を細く縦長に、背を第 1 背びれへ高く、後ろ半分と尾柄を細く、尾びれの下の葉を大きく。中間はいまとの半分ずつ。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
   }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([

@@ -69,6 +69,14 @@ import numpy as _np, json as _json, hh_warp
 _RIGID = {"HH_pect_L", "HH_pect_R", "HH_pectmem_L", "HH_pectmem_R", "HH_pelv_L", "HH_pelv_R", "HH_pelvmem_L", "HH_pelvmem_R"}
 _twp = os.path.join(hh_paths.WORK, "a5_trunk_width.json"); _TW = _json.load(open(_twp)) if os.path.exists(_twp) else None
 def _body_warp(o, n):
+    if n in ("HH_dfin1", "HH_dfin2", "HH_anal"):   # 背と腹を足した案（a5a_shell.py の HH_TRUNK_PROFILE=ref）: 背びれ・臀びれの軟骨を膜と同じだけ動かす
+        if (_TW is None or "dtop_mm" not in _TW) and hh_warp.SHRINK == 1.0: return
+        me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
+        bx = co[:, 0] * 1000   # 膜（a5a_shell.py の段 4）と同じく、体軸の位置ごとに動かす
+        if _TW is not None and "dtop_mm" in _TW:
+            co[:, 2] += (_np.interp(bx, _TW["z_mm"], _TW["dtop_mm"]) if n != "HH_anal" else -_np.interp(bx, _TW["z_mm"], _TW["dbot_mm"])) / 1000
+        co[:, 0] = hh_warp.warp_mm(co[:, 0] * 1000) / 1000
+        me.vertices.foreach_set("co", co.ravel()); me.update(); return
     if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID): return
     me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
     x = co[:, 0] * 1000

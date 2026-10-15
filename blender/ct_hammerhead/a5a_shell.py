@@ -114,6 +114,48 @@ if _os.environ.get('HH_TRUNK_PROFILE')=='photo':
         _w=np.interp(_zk,zmm,ct_w)
         json.dump(dict(z_mm=_zk[::5].tolist(),width_old_mm=np.round((_w*_old)[::5],2).tolist(),width_new_mm=np.round((_w*_K)[::5],2).tolist(),
                        tl_mm=TLf,source='photo profile (a9_body_shape_check)'),open('a5_trunk_width.json','w'))
+# 2026-10-16 案（プロデューサー「胴の形状がまだ違います。画像や文献からあなた自身で調査し相違点を説明して」→ 説明に「了承します」）:
+#  HH_TRUNK_PROFILE=ref で、胴の幅と高さを参考の図に合わせる（計画書 第 9 節「胴の形の相違点の調査」、a9_body_shape_refs.jpg）。
+#   幅（上から、全長比）: FMIB 51331 の図（パブリックドメイン）。0.14 で 0.063、0.20 で 0.079、0.36 で 0.103、0.42 で 0.092、0.46 で 0.084、
+#    0.50 で 0.073、0.56 で 0.058、0.60 で 0.047、0.66 で 0.035、0.70 で 0.025。首（0.16 より前）は CT の幅より細くしない（顎・舌の弓・エラの骨を膜の中に残す）、
+#    尾柄は CT の 0.85 倍まで
+#   高さ（横から、全長比）: Duane Raver の図（パブリックドメイン）。0.13 で 0.091、0.15 で 0.098、0.17 で 0.094、0.20 で 0.100、0.27 で 0.123、
+#    0.38 で 0.112、0.42 で 0.102、0.45 で 0.090、0.50 で 0.080、0.55 で 0.067、0.60 で 0.059、0.68 で 0.037。
+#    0.25〜0.45 は背の側だけを足す（参考の図では腹の線はモデルとほぼ同じで、背が背びれへ上がる）。ほかは背と腹を同じ割合で
+#   尾びれの下の葉: 腹の側を 720〜820 mm で最大 HH_TRUNK_LOBE 倍（既定 1.35、760 mm で最大）。Raver の図の下の葉は全長比 0.085 まで下がる（モデル 0.06）
+#  HH_TRUNK_MIX（既定 1）: 0.5 でいまの形との中間
+_KD=np.ones_like(_zk); _KB=np.ones_like(_zk)
+if _os.environ.get('HH_TRUNK_PROFILE')=='ref':
+    import hh_warp
+    from scipy.interpolate import PchipInterpolator
+    MIX=float(_os.environ.get('HH_TRUNK_MIX',1.0)); TLf=hh_warp.TL; _f=hh_warp.warp_mm(_zk)/TLf
+    _fw=np.array([0.14,0.20,0.36,0.42,0.46,0.50,0.56,0.60,0.66,0.70]); _ww=np.array([0.063,0.079,0.103,0.092,0.084,0.073,0.058,0.047,0.035,0.025])
+    _Wt=PchipInterpolator(_fw,_ww)(np.clip(_f,_fw[0],_fw[-1]))*TLf
+    _cw=np.maximum(np.interp(_zk,zmm,ct_w),1)
+    _kr=_Wt/_cw; _kr=np.maximum(_kr,np.where(_f<0.16,1.0,0.85))
+    _a=np.clip((_zk-125)/15,0,1)*(1-np.clip((_f-0.70)/0.04,0,1))
+    _K=_old+MIX*_a*(_kr-_old)
+    _K=np.where(_zk<115,_old,ndi.gaussian_filter1d(_K,3))
+    # 高さ
+    _ang=np.degrees(TH)
+    _Dd=np.array([(-Rs[i]*np.sin(TH)).max() for i in range(len(zs))]); _Db=np.array([(Rs[i]*np.sin(TH)).max() for i in range(len(zs))])
+    Dd=np.maximum(np.interp(_zk,zmm,_Dd),1); Db=np.maximum(np.interp(_zk,zmm,_Db),1)
+    _fd=np.array([0.13,0.15,0.17,0.20,0.27,0.38,0.42,0.45,0.50,0.55,0.60,0.68]); _dd=np.array([0.091,0.098,0.094,0.100,0.123,0.112,0.102,0.090,0.080,0.067,0.059,0.037])
+    _Dt=PchipInterpolator(_fd,_dd)(np.clip(_f,_fd[0],_fd[-1]))*TLf
+    kboth=_Dt/(Dd+Db); kback=(_Dt-Db)/Dd
+    wb=np.clip((_f-0.22)/0.06,0,1)*(1-np.clip((_f-0.42)/0.06,0,1))
+    kd=(1-wb)*kboth+wb*kback; kb=(1-wb)*kboth+wb*1.0
+    _g=np.clip((_zk-120)/15,0,1)*(1-np.clip((_f-0.68)/0.03,0,1))
+    kd=1+_g*(np.clip(kd,0.8,2.0)-1); kb=1+_g*(np.clip(kb,0.8,2.0)-1)
+    LOBE=float(_os.environ.get('HH_TRUNK_LOBE',1.35))
+    kb=kb*(1+(LOBE-1)*np.interp(_zk,[720,760,820],[0,1,0]))
+    _KD=ndi.gaussian_filter1d(1+MIX*(kd-1),4); _KB=ndi.gaussian_filter1d(1+MIX*(kb-1),4)
+    if STAGE=='2':
+        _w=np.interp(_zk,zmm,ct_w)
+        json.dump(dict(z_mm=_zk[::5].tolist(),width_old_mm=np.round((_w*_old)[::5],2).tolist(),width_new_mm=np.round((_w*_K)[::5],2).tolist(),
+                       dtop_mm=np.round((Dd*(_KD-1))[::5],2).tolist(),dbot_mm=np.round((Db*(_KB-1))[::5],2).tolist(),
+                       tl_mm=TLf,mix=MIX,source='ref profile (FMIB 51331 width, Duane Raver depth)'),open('a5_trunk_width.json','w'))
+def kdv(z): return float(np.interp(z,_zk,_KD)), float(np.interp(z,_zk,_KB))
 def kfac(z): return float(np.interp(z,_zk,_K))
 if STAGE=='2':
     S=np.lib.format.open_memmap('a5_S.npy',mode='w+',dtype=np.bool_,shape=(NZ,NV,NU))
@@ -128,8 +170,9 @@ if STAGE=='2':
             S[k]=m; S0[k]=m; continue
         r=np.array([np.interp(z,zmm,Rs[:,j]) for j in range(NT)]); kk=kfac(z); vc=vc_of(z)
         if r.max()<1: continue
-        for arr,kx in ((S0,1.0),(S,kk)):
-            pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)+vc
+        _kd,_kb=kdv(z)
+        for arr,kx,kd_,kb_ in ((S0,1.0,1.0,1.0),(S,kk,_kd,_kb)):
+            pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)*np.where(np.sin(TH)<0,kd_,kb_)+vc
             rr,cc=skpoly((pv-V0)/VX,(pu-U0)/VX,shape=(NV,NU)); arr[k,rr,cc]=True
     S.flush(); S0.flush(); print('stage2 ok')
 if STAGE=='3':
@@ -160,7 +203,17 @@ if STAGE=='3':
 if STAGE=='4':
     S=np.load('a5_S.npy',mmap_mode='r+')
     for name in ('dfin1','dfin2','anal'):
-        d=np.load(f'a5_fin_{name}.npz'); M=d['mask']; lo=d['origin']; hi=lo+np.array(M.shape)
+        d=np.load(f'a5_fin_{name}.npz'); M=d['mask']; lo=d['origin']
+        # 背と腹を足した案（HH_TRUNK_PROFILE=ref）: 背びれの膜は背の上がった分だけ上へ、臀びれの膜は腹の下がった分だけ下へ動かす（体軸の断面ごと）
+        if _os.path.exists('a5_trunk_width.json') and 'dtop_mm' in json.load(open('a5_trunk_width.json')):
+            _T=json.load(open('a5_trunk_width.json')); PAD=60
+            M2=np.zeros((M.shape[0],M.shape[1]+2*PAD,M.shape[2]),bool)
+            for j in range(M.shape[0]):
+                zz=(lo[0]+j)*VX
+                dv=-np.interp(zz,_T['z_mm'],_T['dtop_mm']) if name!='anal' else np.interp(zz,_T['z_mm'],_T['dbot_mm'])
+                sh=int(round(dv/VX)); M2[j,PAD+sh:PAD+sh+M.shape[1]]=M[j]
+            M=M2; lo=lo-np.array([0,PAD,0])
+        hi=lo+np.array(M.shape)
         lo2=np.maximum(lo,0); hi2=np.minimum(hi,[NZ,NV,NU])
         sub=np.asarray(S[lo2[0]:hi2[0],lo2[1]:hi2[1],lo2[2]:hi2[2]])
         sub|=M[lo2[0]-lo[0]:hi2[0]-lo[0],lo2[1]-lo[1]:hi2[1]-lo[1],lo2[2]-lo[2]:hi2[2]-lo[2]]
