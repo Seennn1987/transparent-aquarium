@@ -2,6 +2,7 @@
 #  derolled3（CT の反り約 4° を残した体積）の 750 mm より後ろを、案の図（a3h_tail_options.py の③）と同じ式で背へずらす。
 #  断面ごとに背腹へずらす（せん断）。曲げた区間の長さは 1/cos(16°)≈1.04 倍に伸びるので、
 #  骨をメッシュにする段（A4）では椎骨ごとに回して長さを保つ。ここでは位置と角度の目安を作る
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy.ndimage import shift as ndshift
 keep=np.load('tail_keep_v.npy'); zz=np.arange(760,1011)

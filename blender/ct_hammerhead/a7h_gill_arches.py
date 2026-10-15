@@ -3,10 +3,11 @@
 #  https://omeka.uottawa.ca/biodidac/items/show/5134）と Kennesaw State Univ. 実習資料に従う。
 #  置き場所は CT から: 左のエラ穴の帯（a7_slit.npy、エラの空気の内側の端 a7_uin.npy）。左で作り右へ鏡映する（右のエラは潰れている）
 #  出力: mesh/HH_gill.ply、a7_gill_arches.json
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as nd
 from skimage.measure import marching_cubes
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 d=np.load('a7_gill_field.npz'); og=d['origin']; Gg=float(d['step'])
 uin,uout=np.load('a7_uin.npy')
 def u_inner(z,v):

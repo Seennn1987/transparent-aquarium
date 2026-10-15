@@ -10,6 +10,7 @@
 #    - 胴の幅: 左右（u）を k 倍。150 mm まで 1、175 mm で 1.55（決定: 写真の 頭÷胴 = 2.6）、720 mm まで 1.55、780 mm で 1
 #  背びれ・第2背びれ・臀びれの膜: 胴から外したひれの肉を、A4 で骨を立て直したのと同じ変換（a4_*_xform.npz）で立て直し、
 #    立て直した骨と合わせて別の体積にする
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json, sys
 STAGE=sys.argv[1]
 from scipy import ndimage as ndi

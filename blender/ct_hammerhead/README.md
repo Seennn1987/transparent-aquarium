@@ -1,17 +1,40 @@
 # シロシュモクザメ CT → 骨格（ZMA.PISC.108725）
 
 データ: Kamminga et al. 2017（figshare, CC0）。元の zip は `~/transparent-aquarium/シュモクザメ/全身CT/`。
-中間ファイル（数百 MB〜1 GB）はリポジトリに入れず、作業フォルダに置く。
+中間ファイル（数百 MB〜1 GB）はリポジトリに入れず、`work/` に置く（git に入れない）。面（PLY）は `mesh/`。
+置き場はすべて `hh_paths.py` で決める。どのスクリプトも先頭でそこから読み、カレントフォルダには頼らない。
+
+## 通して作る
+
+```bash
+blender/ct_hammerhead/run_all.sh <出力のフォルダ>   # zip から glb まで。いまの work/・mesh/・glb には書かない
+blender/ct_hammerhead/run_all.sh --default          # いつもの置き場に上書き
+```
+
+`FIGS=1` で確認の図も作る。`FROM=<スクリプト名>` でその段から始める。
+
+## 段ごとの検算
+
+```bash
+blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
+```
+
+`work/`・`mesh/` の元のファイルを入力に 1 つの段を走らせ（`rebuild/check/` の APFS の複製の中で。元には書かない）、書いたファイルを `compare_work.py` で元と比べる。glb は `compare_glb.py <元> <新>`。
+
+## 実行順
+
 
 | 順 | スクリプト | 内容 |
 |---|---|---|
 | 1 | a1_load_clean.py | DICOM を読む。撮影台とシートを外した体の体積（zyg_clean.npy） |
 | 2 | a2_skeleton.py | 骨格の塊分け、背骨の中心線、椎骨の境目 |
 | 3 | a2b_split_head_spine.py | 頭と背骨を分ける |
+| 3b | a2d_comps_info.py | 塊ごとの断面の範囲の表 → comps_info.json（2026-10-15 書き起こし） |
 | 4 | a2c_roll.py | 体の横倒し（背の向き）を神経弓で測る |
 | 5 | a3_unroll_preview.py | 神経弓の倒れで体を起こした試し（旧。6 で置き換え） |
 | 6 | a3b_sym_tilt.py | 倒れを断面の左右対称で測り直し、体を起こした体積を作る |
-| 7 | a3c_pectoral_options.py | 胸びれを左右に分け、左右対称の向きの案を図にする（前に c833_uvz.npy・c833_split.npy・pect_info.json を作る処理は計画書 第 9 節） |
+| 6b | a3c0_pect_split.py | 肩帯と胸びれの塊 833 を起こした座標に移し、左右に分ける → c833_uvz.npy・c833_split.npy・pect_info.json（2026-10-15 に計画書の文章から書き起こし。前の work/ と一致） |
+| 7 | a3c_pectoral_options.py | 左右対称の向きの案を図にする → pect_options.png |
 | 8 | a3d_pectoral_pose.py（2026-10-14 に 20 の後でやり直し） | 決定した向き（後ろへ35°・下へ15°）で左右の胸びれを置き、肩帯の右半分を鏡映して左右をそろえる → pect_posed.npz・pect_posed.json・pect_posed.png |
 | 9 | a3e0_pelvic_look.py | 腹びれの所の塊を起こした座標に移す（pelvic_uvz.npz）。確認図 pelvic_look.png |
 | 10 | a3e_pelvic_options.py | 腹びれの向きの案（右を使う／左を使う × 3 通り）→ pelvic_options.png・pelvic_info.json |
@@ -37,18 +60,19 @@
 | 30 | a4g_overlay_top.py | 背中の静止画に写真の外形を重ねる → a4_top_photo.png |
 | 31 | a4h_headwidth_options.py ／ a4i_bodywidth_options.py | 頭の幅・胴の幅の案の絵 |
 | 32 | a5a_shell.py（段 1〜4）／ a5a_mesh.py ／ a5a_check.py | 体の膜の体積（半径の表、胴の幅、正中のひれの膜）→ a5_S.npy、面 mesh/HH_body.ply、確かめの図 |
-| 34 | a5c_photo_pect.py ／ a5d_pect_membrane.py ／ a5e_pelv_membrane.py | 胸びれの膜（写真の外形）、腹びれの膜（仮、骨を広げた形）→ mesh/HH_pectmem_*.ply・HH_pelvmem_*.ply |
-| 35 | a6b_split_head.py ／ a6a_export_gltf.py | 骨格を頭の軟骨とそれ以外に分け、組織ごとに減らして glb に書き出す（Blender の別シーン HH_EXPORT）→ 水槽/scenes/specimen/assets/specimen_hammerhead.glb |
 | 33 | a5b_render_body.py | 膜と骨を重ねた静止画 → docs/hammerhead_ct/a5_*.png（a4f の後に同じシーンで） |
-| 36 | a4c_final_volume.py（直し）| 頭の幅の縮めを翼だけにする（正中から 45 mm まで縮めない）。`python3 a4c_final_volume.py 0 226 keep` で頭の断面だけ作り直し、a5a_shell.py 1〜4 をやり直す |
+| 34 | a5c_photo_pect.py ／ a5d_pect_membrane.py ／ a5e_pelv_membrane.py | 胸びれの膜（写真の外形）、腹びれの膜（仮、骨を広げた形）→ mesh/HH_pectmem_*.ply・HH_pelvmem_*.ply |
+| 35 | a6b_split_head.py ／ a6a_export_gltf.py | 骨格を頭の軟骨とそれ以外に分け、組織ごとに減らして glb に書き出す（Blender の別シーン HH_EXPORT）→ 水槽/scenes/specimen/assets/specimen_hammerhead.glb。A7 の後は 40 のあとにやり直す |
+| 36 | a4c_final_volume.py（直し）| 頭の幅の縮めを翼だけにする（正中から 45 mm まで縮めない）。`python3 a4c_final_volume.py 0 226 keep` で頭の断面だけ作り直し、a5a_shell.py 1〜4 をやり直す。いまの a4c はこの直しを含むので、通して作るときは 26 の 1 回でよい |
 | 37 | a7_probe.py ／ a7a_jaw_fine.py | 逆写像の共通部分。顎のまわりを 0.35 mm の格子で作る → a7_jaw_fine.npz |
 | 38 | a7b_jaw_seg.py | 頭骨・上あご・下あご・舌の弓・歯（上・下）に分ける（断面で置いた種から殻に沿って流し込む）→ a7_jawlab.npy |
 | 39 | a7c_open_mesh.py <角度> mesh | 顎の関節の軸のまわりに下あごと下の歯を回して口を開き、体の膜（a5_S_open.npy）も開く。顎・歯・舌の弓の面 → mesh/HH_jaw_*・HH_teeth_*・HH_hyoid.ply、docs/hammerhead_ct/a7_open.json。このあと `a5a_mesh.py a5_S_open.npy` |
 | 40 | a7d_skel_mesh.py | 骨格の面を、顎・歯・舌の弓を除いて作り直す（HH_skeleton.ply）。このあと a6b_split_head.py |
 | 41 | a7f_gill_field.py ／ a7g_gill_frag.py | エラのまわりを 0.5 mm の格子で（小さな塊も入れて）作り、エラの空気とかけらを見る |
+| 41b | a7g2_gill_air.py | エラの空気（a7_slit.npy）と、左のエラの空気の内と外の端（a7_uin.npy）（2026-10-15 書き起こし。前の work/ と一致） |
 | 42 | a7h_gill_arches.py | エラの骨 5 対と底鰓を作る（並び方は BIODIDAC の Squalus の図、置き場所は左のエラの空気の帯）→ mesh/HH_gill.ply、docs/hammerhead_ct/a7_gill_arches.json |
 | 43 | a7e_render_head.py ／ a7i_mouth_options.py | 頭の部品を色分けした不透明の静止画（Blender の別シーン HH_HEAD）、口の開き方の案 → docs/hammerhead_ct/a7_head_*.png・a7_mouth_*.png |
 
 確かめた図は `docs/hammerhead_ct/`（comps_named.png、spine_cpr2.png、roll_check.png、pect_posed.png）と `~/transparent-aquarium/シュモクザメ/_確認/`。
 
-注意: Mac 上の Linux（メモリ約 4 GB）では、全体の体積（2093×512×512）に 3D の塊分けをかけるとメモリが足りない。体の範囲に切った zyg_clean.npy（2093×108×430）で行う。
+注意: 前の担当の Mac 上の Linux（メモリ約 4 GB）では、全体の体積（2093×512×512）に 3D の塊分けをかけるとメモリが足りないため、体の範囲に切った zyg_clean.npy（2093×108×430）で行っていた。24 GB の Mac でも同じ手順で動き、結果を変えないため切ったままにしている。

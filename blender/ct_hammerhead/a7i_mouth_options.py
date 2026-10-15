@@ -1,13 +1,16 @@
 """A7: 口の開き方の案の絵。a7e_render_head.py のシーン HH_HEAD（下あごは 30° 開いた面）で、下あごと下の歯を関節の軸のまわりに回して描く。
 出力: docs/hammerhead_ct/a7_mouth_<角度>.png"""
 import bpy, math, mathutils, json
-ROOT = "/Users/shoui/transparent-aquarium/transparent-aquarium"
-OUTD = ROOT + "/docs/hammerhead_ct"
-J = json.load(open("/Users/shoui/transparent-aquarium/transparent-aquarium/docs/hammerhead_ct/a7_open.json"))
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.environ.get("HH_SCRIPTS", "/Users/shoui/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead"))
+import hh_paths
+ROOT = hh_paths.ROOT
+OUTD = hh_paths.DOCS
+J = json.load(open(next(p for p in (hh_paths.WORK + "/a7_open.json", hh_paths.DOCS + "/a7_open.json") if _os.path.exists(p))))
 BASE = J["angle_deg"]; jl = J["joint_L_zuv_mm"]; jr = J["joint_R_zuv_mm"]; sgn = J["sign"]
 pL = mathutils.Vector((jl[0], jl[1], -jl[2])) / 1000; pR = mathutils.Vector((jr[0], jr[1], -jr[2])) / 1000
 ax = (pR - pL).normalized()
-sc = bpy.data.scenes["HH_HEAD"]; bpy.context.window.scene = sc
+sc = hh_paths.blender_scene("HH_HEAD")
 movers = [sc.objects["hd_HH_jaw_lower"], sc.objects["hd_HH_teeth_lower"]]
 for o in movers: o["m0"] = [list(r) for r in o.matrix_world]
 cam = sc.objects["hd_cam"]; cam.data.ortho_scale = 0.20

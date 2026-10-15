@@ -1,3 +1,4 @@
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as ndi
 D=np.load('derolled5.npy',mmap_mode='r')

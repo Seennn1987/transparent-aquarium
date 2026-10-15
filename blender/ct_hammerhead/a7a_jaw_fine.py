@@ -1,8 +1,9 @@
 # A7a: 顎のまわり（最終の座標で吻端から 40〜125 mm、左右 ±60 mm、背腹 -15〜50 mm）を 0.35 mm の格子で作り直す。
 #  逆写像・頭の鏡映・骨にしない塊の消し方は a4_final_volume.py と同じ
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json, sys
 from scipy.ndimage import map_coordinates, binary_dilation
-exec(open('a7_probe.py').read())
+exec(open(hh_paths.script('a7_probe.py')).read())
 ZC=int(300)  # 元の CT の 0〜150 mm
 C=np.array(C[:ZC]); L=np.asarray(np.load('skel_lab.npy',mmap_mode='r')[:ZC]); sizes=np.load('skel_sizes.npy')
 DROP={2670,3867,784,827,833,1341,3064,3149,3077,3067,1546,4513,4302}

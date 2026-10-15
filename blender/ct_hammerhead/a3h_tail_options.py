@@ -1,8 +1,9 @@
 # A3 尾の反りの案: CT のまま / 写真で読んだ角度に近づける（横から見た図だけ。体積は決定後に作る）
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy.ndimage import shift as ndshift
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 keep=np.load('tail_keep_v.npy'); B=np.load('derolled3_mips.npy')[1]    # (z mm, v px 1.47mm)
 zz=np.arange(760,1011); p=np.polyfit(zz,keep[zz*2],1); ct_deg=float(np.degrees(np.arctan(-p[0])))
 print('CT 上葉の背骨の角度（760〜1010 mm、胴の軸から）', round(ct_deg,1))

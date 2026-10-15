@@ -2,6 +2,7 @@
 #  derolled4 の上から見た外形の鏡映で探した頭の正中線: u = -7.0 + tan(11°)(z-70) mm（重なり 0.89）。
 #  胴（背骨, z>=140 mm）は u=0 で z に平行。頭は胴に対して約 11° 横を向き、z=140 mm で 6.6 mm ずれている。
 #  z<=130 mm は頭を剛体として回して正中線を u=0 にそろえ、130〜170 mm で回す角度とずらしをなめらかに 0 へ移す
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy.ndimage import map_coordinates
 D=np.load('derolled4.npy'); ZB=260

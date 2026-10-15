@@ -1,8 +1,9 @@
 # A5: 体の膜の体積（a5_S.npy）から、閉じた面を作る（Blender 座標、単位 m）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, os
 from scipy import ndimage as ndi
 from skimage.measure import marching_cubes
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0].replace("import numpy as np, sys, os","import numpy as np, sys, os"))
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0].replace("import numpy as np, sys, os","import numpy as np, sys, os"))
 S=np.load(sys.argv[1] if len(sys.argv)>1 else 'a5_S.npy',mmap_mode='r'); NZ=S.shape[0]; Vs=[];Fs=[];n=0
 for k0 in range(0,NZ-1,150):
     a=max(k0-3,0); b=min(k0+154,NZ)

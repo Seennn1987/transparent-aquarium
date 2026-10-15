@@ -3,10 +3,13 @@ a4f_render_outline.py の後に、同じシーン HH_A4 で実行する（骨の
 膜は確かめ用の半透明の灰（染まりと屈折は A6 で作る）。
 """
 import bpy, bmesh, os, math
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.environ.get("HH_SCRIPTS", "/Users/shoui/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead"))
+import hh_paths
 from mathutils import Vector
-ROOT = "/Users/shoui/transparent-aquarium/transparent-aquarium"
-MESH = ROOT + "/blender/ct_hammerhead/mesh"; OUT = ROOT + "/docs/hammerhead_ct"
-sc = bpy.data.scenes["HH_A4"]; bpy.context.window.scene = sc
+ROOT = hh_paths.ROOT
+MESH = hh_paths.MESH; OUT = hh_paths.DOCS
+sc = hh_paths.blender_scene("HH_A4")
 coll = bpy.data.collections["HH_A4"]
 MEMS = ["HH_body", "HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R"]
 mat = bpy.data.materials.get("HH_BodyCheck") or bpy.data.materials.new("HH_BodyCheck")

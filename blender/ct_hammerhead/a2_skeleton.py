@@ -2,11 +2,12 @@
 使い方: python3 a2_skeleton.py <作業フォルダ>
 出力: skel_lab.npy / skel_sizes.npy（26 近傍の塊）, axial_profile.npy, spine_line.npy, spine_core.npy, vert_bounds.npy
 椎骨の境目 = 中心線の上の濃さの極小（椎体のあいだの、脊索の菱形の暗い所）"""
+import hh_paths
 import sys, numpy as np
 from scipy import ndimage as nd
 from scipy.ndimage import gaussian_filter1d, map_coordinates
 from scipy.signal import find_peaks
-w = sys.argv[1].rstrip('/') + '/'
+w = (sys.argv[1] if len(sys.argv) > 1 else hh_paths.WORK).rstrip('/') + '/'
 C = np.load(w + 'zyg_clean.npy')
 S = C > 250; lab, n = nd.label(S, structure=np.ones((3, 3, 3))); sz = nd.sum(S, lab, range(1, n + 1))
 np.save(w + 'skel_lab.npy', lab.astype(np.int32)); np.save(w + 'skel_sizes.npy', sz)

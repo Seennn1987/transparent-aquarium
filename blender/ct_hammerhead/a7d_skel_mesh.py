@@ -1,7 +1,8 @@
 # A7d: 骨格の面（HH_skeleton.ply）を、顎・歯・舌の弓を除いて作り直す（それらは a7c で細かい格子から別の部品にした）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, sys
 from scipy import ndimage as nd
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 d=np.load('a7_jaw_fine.npz'); o=d['origin']; G=float(d['step']); W=np.load('a7_jawlab.npy')
 J=nd.binary_dilation(np.isin(W,(2,3,4,5,6)),iterations=3)
 F=np.load('a4_skel_field.npy',mmap_mode='r'); NZ,NV,NU=F.shape; Vs=[];Fs=[];n=0

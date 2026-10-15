@@ -2,15 +2,17 @@
 別シーン HH_HEAD で行い、ファイルは保存しない。出力: docs/hammerhead_ct/a7_head_<向き>.png
 使い方（Blender の中）: TAG = "..."; exec(open(この file).read())"""
 import bpy, os, math, mathutils
-ROOT = "/Users/shoui/transparent-aquarium/transparent-aquarium"
-MESH = ROOT + "/blender/ct_hammerhead/mesh"
-OUTD = ROOT + "/docs/hammerhead_ct"
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.environ.get("HH_SCRIPTS", "/Users/shoui/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead"))
+import hh_paths
+ROOT = hh_paths.ROOT
+MESH = hh_paths.MESH
+OUTD = hh_paths.DOCS
 TAG = globals().get("TAG", "")
 PARTS = [("HH_skel_head", (0.55, 0.62, 0.60, 1)), ("HH_bone", (0.6, 0.25, 0.5, 1)), ("HH_jaw_upper", (0.15, 0.45, 0.95, 1)),
          ("HH_jaw_lower", (1.0, 0.55, 0.1, 1)), ("HH_teeth_upper", (0.95, 0.95, 0.95, 1)), ("HH_teeth_lower", (0.95, 0.95, 0.95, 1)),
          ("HH_hyoid", (0.2, 0.75, 0.25, 1)), ("HH_gill", (0.9, 0.2, 0.3, 1)), ("HH_girdle", (0.55, 0.62, 0.60, 1))] + globals().get("EXTRA", [])
-sc = bpy.data.scenes.get("HH_HEAD") or bpy.data.scenes.new("HH_HEAD")
-bpy.context.window.scene = sc
+sc = hh_paths.blender_scene("HH_HEAD")
 coll = bpy.data.collections.get("HH_HEAD")
 if coll is None:
     coll = bpy.data.collections.new("HH_HEAD"); sc.collection.children.link(coll)

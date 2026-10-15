@@ -2,6 +2,7 @@
 #  derolled6 の u<0 の半分を、z 0〜110 mm は u>0 の半分の鏡映に置き換え、110〜135 mm は鏡映と元の CT を
 #  なめらかに混ぜる（境目の段を消すため）。翼の後ろの端は 115 mm まで。135 mm より後ろは CT のまま
 #  鏡の軸は u=0（直した後の頭の正中線 u≈-1 mm の 0.7 mm 手前）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 D=np.load('derolled6.npy'); Z0,Z1=110,135
 M=D[:Z1,:,::-1].astype(np.float32); O=D[:Z1].astype(np.float32)

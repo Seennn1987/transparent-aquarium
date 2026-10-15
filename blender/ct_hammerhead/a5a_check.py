@@ -1,3 +1,4 @@
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image
 F=np.load('a4_skel_field.npy',mmap_mode='r'); S=np.load('a5_S.npy',mmap_mode='r'); NZ,NV,NU=S.shape

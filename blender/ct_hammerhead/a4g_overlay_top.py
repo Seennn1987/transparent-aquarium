@@ -1,17 +1,17 @@
 # A4: 背中からの骨の静止画（a4_top.png）に、写真の外形（頭の幅をそろえた）を重ねる
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',18)
-import os; R=os.path.expanduser('~/mnt/transparent-aquarium/transparent-aquarium')
-img=Image.open(R+'/docs/hammerhead_ct/a4_top.png').convert('RGB'); W,H=img.size
+F=hh_paths.font(18)
+img=Image.open(hh_paths.DOCS+'/a4_top.png').convert('RGB'); W,H=img.size
 # a4f_render_outline.py の外接と同じ数（Blender の出力 bbox m (0.005,-0.167,-0.073)-(1.012,0.166,0.113)）
 mn=np.array([0.005,-0.167]); mx=np.array([1.012,0.166]); ctr=(mn+mx)/2; ortho=(mx[0]-mn[0])*1.05; mpp=ortho/W
 def to_px(z_mm,u_mm):
     X=z_mm/1000; Y=u_mm/1000
     return (X-ctr[0])/mpp+W/2, H/2-(Y-ctr[1])/mpp
 # 写真の外形（a4a_photo_top_cmp.py と同じ合わせ方。頭の幅は骨の外接ではなく、体の外形の 339.6 mm）
-runs=open('ref/noaa_compare_right_runs.txt').read().strip().split(';')
+runs=open(hh_paths.REF+'/noaa_compare_right_runs.txt').read().strip().split(';')
 M=np.zeros((366,590),bool)
 for k,r in enumerate(runs):
     for seg in filter(None,r.split(',')):

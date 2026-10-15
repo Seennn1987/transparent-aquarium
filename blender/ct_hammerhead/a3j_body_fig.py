@@ -1,7 +1,8 @@
 # 確認図: A3 で起こした体（derolled4）の全身を横と背中から。ひれの決定後の位置を重ねる
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 M=np.load('derolled7_mips.npy'); pe=np.load('pect_posed.npz'); pv=np.load('pelvic_posed.npz')
 def im(m,rows):
     g=np.clip((m.astype(float)+600)/1100,0,1); a=(255-g*225).astype(np.uint8).T[rows[0]:rows[1]]

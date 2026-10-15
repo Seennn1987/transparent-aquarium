@@ -1,6 +1,7 @@
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 A=np.load('derolled_mips.npy'); B=np.load('derolled3_mips.npy')
 def im(m,lo=-600,hi=500):
     g=np.clip((m[600:1046].astype(float)-lo)/(hi-lo),0,1)          # z 600..1045 mm, 縦=v（または u）

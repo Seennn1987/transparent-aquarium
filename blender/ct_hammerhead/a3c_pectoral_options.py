@@ -1,10 +1,11 @@
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 zm,u,v=np.load('c833_uvz.npy'); lab=np.load('c833_split.npy'); info=json.load(open('pect_info.json'))
 P=np.stack([u,zm,v],1); G=P[lab==0]; blue=P[lab==2]
 D=np.load('derolled2.npy',mmap_mode='r'); sub=np.asarray(D[150:420])>-400
 front_body=sub.any(0); vent_body=sub.any(1); side_body=sub.any(2)
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 bb=np.array(info['blue']['base']); rb=np.array(info['red']['base'])
 mid=(rb+bb)/2; half=abs(rb[0]-bb[0])/2
 c=blue.mean(0); w,V=np.linalg.eigh(np.cov((blue-c).T)); e1=V[:,2]; e3=V[:,0]

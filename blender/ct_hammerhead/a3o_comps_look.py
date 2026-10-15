@@ -1,7 +1,8 @@
 # A3 名前のない塊を、起こした座標（derolled2 と同じ変換）で背骨と一緒に描く
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',13)
+F=hh_paths.font(13)
 L=np.load('skel_lab.npy',mmap_mode='r'); cxs,cys=np.load('spine_line.npy'); t=np.load('tilt_sym.npy')
 info=json.load(open('comps_info.json'))
 def uvz(ids,z0,z1):

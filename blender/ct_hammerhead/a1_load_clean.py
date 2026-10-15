@@ -2,9 +2,12 @@
 使い方: python3 a1_load_clean.py <zip> <作業フォルダ>
 出力: zyg.npy（全体, z,y,x, int16）, body2.npy（2 倍に縮めた体のマスク）, zyg_clean.npy（体の外を -1000、y と x を体の範囲に切った体積）, clean_meta.json
 軸: z = 吻→尾（0.5 mm）, y = 背→腹（0.735 mm）, x = 左右（0.735 mm。左右の向きは未確認）"""
+import hh_paths
 import sys, io, json, zipfile, numpy as np, pydicom
 from scipy import ndimage as nd
-src, out = sys.argv[1], sys.argv[2].rstrip('/') + '/'
+src = sys.argv[1] if len(sys.argv) > 1 else hh_paths.ZIP
+out = (sys.argv[2] if len(sys.argv) > 2 else hh_paths.WORK).rstrip('/') + '/'
+import os; os.makedirs(out, exist_ok=True)
 z = zipfile.ZipFile(src); sl = []
 for n in z.namelist():
     if n.endswith('/'): continue

@@ -2,6 +2,7 @@
 #  CT（A3 の後）では、第1背びれの付け根が正中から左右へ約 15 mm ずれ、先へ向かって約 20° 傾いていた。
 #  ひれの点を最終の座標へ移し（この範囲 266〜660 mm は derolled2 と同じ変換）、
 #  付け根の近く（体から 12 mm 以内）の点の左右の中央を正中（u=0）へ動かし、u と v の一次の当てはめの傾きを 0 に回す（z 軸のまわり、付け根を中心）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy.ndimage import binary_closing, gaussian_filter
 VX=0.735; U0,V0=-180.0,-150.0

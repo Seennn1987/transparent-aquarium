@@ -3,6 +3,7 @@
 #    で腰帯（左右のひれをつなぐ横の棒）かは未確認。腰帯の横の棒は閾値 250 HU では写っていないか、細い（未確認）
 #  - 右のひれを左右に使い（左は鏡映）、付け根は右の元の付け根 (5.5, 464.4, 46.8) とその鏡映。
 #    付け根 = 3048 にいちばん近い 3% の点の平均。z 465 mm の断面で左右 5 mm の所の腹面は 56 mm なので体の内側
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import cKDTree
@@ -29,7 +30,7 @@ def place(side,s,dn,loc=None):
     if a2[1]>0: a2=-a2
     return loc[:,0:1]*a1+loc[:,1:2]*a2+loc[:,2:3]*n+bb*np.array([side,1,1])
 D=np.load('derolled2.npy',mmap_mode='r'); body=np.asarray(D[420:560])>-400   # z 420..559
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',14)
+F=hh_paths.font(14)
 def view(parts,kind):
     if kind=='front':
         m=body.any(0); W,H=130,140; img=np.full((H,W,3),255,np.uint8)

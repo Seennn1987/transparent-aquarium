@@ -1,8 +1,9 @@
 # A7f: エラのまわり（最終の座標で 100〜250 mm、左右 ±75 mm、背腹 -25〜60 mm）を 0.5 mm の格子で作る。
 #  小さな塊（100 ボクセル未満）も消さずに入れ、別に「小さな塊だった所」の印も作る（エラの骨のかけらを見るため）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy.ndimage import map_coordinates, binary_dilation
-exec(open('a7_probe.py').read())
+exec(open(hh_paths.script('a7_probe.py')).read())
 z_lo=int(40/0.5); z_hi=int(300/0.5)   # 元の CT の 40〜300 mm
 C=np.array(C[:z_hi]); L=np.asarray(np.load('skel_lab.npy',mmap_mode='r')[:z_hi]); sizes=np.load('skel_sizes.npy')
 DROP={2670,3867,784,827,1341,3064,3149,3077,3067,1546,4513,4302}   # 833（肩帯）は残す

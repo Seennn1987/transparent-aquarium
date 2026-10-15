@@ -1,10 +1,11 @@
 # A4: 頭の幅の案を絵で見せる（背中から。体の外形=薄い灰、骨=濃い灰）
 #  今の CT: 頭の幅 340 mm ÷ 全長 約 1025 mm = 33%。ICCAT の説明は 26〜29%
 #  案の絵は、頭（吻端〜130 mm）の左右の幅だけを縮めた見本（130〜160 mm でなめらかにつなぐ）
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',22); Fs=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',17)
+F=hh_paths.font(22); Fs=hh_paths.font(17)
 D=np.load('derolled7.npy',mmap_mode='r')
 body=np.zeros((1046,300),bool)
 for k in range(0,1046,200):

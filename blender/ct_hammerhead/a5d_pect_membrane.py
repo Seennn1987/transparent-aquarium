@@ -4,10 +4,11 @@
 #  置き方: 写真で、ひれの付け根（胴の縁）の中点から先端への向きを、骨の向き（後ろへ 35°・下へ 15°）に合わせる。
 #         付け根は、骨の付け根から骨の向きに進んで体の膜の外へ出る点から 6 mm 内側（体と重ねる）
 #  厚さ: 付け根 4 mm → 先 1.5 mm。骨（1 ボクセル広げたもの）を必ず膜に含める
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as ndi
 from skimage.measure import marching_cubes
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 VX=0.735; U0,V0=-180.0,-150.0
 d=np.load('photo_pect.npz'); fin=d['L']; L0,R0,L1,R1=d['trunk']
 tl,tr=np.array([326,86.]),np.array([554,66.]); ang=np.arctan2(tr[1]-tl[1],tr[0]-tl[0]); mid=(tl+tr)/2

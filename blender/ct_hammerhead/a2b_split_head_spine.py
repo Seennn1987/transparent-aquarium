@@ -1,7 +1,8 @@
 """A2 の続き: 最大の塊（頭と背骨）を、背骨の中心線から 13 ボクセル以内（断面 195 以降）= 背骨、残り = 頭 に分ける。
 使い方: python3 a2b_split_head_spine.py <作業フォルダ>   出力: m_head.npy, m_spine.npy（np.packbits）"""
+import hh_paths
 import sys, numpy as np
-w = sys.argv[1].rstrip('/') + '/'
+w = (sys.argv[1] if len(sys.argv) > 1 else hh_paths.WORK).rstrip('/') + '/'
 lab = np.load(w + 'skel_lab.npy'); sz = np.load(w + 'skel_sizes.npy'); cxs, cys = np.load(w + 'spine_line.npy')
 axial = int(np.argmax(sz)) + 1
 Z, Y, X = lab.shape; yy, xx = np.mgrid[0:Y, 0:X]

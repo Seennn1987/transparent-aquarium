@@ -2,9 +2,10 @@
 使い方: python3 a3_unroll_preview.py <作業フォルダ>   出力: tilt.npy（断面ごとの倒れ、度）, derolled2.npy, derolled_mips.npy
 倒れ: 吻端 0〜100 mm は 0°（頭の翼が水平）。それより後ろは 20 mm ごとの測定を補間し、約 20 mm でならす。
 注意: 背骨の中心線そのものを一直線にしているので、尾びれの上葉へ上がる背骨の自然な曲がりも消えている（試しの図のため）。"""
+import hh_paths
 import sys, numpy as np
 from scipy.ndimage import gaussian_filter1d, map_coordinates
-w = sys.argv[1].rstrip('/') + '/'
+w = (sys.argv[1] if len(sys.argv) > 1 else hh_paths.WORK).rstrip('/') + '/'
 o = np.load(w + 'arch_angle.npy'); z, a = o[:, 0], o[:, 1]
 cent, vals, prev = [], [], None
 for z0 in range(140, 1000, 20):

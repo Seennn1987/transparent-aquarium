@@ -1,8 +1,9 @@
 # 名前の決まらない塊の断面（全身 CT の元の断面、塊を赤で囲う）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',14)
+F=hh_paths.font(14)
 L=np.load('skel_lab.npy',mmap_mode='r'); C=np.load('zyg_clean.npy',mmap_mode='r'); info=json.load(open('comps_info.json'))
 cxs,cys=np.load('spine_line.npy')
 tiles=[]

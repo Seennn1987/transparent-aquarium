@@ -1,8 +1,9 @@
 # A4: 最終の座標の骨の体積から、マーチングキューブで面を作り、PLY に書く（Blender 座標: x=吻→尾, y=左右, z=背が上。単位 m）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, sys, os
 from skimage.measure import marching_cubes
 VX=0.735; U0,V0=-180.0,-150.0
-OUT=os.path.expanduser('~/mnt/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead/mesh')
+OUT=hh_paths.MESH
 os.makedirs(OUT,exist_ok=True)
 def to_blender(verts_zvu):       # verts in (iz, iv, iu) index units
     z=verts_zvu[:,0]*VX; v=V0+verts_zvu[:,1]*VX; u=U0+verts_zvu[:,2]*VX

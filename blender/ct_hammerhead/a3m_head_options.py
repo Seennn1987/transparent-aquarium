@@ -1,8 +1,9 @@
 # A3 頭の翼の左右差の案（derolled6、z 0〜139 mm。頭の片側の半分を鏡映して反対側に使う。正中は上から見た外形の鏡映で u≈-1 mm、0° に直してある）
 #  測った左右差: 翼の前後の幅（|u|=100 mm）は左 51 mm・右 70 mm。右の翼の先は腹側へ約 15 mm 下がる（z=100 mm、|u|=150 mm で左 v 7〜13、右 25〜32 mm）
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 D=np.load('derolled6.npy',mmap_mode='r'); H=np.asarray(D[0:140]).copy()     # (z, v, u)
 cols=np.arange(300); wingL=cols<150; wingR=cols>=150
 def variant(k):

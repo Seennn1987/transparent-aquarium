@@ -8,6 +8,7 @@
 #    元の肩帯は左右で高さが違う（正中付近 u=±7.5 で v 57 と 50）。背骨(0,0)と肩帯中央(u≈0,v≈53)は
 #    縦に並ぶので、座標の傾きではなく肩帯そのものの変形と判断
 # 座標: derolled2 の (u 左右, z 吻→尾, v 背-/腹+) mm。背骨の中心が u=0,v=0
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 # 2026-10-14: 頭〜胸の倒れの残り（a3l_neck_roll_fix.py）を戻した後の点を使う
@@ -44,7 +45,7 @@ json.dump(meta,open('pect_posed.json','w'),indent=1,ensure_ascii=False); print(m
 
 # ---- 確認図: 前から / 腹側から / 横から（体の輪郭は皮膚の影）----
 D=np.load('derolled6.npy',mmap_mode='r'); sub=np.asarray(D[150:420])>-400   # z 150..419 mm
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
+F=hh_paths.font(15)
 BODY=np.array([225,220,228],np.uint8)
 def sil(mask): return np.where(mask[...,None],BODY,255).astype(np.uint8)
 def view(parts,kind):

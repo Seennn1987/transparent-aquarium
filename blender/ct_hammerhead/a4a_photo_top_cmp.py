@@ -2,11 +2,12 @@
 #  写真: Wikimedia Commons "Sphyrna corona-zygaena compare.jpg"（右の個体が S. zygaena。590×366 px）
 #   暗い画素（輝度 < 90）の行ごとの区間を、ブラウザで画像から読んだもの（ref/noaa_compare_right_runs.txt、行 30〜365、列 300〜565）
 #  合わせ方: 頭の翼の両端 (326,86)・(554,66) を結ぶ線を水平に回し（5.0°）、両端の距離を CT の頭の幅にそろえ、翼の両端の中点を正中・同じ z にそろえる
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',15)
-runs=open('ref/noaa_compare_right_runs.txt').read().strip().split(';')
+F=hh_paths.font(15)
+runs=open(hh_paths.REF+'/noaa_compare_right_runs.txt').read().strip().split(';')
 M=np.zeros((366,590),bool)
 for k,r in enumerate(runs):
     for seg in filter(None,r.split(',')):

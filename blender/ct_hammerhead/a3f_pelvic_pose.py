@@ -2,10 +2,11 @@
 #  - 右の塊（3064+3149+3077）を左右に使い、左は鏡映
 #  - 付け根: 右の元の付け根（3048 にいちばん近い 3% の点の平均）とその鏡映
 # 座標: derolled2 の (u 左右, z 吻→尾, v 背-/腹+) mm。入力 pelvic_uvz.npz（a3e0_pelvic_look.py）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 from scipy.spatial import cKDTree
-exec(open('pelvic_opts.py').read().split("D=np.load('derolled2.npy'")[0])   # right, left, bb, local, place など
+exec(open(hh_paths.script('a3e_pelvic_options.py')).read().split("D=np.load('derolled2.npy'")[0])   # right, left, bb, local, place など
 S_DEG,D_DEG=60,20
 R=place(1,S_DEG,D_DEG); L=place(-1,S_DEG,D_DEG)
 err=float(np.abs(L*[-1,1,1]-R).max())
@@ -17,7 +18,7 @@ meta={'source':'right (3064+3149+3077)','swept_deg':S_DEG,'down_deg':D_DEG,'base
 json.dump(meta,open('pelvic_posed.json','w'),ensure_ascii=False,indent=1); print(meta)
 # 確認図: 前・腹側・横から、いまの CT と決定後
 D=np.load('derolled2.npy',mmap_mode='r'); body=np.asarray(D[420:560])>-400
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',14)
+F=hh_paths.font(14)
 def view(parts,kind):
     if kind=='front':
         m=body.any(0); W,H=130,140; img=np.full((H,W,3),255,np.uint8)

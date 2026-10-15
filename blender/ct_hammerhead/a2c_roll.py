@@ -2,8 +2,9 @@
 使い方: python3 a2c_roll.py <作業フォルダ>   出力: arch_angle.npy（断面, 角度, 画素数, 椎体の半径）
 角度: 断面画像の右 = 0°、真上（背側の台から遠い側）= −90°。
 480 mm より後ろは上下に弓が 2 つ写るので、角度を 2 倍した平均（軸）を出し、前の区間から続く側を背とする。"""
+import hh_paths
 import sys, numpy as np
-w = sys.argv[1].rstrip('/') + '/'
+w = (sys.argv[1] if len(sys.argv) > 1 else hh_paths.WORK).rstrip('/') + '/'
 C = np.load(w + 'zyg_clean.npy', mmap_mode='r'); cxs, cys = np.load(w + 'spine_line.npy')
 out = []
 for z in range(280, 2000, 4):

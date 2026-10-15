@@ -1,4 +1,5 @@
 # 起こした体（derolled4）で、頭の正中線を上から見た外形の鏡映で探す
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from scipy.ndimage import map_coordinates, binary_fill_holes
 D=np.load('derolled4.npy',mmap_mode='r'); H=np.asarray(D[0:140])            # z 0..139 mm, (v,u) 1.47mm

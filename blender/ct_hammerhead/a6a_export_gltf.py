@@ -12,9 +12,12 @@
 CT（Kamminga et al. 2017、figshare、CC0）から作ったので、glb はリポジトリに入れてよい。
 """
 import bpy, bmesh, os
-ROOT = "/Users/shoui/transparent-aquarium/transparent-aquarium"
-MESH = ROOT + "/blender/ct_hammerhead/mesh"
-OUT = ROOT + "/水槽/scenes/specimen/assets/specimen_hammerhead.glb"
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.environ.get("HH_SCRIPTS", "/Users/shoui/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead"))
+import hh_paths
+ROOT = hh_paths.ROOT
+MESH = hh_paths.MESH
+OUT = hh_paths.GLB
 PARTS = {
     "Bone": (["HH_bone"], 60000),
     "Cartilage": (["HH_skel_rest", "HH_girdle", "HH_pect_L", "HH_pect_R", "HH_pelv_L", "HH_pelv_R", "HH_dfin1", "HH_dfin2", "HH_anal"], 110000),
@@ -24,8 +27,7 @@ PARTS = {
     "Gill": (["HH_hyoid", "HH_gill"], 60000),
     "Skin": (["HH_body", "HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R"], 160000),
 }
-sc = bpy.data.scenes.get("HH_EXPORT") or bpy.data.scenes.new("HH_EXPORT")
-bpy.context.window.scene = sc
+sc = hh_paths.blender_scene("HH_EXPORT")
 coll = bpy.data.collections.get("HH_EXPORT")
 if coll is None:
     coll = bpy.data.collections.new("HH_EXPORT"); sc.collection.children.link(coll)

@@ -24,3 +24,5 @@ docs/references/hammerhead/*.jpg
 blender/ct_hammerhead/mesh/
 # シュモクザメ: CT 処理の中間ファイル（数百 MB〜1 GB）
 blender/ct_hammerhead/work/
+# シュモクザメ: 作り直しの検算（work/ の複製と作り直した中間ファイル）
+blender/ct_hammerhead/rebuild/

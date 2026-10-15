@@ -1,6 +1,7 @@
 # A7b: 顎のまわりの細かい体積を、頭骨・上あご（口蓋方形軟骨）・下あご（メッケル軟骨）・舌の弓・歯に分ける。
 #  断面を見て置いた種（左側 u<0 の座標。右は鏡映）から、骨の殻の中を流し込んで分ける（watershed、平らな像＝殻に沿った距離）。
 #  歯（800 HU 超）は殻どうしをつなぐので先に外し、あとで近い顎に付ける
+import hh_paths; hh_paths.cd_work()
 import numpy as np, matplotlib, sys; matplotlib.use('Agg'); import matplotlib.pyplot as plt
 from scipy import ndimage as nd
 from skimage.segmentation import watershed

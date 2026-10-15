@@ -2,6 +2,7 @@
 #  derolled2 は背骨の中心線を一直線にそろえたため、尾びれへ上がる背骨の曲がりも消えた。
 #  尾びれの起点の手前（700 mm）から後ろだけ、背骨の背腹方向のずれ（胴の直線から測る）を残し、左右のずれだけ消す。
 #  700 mm より前は derolled2 と同じ（ひれの座標 c833_uvz などはそのまま使える）
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy.ndimage import map_coordinates, gaussian_filter1d
 C=np.load('zyg_clean.npy',mmap_mode='r'); cxs,cys=np.load('spine_line.npy'); t=np.load('tilt_sym.npy')

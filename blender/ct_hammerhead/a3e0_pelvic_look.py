@@ -1,4 +1,5 @@
 # A3 腹びれの所の塊を、起こした座標（u,z,v mm）に移して見る
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from PIL import Image, ImageDraw, ImageFont
 L=np.load('skel_lab.npy',mmap_mode='r'); cxs,cys=np.load('spine_line.npy'); t=np.load('tilt_sym.npy')
@@ -12,7 +13,7 @@ for i in IDS:
     pts[i]=P.astype(np.float32)
 np.savez('pelvic_uvz.npz',**{str(k):v for k,v in pts.items()})
 D=np.load('derolled2.npy',mmap_mode='r'); body=np.asarray(D[440:540])>-400
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',14)
+F=hh_paths.font(14)
 COL={3067:(220,60,60),3064:(40,110,220),3149:(30,170,200),3048:(230,150,20),3077:(150,60,200),3061:(60,160,60),3515:(120,120,0),4:(90,90,90)}
 def view(kind):
     if kind=='front':

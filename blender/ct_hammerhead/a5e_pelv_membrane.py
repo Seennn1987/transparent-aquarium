@@ -1,9 +1,10 @@
 # A5 腹びれの膜（仮）: 出典のある写真がまだ無いので、決めた向きの腹びれの骨の形を、板の面の中で 5 mm 広げた膜にする
 #  厚さ 3 mm（付け根）→ 1.5 mm（先）。右を作り、左は鏡映
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as ndi
 from skimage.measure import marching_cubes
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 VX=0.735; U0,V0=-180.0,-150.0
 P=np.load('pelvic_posed.npz')['right'].astype(float)          # (u,z,v)
 c=P.mean(0); w,Vv=np.linalg.eigh(np.cov((P-c).T)); e1,e2,nrm=Vv[:,2],Vv[:,1],Vv[:,0]

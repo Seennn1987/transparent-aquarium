@@ -1,4 +1,5 @@
 # A3 尾: 背骨の線でまっすぐにせず、胴の直線（z 200〜800 mm の背骨の線に合わせた直線）を中心に起こして見る
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from scipy.ndimage import map_coordinates
 from PIL import Image, ImageDraw, ImageFont
@@ -17,7 +18,7 @@ def img(a,b):
     g=np.clip((a.astype(float)-0)/600,0,1); rgb=np.where(b[...,None],np.array([225,220,228]),255).astype(float)
     rgb=rgb*(1-g[...,None])+np.array([30,30,30])*g[...,None]
     return Image.fromarray(rgb.astype(np.uint8).transpose(1,0,2))   # 横=z（左が吻）, 縦=v または u
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',14)
+F=hh_paths.font(14)
 a=img(side,bside); b=img(top,btop); W,H=a.width*2,a.height*2
 S=Image.new('RGB',(W+10,2*H+80),(255,255,255)); d=ImageDraw.Draw(S)
 S.paste(a.resize((W,H),Image.NEAREST),(0,22)); S.paste(b.resize((W,H),Image.NEAREST),(0,H+60))

@@ -1,11 +1,12 @@
 # 頭の幅を全長の 26% に決めた後の、胴の幅の案（背中から。体の外形=薄い灰、骨=濃い灰）
 #  頭（〜130 mm）は左右を 0.784 倍（340→266 mm）。胴（160 mm〜）は左右を k 倍。130〜160 mm はなめらかにつなぐ
 #  骨は広げない（頭の骨だけ 0.784 倍）
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
-exec(open('a4_headwidth_opts.py').read().split("TL=1025.0")[0])        # body, bone を作る部分だけ流用
-F=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',22); Fs=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',17)
+exec(open(hh_paths.script('a4h_headwidth_options.py')).read().split("TL=1025.0")[0])        # body, bone を作る部分だけ流用
+F=hh_paths.font(22); Fs=hh_paths.font(17)
 FH=266.0/340.0
 def prof(k):
     z=np.arange(1046.); w=np.clip((z-130)/30,0,1); w=w*w*(3-2*w); return FH*(1-w)+k*w

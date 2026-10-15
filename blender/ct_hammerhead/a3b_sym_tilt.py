@@ -1,9 +1,10 @@
 """A3: 体の倒れを、断面の外形の左右対称で測り直す（神経弓の値 tilt.npy の ±35° の範囲で探す）。
 使い方: python3 a3b_sym_tilt.py <作業フォルダ>   出力: sym_tilt.npy（mm, 角度, 重なり, 神経弓の値）, tilt_sym.npy, derolled2.npy, derolled_mips.npy
 断面を、背骨を通る軸で鏡に映し、元の断面と最もよく重なる軸を背腹の軸とする。楕円は 2 本の軸で対称になるので、神経弓の値に近い方だけを探す。"""
+import hh_paths
 import sys, numpy as np
 from scipy.ndimage import map_coordinates, gaussian_filter1d
-w = sys.argv[1].rstrip('/') + '/'
+w = (sys.argv[1] if len(sys.argv) > 1 else hh_paths.WORK).rstrip('/') + '/'
 C = np.load(w + 'zyg_clean.npy', mmap_mode='r'); cxs, cys = np.load(w + 'spine_line.npy'); t0 = np.load(w + 'tilt.npy')
 R = 70; u, v = np.meshgrid(np.arange(-R, R + 1), np.arange(-R, R + 1)); res = []
 for mm in range(100, 1000, 10):

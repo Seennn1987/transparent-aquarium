@@ -2,6 +2,7 @@
 #  断面の外形の左右対称（neck_roll2.json, ±30° を 2° 刻み）で、175〜200 mm は +16°、205〜250 mm は +4〜+10°、260 mm 以降は 0〜−4°。
 #  150〜160 mm は答えが探す範囲の端（±30°）に張り付き、決まらない（頭の平たい断面から胴の縦長の断面へ移る所）。
 #  戻す量: 145 mm まで 0、170 mm で 16° まで上げ、200 mm まで 16°、そこから測った値に沿って 260 mm で 0。5 mm で平滑
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as ndi
 from scipy.ndimage import gaussian_filter1d

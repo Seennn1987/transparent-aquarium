@@ -1,11 +1,12 @@
 # A7c: 口を開く。下あご（メッケル軟骨）と下の歯を、顎の関節（上あごと下あごがいちばん近づく後ろの端、左右 2 点）を
 #  通る軸のまわりに回す。体の膜（a5_S）は、いちばん近い骨が下あごである所を同じように回し、上と下の間を口として空ける。
 #  使い方: python3 a7c_open_mesh.py <角度°> [mesh]   出力: a7_open.json、a5_S_open.npy、mesh/HH_jaw_*.ply ほか
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json, sys, os
 from scipy import ndimage as nd
 from scipy.spatial import cKDTree
 from skimage.measure import marching_cubes
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 ANG=float(sys.argv[1]); DO_MESH='mesh' in sys.argv
 d=np.load('a7_jaw_fine.npz'); Ff=d['field']; o=d['origin']; G=float(d['step']); W=np.load('a7_jawlab.npy')
 def f2mm(ix):  # (iz,iv,iu) -> (z,u,v) mm

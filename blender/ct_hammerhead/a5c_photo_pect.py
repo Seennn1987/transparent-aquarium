@@ -1,7 +1,8 @@
 # 写真（NOAA、背中から）の右の個体の胸びれの外形を取り出す
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json
 from scipy import ndimage as ndi
-runs=open('ref/noaa_compare_right_runs.txt').read().strip().split(';')
+runs=open(hh_paths.REF+'/noaa_compare_right_runs.txt').read().strip().split(';')
 M=np.zeros((366,590),bool)
 for k,r in enumerate(runs):
     for seg in filter(None,r.split(',')):

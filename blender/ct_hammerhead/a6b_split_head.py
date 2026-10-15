@@ -1,10 +1,11 @@
 # A6: 骨格の面（HH_skeleton.ply）を、頭の軟骨（頭骨・顎・鰓弓。吻端から 200 mm より前に重心がある塊）と、
 #  それ以外（ひれの骨・肩帯・尾の骨など）に分ける。参考の胚（Eames et al. 2007 Fig. 2A）では、頭の軟骨は
 #  ひれの放射軟骨よりずっと濃く緑がかった青で、1 つの色の吸い方では両方を出せないため（計画書 第 9 節 A6）
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-exec(open('a4_mesh.py').read().split("which=sys.argv[1]")[0])
+exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 def load(p):
     f=open(p,'rb'); h=b''
     while not h.endswith(b'end_header\n'): h+=f.read(1)

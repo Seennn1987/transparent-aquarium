@@ -5,6 +5,7 @@
 #              → 尾の背腹のずれ（tail_keep） → 体を起こす（derolled2：倒れ tilt_sym と背骨の線 spine_line）
 #  骨にしない塊: 表面の線（2670, 3867, 784, 827）、姿勢を決め直したひれの元（833, 1341, 3064, 3149, 3077, 3067）、
 #               100 ボクセル未満の小さな塊。ひれは決定後の点（pect_posed, pelvic_posed）から別の体積にする
+import hh_paths; hh_paths.cd_work()
 import numpy as np, json, sys, time
 from scipy.ndimage import map_coordinates, binary_dilation, gaussian_filter
 VX=0.735; Z0,Z1=0.0,1046.0; U0,U1=-180.0,180.0; V0,V1=-150.0,120.0

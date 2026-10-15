@@ -1,4 +1,5 @@
 # A4: 決定後の胸びれ・肩帯・腹びれの点（u, z, v mm）を、最終の座標の 0.735 mm 格子に置き、なめらかな値の体積にする
+import hh_paths; hh_paths.cd_work()
 import numpy as np
 from scipy.ndimage import binary_closing, gaussian_filter
 VX=0.735; U0,V0=-180.0,-150.0; NZ,NV,NU=1423,367,489
