@@ -97,6 +97,19 @@ async function start() {
   if (swim && query.get("pick") === "turnbend") turnBendPicker();
   if (swim && query.get("pick") === "mouth") mouthPicker();
   if (swim && query.get("pick") === "organs") organPicker();
+  // ?pick=look: 頭の幅（glb を読み直す）とエラの骨の色（?gillbone= ?gillcart=）の案（2026-10-15、プロデューサー「鰓骨の色が他の色対比で濃すぎないでしょうか？」
+  //  「頭の大きさが体のサイズに比べて小さくないでしょうか？」）。頭の幅の案の glb は試しのページだけに置く
+  if (query.get("pick") === "look") {
+    const reload = (set) => { const q = new URLSearchParams(location.search); set(q); location.search = q.toString(); };
+    const head = { specimen_hammerhead: 26, specimen_hammerhead_h29: 29, specimen_hammerhead_h33: 33 }[GLB_NAME] ?? 26;
+    const gill = `${query.get("gillbone") ?? 1.67},${query.get("gillcart") ?? 1.518}`;
+    pickerPanel([
+      ["頭の幅", [["全長の 26%（いま）", 26], ["29%", 29], ["33%（CT の個体）", 33]], () => head,
+        (v) => reload((q) => { if (v === 26) q.delete("glb"); else q.set("glb", `specimen_hammerhead_h${v}`); })],
+      ["エラの骨", [["濃い紺（いま）", "1.67,1.518"], ["半分", "0.84,0.76"], ["顎に近い淡い青", "0,0.5"], ["青緑", "0,1"]], () => gill,
+        (v) => reload((q) => { const [b, c] = v.split(","); if (v === "1.67,1.518") { q.delete("gillbone"); q.delete("gillcart"); } else { q.set("gillbone", b); q.set("gillcart", c); } })],
+    ], "頭の幅: 資料（ICCAT）では全長の 26〜29%、CT の個体は 33%。胴の幅（102 mm）は変えず、頭だけ広げる。エラの骨: いまは胚の鰓弓の濃い紺。鰓条の縞も同じ色に合わせて変わる");
+  }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
     ["胴の色", [["A 前の色", "A"], ["B 胴の真ん中", "B"], ["C 胴全体", "C"], ["D 胴全体（画面で合わせる、決定）", "D"]], () => query.get("tissue") ?? "D",

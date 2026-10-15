@@ -5,7 +5,7 @@
 #              → 尾の背腹のずれ（tail_keep） → 体を起こす（derolled2：倒れ tilt_sym と背骨の線 spine_line）
 #  骨にしない塊: 表面の線（2670, 3867, 784, 827）、姿勢を決め直したひれの元（833, 1341, 3064, 3149, 3077, 3067）、
 #               100 ボクセル未満の小さな塊。ひれは決定後の点（pect_posed, pelvic_posed）から別の体積にする
-import hh_paths; hh_paths.cd_work()
+import hh_paths, os; hh_paths.cd_work()
 import numpy as np, json, sys, time
 from scipy.ndimage import map_coordinates, binary_dilation, gaussian_filter
 VX=0.735; Z0,Z1=0.0,1046.0; U0,U1=-180.0,180.0; V0,V1=-150.0,120.0
@@ -22,7 +22,7 @@ from scipy.ndimage import binary_dilation as _bd
 for z0 in range(0,C.shape[0],200):
     Lb=np.asarray(L[max(z0-1,0):z0+201]); bad=(Lb>0)&(~okl[Lb]); bad=_bd(bad)
     sl=slice(max(z0-1,0),z0+201); cb=C[sl]; cb[bad&(cb>-200)]=-200; C[sl]=cb
-HEAD_SCALE=266.0/340.0   # 2026-10-14 プロデューサー決定: 頭の幅を全長の 26%（340→266 mm）。頭（〜130 mm）の左右だけを縮め、130〜160 mm でなめらかにつなぐ
+HEAD_SCALE=float(os.environ.get("HH_HEAD_MM",266.0))/340.0   # 2026-10-14 プロデューサー決定: 頭の幅を全長の 26%（340→266 mm）。頭（〜130 mm）の左右だけを縮め、130〜160 mm でなめらかにつなぐ。HH_HEAD_MM で案（2026-10-15、プロデューサー「頭の大きさが体のサイズに比べて小さくないでしょうか？」）
 # 2026-10-14 直し: 頭の幅の決定は翼のこと。正中から 45 mm までの中央（頭骨の中央・顎・歯）は縮めず、
 #  45〜60 mm で縮め方をなめらかに変え、その外の翼だけを縮める（片側 170 → 133 mm は前と同じ）。前は顎も 26% 細くなっていた
 HS_A,HS_B,HS_HALF=45.0,15.0,170.0

@@ -70,6 +70,9 @@ export const HH_CARTILAGE_GAIN = 408;
 export const HH_HEAD_GAIN = 1014;  // 2026-10-15 780 → 1014（上の注）
 export const HH_SKIN_GAIN = TISSUE_STAIN?.gain ?? 7.0;
 
+const GILL_Q = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
+const GILL_BONE = Number(GILL_Q.get("gillbone") ?? 1.67), GILL_CART = Number(GILL_Q.get("gillcart") ?? 1.518);
+const GILL_RAY = [0, 1, 2].map((i) => +((HH_BONE_GAIN * GILL_BONE * HH_BONE_SPECTRUM[i] + HH_CARTILAGE_GAIN * GILL_CART * HH_CARTILAGE_SPECTRUM[i]) * 0.0005).toFixed(4));
 STAINS.hammerhead = {
   lightbox: HH_LIGHTBOX,
   bone: { spectrum: HH_BONE_SPECTRUM, gain: HH_BONE_GAIN },
@@ -84,5 +87,6 @@ STAINS.hammerhead = {
   // A8 鰓条（hammerhead-material.js の gillRayMaterial）: エラの骨の色（骨 1.67・軟骨 1.518 の重み）の 0.5 mm 分を 1 回横切るごとに
   //  （骨 166 × 1.67 × (0.37, 1, 0.28) + 軟骨 408 × 1.518 × (1, 0.01, 0.04)、/m → × 0.0005）
   // まだらの色は体の組織の色（案で変わる）に合わせる。いま（A）では前と同じ 0.42 / 0.74 / 1 × 0.12
-  organs: { mottle: HH_SKIN_SPECTRUM.map((v) => v * 0.12), gillray: [0.361, 0.142, 0.051] },
+  // 鰓条の色はエラの骨の色の混ぜ方（hammerhead-material.js の GILL_MIX、?gillbone= ?gillcart=）に合わせる（2026-10-15。既定の 1.67・1.518 で前と同じ 0.361 / 0.142 / 0.051）
+  organs: { mottle: HH_SKIN_SPECTRUM.map((v) => v * 0.12), gillray: GILL_RAY },
 };
