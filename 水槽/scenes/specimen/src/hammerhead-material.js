@@ -19,27 +19,30 @@ const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth")
 
 const ASYM_GLSL = `
 // A8 左右差（2026-10-15）: 鏡映で作った左右を、左側（glTF の z > 0。z = −u）だけ決まった量なめらかに曲げる。すべての部品で同じ式なので、
-//  骨・膜・皮歯・まだらはずれない。強さ asym（?asym=、既定 0）が 1 のとき:
+//  骨・膜・皮歯・まだらはずれない。量は翼の先 asymWingMM（?asymwing=）とひれ asymFinDeg（?asymfin=）、まとめた強さ asym（?asym=）が 1 のとき:
 //   頭の翼: 左の翼の先を背側へ 3 mm 上げる（CT では左の翼の先が右より約 15 mm 高かった、計画書 第 9 節 A3。その 2 割）
 //   左の胸びれ: 付け根（吻端 232.7 mm、左右 17.9、背腹 38.6）を中心に、背腹の軸のまわりに 4° 後ろへ寝かせる（推定）
 //   左の腹びれ: 付け根（464.4、5.5、46.8）を中心に 4° 前へ起こす（推定）
 uniform float asym;
+uniform float asymWingMM;
+uniform float asymFinDeg;
 vec3 swingY(vec3 p, vec3 c, float a) {   // c を中心に、背腹の軸（y）のまわりに a ラジアン。+ で外の点が後ろ（+x）へ
   vec3 d = p - c; float cs = cos(a), sn = sin(a);
   return c + vec3(d.x * cs + d.z * sn, d.y, -d.x * sn + d.z * cs);
 }
 vec3 asymWarp(vec3 p) {
-  if (asym == 0.) return p;
+  float wingMM = asymWingMM + 3. * asym, finDeg = asymFinDeg + 4. * asym;
+  if (wingMM == 0. && finDeg == 0.) return p;
   float side = smoothstep(.0, .012, p.z);
   float wing = side * smoothstep(.05, .15, p.z) * (1. - smoothstep(.12, .16, p.x));
-  p.y += asym * .003 * wing;
+  p.y += wingMM * .001 * wing;
   vec3 cp = vec3(.2327, -.0386, .0179);
   // 胴の表面（正中から約 50 mm）より外のひれだけを回す（中まで回すと胴の横腹が最大 7 mm 内側へずれた）
   float wp = side * smoothstep(.05, .065, p.z) * (1. - smoothstep(.33, .37, p.x)) * smoothstep(.16, .19, p.x);
-  p = mix(p, swingY(p, cp, radians(4.) * asym), wp);
+  p = mix(p, swingY(p, cp, radians(finDeg)), wp);
   vec3 cv = vec3(.4644, -.0468, .0055);
   float wv = side * smoothstep(.035, .05, p.z) * (1. - smoothstep(.54, .57, p.x)) * smoothstep(.43, .45, p.x) * (1. - smoothstep(-.045, -.035, p.y));
-  p = mix(p, swingY(p, cv, -radians(4.) * asym), wv);
+  p = mix(p, swingY(p, cv, -radians(finDeg)), wv);
   return p;
 }
 `;
@@ -71,7 +74,8 @@ const ADD = {
 //  点は、体の座標（glb のメートル）の 3 次元の格子のそれぞれの箱に 1 つ、決まった乱数でずらして置く（毎回同じ）。
 //  膜の表面を横切るたびに、点の上なら 1 / |cos|（表面と視線の角）を足す。強さは ?dent=（既定 1、2026-10-15 決定）、間隔は ?dentcell= mm（既定 1.2）
 const DENT_Q = new URLSearchParams(location.search);
-export const asymLook = { amount: { value: Number(DENT_Q.get("asym") ?? 0) } };   // A8 左右差の強さ（ASYM_GLSL）
+// A8 左右差（ASYM_GLSL）: 翼の先の高さ ?asymwing= mm、ひれの角度 ?asymfin= °（2026-10-15 に分けた）。?asym= は両方をまとめて（1 で 3 mm・4°）
+export const asymLook = { amount: { value: Number(DENT_Q.get("asym") ?? 0) }, wingMM: { value: Number(DENT_Q.get("asymwing") ?? 0) }, finDeg: { value: Number(DENT_Q.get("asymfin") ?? 0) } };
 export const denticleLook = {
   cell: { value: Number(DENT_Q.get("dentcell") ?? 1.2) / 1000 },
   radius: { value: Number(DENT_Q.get("dentsize") ?? 0.28) },   // 点の半径 ÷ 間隔
@@ -111,7 +115,7 @@ void main() {
 }`;
 function denticleMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { cell: denticleLook.cell, radius: denticleLook.radius, filmMinCos: { value: 0.2 }, asym: asymLook.amount },
+    uniforms: { cell: denticleLook.cell, radius: denticleLook.radius, filmMinCos: { value: 0.2 }, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: denticleFragment, ...ADD,
   });
 }
@@ -144,7 +148,7 @@ void main() {
 }`;
 function mottleMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { cell: mottleLook.cell, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount },
+    uniforms: { cell: mottleLook.cell, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: mottleFragment, ...ADD,
   });
 }
@@ -159,7 +163,7 @@ export function applyHammerheadTissue(model, reference) {
     o.frustumCulled = false;
     const channel = new THREE.Vector4(0, 0, 0, 0);
     if (Array.isArray(CHANNEL[part])) channel.set(...CHANNEL[part]); else channel.setComponent(CHANNEL[part], WEIGHT[part] ?? 1);
-    o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
     o.userData.pathMaterial = o.material;
     if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
   });
