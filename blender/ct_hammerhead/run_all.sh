@@ -87,7 +87,7 @@ step py a5e_pelv_membrane.py
 # A7 顎・歯・舌の弓（口は 25° 開く。2026-10-15 プロデューサー決定）、エラの骨
 step py a7a_jaw_fine.py
 step py a7b_jaw_seg.py
-step py a7c_open_mesh.py ${HH_MOUTH_DEG:-25} mesh   # 口の開き（2026-10-15 決定 25°。HH_MOUTH_DEG で案を作る）
+step py a7c_open_mesh.py ${HH_MOUTH_DEG:-15} mesh   # 口の開き（2026-10-15 決定 15°、前は 25°。HH_MOUTH_DEG で案を作る）
 step py a5a_mesh.py a5_S_open.npy
 step py a7d_skel_mesh.py
 step py a6b_split_head.py

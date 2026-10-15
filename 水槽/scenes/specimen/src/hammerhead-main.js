@@ -126,12 +126,13 @@ function pickerPanel(rows, noteText) {
   const note = document.createElement("div"); note.style.cssText = "font-size:12px;color:#666;max-width:28em"; note.textContent = noteText;
   box.append(note); document.body.append(box);
 }
-// ?pick=mouth: 口の開け閉めの振れと回数の案を、動かしたまま切り替える（B5）
+// ?pick=mouth: 口の休みの開き・開け閉めの振れと回数の案を、動かしたまま切り替える（B5）
 function mouthPicker() {
-  const base = { specimen_hammerhead: 25, specimen_hammerhead_m20: 20, specimen_hammerhead_m15: 15 }[GLB_NAME] ?? 25;
+  // 休みの開きの既定は 15°（2026-10-15 プロデューサー決定）。25°・20° は試しのページにだけ置いた案の glb
+  const base = { specimen_hammerhead: 15, specimen_hammerhead_m20: 20, specimen_hammerhead_m25: 25 }[GLB_NAME] ?? 15;
   pickerPanel([
-    ["休みの開き", [["25°", 25], ["20°", 20], ["15°", 15]], () => base, (v) => {
-      const q = new URLSearchParams(location.search); if (v === 25) q.delete("glb"); else q.set("glb", `specimen_hammerhead_m${v}`);
+    ["休みの開き", [["15°", 15], ["20°", 20], ["25°", 25]], () => base, (v) => {
+      const q = new URLSearchParams(location.search); if (v === 15) q.delete("glb"); else q.set("glb", `specimen_hammerhead_m${v}`);
       location.search = q.toString();   // 開きの違う glb を読み直す
     }],
     ["口の振れ", [["0°", 0], ["±2°", 2], ["±3°", 3], ["±5°", 5]], () => mouthLook.deg, (v) => { mouthLook.deg = v; }],
