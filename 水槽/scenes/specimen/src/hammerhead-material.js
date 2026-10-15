@@ -41,7 +41,7 @@ const ADD = {
 //  胚（Eames et al. 2007 Fig. 2A・2E）では皮歯はアリザリンで赤紫に染まり、体の表面に点として並ぶ。シロシュモクザメの皮歯の
 //  大きさの数は見つかっていない（一般に 1 mm よりずっと小さい）ので、点の間隔は画面で見える最小として決めた（出典なし、2026-10-15）。
 //  点は、体の座標（glb のメートル）の 3 次元の格子のそれぞれの箱に 1 つ、決まった乱数でずらして置く（毎回同じ）。
-//  膜の表面を横切るたびに、点の上なら 1 / |cos|（表面と視線の角）を足す。強さは ?dent=（既定 0）、間隔は ?dentcell= mm（既定 1.2）
+//  膜の表面を横切るたびに、点の上なら 1 / |cos|（表面と視線の角）を足す。強さは ?dent=（既定 1、2026-10-15 決定）、間隔は ?dentcell= mm（既定 1.2）
 const DENT_Q = new URLSearchParams(location.search);
 export const denticleLook = {
   cell: { value: Number(DENT_Q.get("dentcell") ?? 1.2) / 1000 },
