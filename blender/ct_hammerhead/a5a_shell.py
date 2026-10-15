@@ -69,17 +69,29 @@ def kfac(z):
 #  写真では頭のすぐ後ろから胸びれの前まで胴の幅がほぼ一定なので、120〜250 mm はこの幅に合わせ、
 #  250 mm より後ろは CT の幅の 1.55 倍（250 mm で目標とほぼ同じ）、720〜780 mm で 1 倍へ戻す
 TW=266.0/2.6
+import os as _os
 ct_w=np.array([np.interp(0,np.degrees(TH),Rs[i])+np.interp(180,np.degrees(TH),Rs[i]) for i in range(len(zs))])
+# 2026-10-15 決定: 胴の幅を、背骨の高さの幅でなく断面のいちばん広い所の幅（上から見た幅）で測る（既定。前のやり方は HH_TRUNK_WIDTH=spine）。
+#  背骨の高さの幅で倍率を決めると、頭のすぐ後ろ（124〜156 mm）の平たい断面では背骨より腹側の広い所まで広がり、上から見た幅が
+#  決めた 102 mm を超えて 125 mm になっていた（計画書 第 9 節 A7「頭のすぐ後ろの出っ張り」）
+if _os.environ.get('HH_TRUNK_WIDTH', 'max') == 'max':
+    ct_w=np.array([max(0,(Rs[i]*np.cos(TH)).max())+max(0,(-Rs[i]*np.cos(TH)).max()) for i in range(len(zs))])
 def kfac(z):
     if z<115: return 1.0
     w=np.interp(z,zmm,ct_w)
     if z<=250:
         a=np.clip((z-115)/10,0,1)
-        return 1.0*(1-a)+a*np.clip(TW/max(w,1),1.0,1.6)
+        return 1.0*(1-a)+a*np.clip(TW/max(w,1),float(_os.environ.get('HH_TRUNK_KMIN','1.0')),1.6)   # HH_TRUNK_KMIN: 狭める下限（既定 1.0。2026-10-15 に 0.9 を試し、効かなかった）
     if z<=720: return 1.55
     if z<=780: return 1.55-0.55*(z-720)/60
     return 1.0
 _zk=np.arange(0,1046,1.0); _K=np.array([kfac(z) for z in _zk]); _K=ndi.gaussian_filter1d(_K,8)   # 体軸方向にならす（8 mm）
+if _os.environ.get('HH_TRUNK_WIDTH', 'max') == 'max':
+    # 2026-10-15 決定: ならした倍率が、決めた幅 ÷ その位置の幅 を超えないように抑える（120〜250 mm）。後ろの倍率 1.6 がならしで前へ
+    #  染み出し、144〜152 mm の幅が 109 mm になっていた
+    _cap=TW/np.maximum(np.interp(_zk,zmm,ct_w),1); _in=(_zk>=125)&(_zk<=250)
+    _K[_in]=np.minimum(_K[_in],np.maximum(_cap[_in],1.0))
+    _K=np.where(_zk<120,_K,ndi.gaussian_filter1d(_K,2))   # 段を消す（2 mm）
 kfac_raw=kfac
 def kfac(z): return float(np.interp(z,_zk,_K))
 if STAGE=='2':
