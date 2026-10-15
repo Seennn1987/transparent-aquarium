@@ -1,8 +1,9 @@
 // 案を動かしたまま切り替えるボタンの欄（シュモクザメの標本ページとギャラリーで使う、2026-10-15）。
+// ギャラリーでは上の帯（nav.chrome）が重なってボタンが押せなかったので、z-index で上に出す（2026-10-15）
 // rows: [見出し, [[ボタンの文字, 値], ...], 今の値を返す関数, 値を決める関数]。noteText: 下の説明
 export function pickerPanel(rows, noteText) {
   const box = document.createElement("div");
-  box.style.cssText = "position:fixed;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;font:14px/1.3 system-ui,sans-serif;color:#333;background:rgba(255,255,255,.85);padding:10px 12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15)";
+  box.style.cssText = "position:fixed;z-index:1000;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;font:14px/1.3 system-ui,sans-serif;color:#333;background:rgba(255,255,255,.85);padding:10px 12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15)";
   for (const [title, items, get, set] of rows) {
     const r = document.createElement("div"); r.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap";
     const t = document.createElement("span"); t.textContent = title; t.style.minWidth = "5.5em"; r.append(t);
