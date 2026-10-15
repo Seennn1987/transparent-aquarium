@@ -112,7 +112,7 @@ if os.environ.get("HH_RIG_TEST") == "1":
         ang = np.arctan(np.gradient(y, s))
         # 旋回（HH_RIG_TURN、+ で体の右へ）: 体が自分の通り道の円（半径 0.374 L、Hoffmann & Porter 2019 のボンネットヘッドのふだんの旋回）に
         #  沿うとして、向きの角を吻端からの長さに比例して足す（推定）
-        ang = ang + TURN * float(os.environ.get("HH_RIG_TURNBEND", 1)) * np.maximum(s - centers[0] / 1000, 0) / (0.374 * L)   # 首（頭の骨だけの終わり）から曲げる。HH_RIG_TURNBEND: 体の曲げの割合（試し）
+        ang = ang + TURN * float(os.environ.get("HH_RIG_TURNBEND", 0.5)) * np.maximum(s - centers[0] / 1000, 0) / (0.374 * L)   # 首（頭の骨だけの終わり）から曲げる。HH_RIG_TURNBEND: 体の曲げの割合（既定 0.5、2026-10-15 決定。1 でも膜は 1.40 倍まで）
         prev_world = 0.0
         for nm in names:
             pb = arm.pose.bones[nm]; bone = pb.bone

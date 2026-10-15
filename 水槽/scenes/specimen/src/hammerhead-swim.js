@@ -22,7 +22,7 @@ export const swimLook = {
   wavelength: Number(Q.get("wave") ?? 0.91),
   phase: Q.has("phase") ? Number(Q.get("phase")) : null,
   turn: Number(Q.get("turn") ?? 0),
-  turnBend: Number(Q.get("turnbend") ?? 1),   // 旋回で体を曲げる割合（1 で通り道の円に沿う。推定なので案を見比べるため）
+  turnBend: Number(Q.get("turnbend") ?? 0.5),   // 旋回で体を曲げる割合（1 で通り道の円に沿う、推定）。既定 0.5（2026-10-15 プロデューサー「旋回の体の曲げは 0.5 にしてください」）
 };
 const NECK = 0.125, TURN_R = 0.374;   // 首（頭の骨だけの終わり、m）、旋回の半径（L）
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
