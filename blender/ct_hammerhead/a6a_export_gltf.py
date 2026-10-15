@@ -44,7 +44,9 @@ if os.path.exists(f"{MESH}/HH_vert_arches.ply"):
         PARTS["Arch"] = (["HH_vert_arches"], 20000)
     else:
         PARTS["Cartilage"] = (PARTS["Cartilage"][0] + ["HH_vert_arches"], 130000)
-for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000)):   # 案 2（a8b_viscera_organs.py）
+for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000),   # 案 2（a8b_viscera_organs.py）
+                   # B5 心臓（推定、b5b_heart.py）。HeartLarge・HeartSmall は見比べの案（試しの glb だけ）
+                   ("Heart", "HH_heart", 20000), ("HeartLarge", "HH_heart_large", 20000), ("HeartSmall", "HH_heart_small", 20000)):
     if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 sc = hh_paths.blender_scene("HH_EXPORT")
 coll = bpy.data.collections.get("HH_EXPORT")
@@ -68,6 +70,7 @@ for part, (names, target) in PARTS.items():
     bpy.context.view_layer.objects.active = objs[0]
     if len(objs) > 1: bpy.ops.object.join()
     ob = bpy.context.view_layer.objects.active; ob.name = f"HH_{part}"; ob.data.name = f"HH_{part}"
+    if part.startswith("Heart"): ob.name = f"HH_{part}_推定"   # CT に無く、図から作った部品（CLAUDE.md）
     bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6); bm.to_mesh(ob.data); bm.free()
     n0 = len(ob.data.polygons)
     if n0 > target:

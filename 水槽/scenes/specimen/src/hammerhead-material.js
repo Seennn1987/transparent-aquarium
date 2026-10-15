@@ -18,7 +18,9 @@ const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE
   // 案 H: ?centrumbone= ?archbone= で骨の色（アリザリン）を混ぜる（胚の 15 cm では軟骨の多くも表面がアリザリンで染まる、計画書 第 8.3 節）
   Centrum: [Number(new URLSearchParams(location.search).get("centrumbone") ?? 0.1), Number(new URLSearchParams(location.search).get("centrum") ?? 0.02), 0, 0],   // 既定 骨 0.1・軟骨 0.02（2026-10-15 プロデューサー決定「H1」）
   Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0.3), Number(new URLSearchParams(location.search).get("arch") ?? 0.08), 0, 0] };   // 既定 骨 0.3・軟骨 0.08（同「H1」）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
-const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch"]);   // 2026-10-15 前の glb には無い
+const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（推定、b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
+for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描く
+const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", ...HEARTS]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 
@@ -50,6 +52,17 @@ vec3 asymWarp(vec3 p) {
   p = mix(p, swingY(p, cv, -radians(finDeg)), wv);
   return p;
 }
+// B5 エラ（2026-10-15）: エラの範囲（吻端から 135〜240 mm、エラの骨は 139〜215 mm）の体の横を、正中から外へ breath 倍だけ押し広げる。
+//  骨・膜・内臓すべてに同じ式なので、ずれない。breath は hammerhead-swim.js が時刻で決める（0 で止まる）
+uniform float breath;
+vec3 breathWarp(vec3 p) {
+  if (breath == 0.) return p;
+  float wx = smoothstep(.13, .15, p.x) * (1. - smoothstep(.215, .24, p.x));
+  float az = abs(p.z), wz = smoothstep(.008, .025, az) * (1. - smoothstep(.055, .07, az));
+  p.z += breath * p.z * wx * wz;
+  return p;
+}
+vec3 restWarp(vec3 p) { return breathWarp(asymWarp(p)); }
 `;
 // B3 骨組み（2026-10-15）: glb に骨組み（blender/ct_hammerhead/b1_rig.py）があれば、左右差で曲げた休みの形を骨組みで動かす（three.js の skinning）。
 //  骨組みの無い glb では USE_SKINNING が付かず、前と同じ
@@ -59,7 +72,7 @@ const vertex = `
 varying vec3 vViewPosition;
 ${ASYM_GLSL}
 void main() {
-  vec3 transformed = asymWarp(position);
+  vec3 transformed = restWarp(position);
   #include <skinbase_vertex>
   #include <skinning_vertex>
   vec4 mv = modelViewMatrix * vec4(transformed, 1.);
@@ -102,7 +115,7 @@ varying vec3 vViewNormal;
 ${ASYM_GLSL}
 void main() {
   vRest = position;
-  vec3 transformed = asymWarp(position);
+  vec3 transformed = restWarp(position);
   vec3 objectNormal = normal;
   #include <skinbase_vertex>
   #include <skinnormal_vertex>
@@ -135,7 +148,7 @@ void main() {
 }`;
 function denticleMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { cell: denticleLook.cell, radius: denticleLook.radius, filmMinCos: { value: 0.2 }, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    uniforms: { cell: denticleLook.cell, radius: denticleLook.radius, filmMinCos: { value: 0.2 }, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: denticleFragment, ...ADD,
   });
 }
@@ -169,7 +182,7 @@ void main() {
 }`;
 function mottleMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { cell: mottleLook.cell, amount: mottleLook.amount, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    uniforms: { cell: mottleLook.cell, amount: mottleLook.amount, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: mottleFragment, ...ADD,
   });
 }
@@ -198,7 +211,7 @@ void main() {
 function gillRayMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: { amount: gillRayLook.amount, space: gillRayLook.space, organAbs: (chameleonOrgans.gillray ??= { value: new THREE.Vector3() }),
-      filmMinCos: { value: 0.4 }, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+      filmMinCos: { value: 0.4 }, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: gillRayFragment, ...ADD,
   });
 }
@@ -208,10 +221,16 @@ function gillRayMaterial() {
 //  強さ ?visc=（既定 2、2026-10-15 決定）。1 で 40 mm 通ると、いちばん吸う色で約 0.3 吸う
 const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1, 0.5, 0.42] };
 // 案 2 の部品ごとの色（仮、出典なし）: 肝臓は黄みのクリーム、消化管は淡い青、らせん弁の仕切りは濃い青（強さ 3 倍）
-const ORGAN_COLORS = { Liver: [0.25, 0.45, 1], Gut: [1, 0.5, 0.42], Spiral: [3, 1.5, 1.2] };
+const ORGAN_COLORS = { Liver: [0.25, 0.45, 1], Gut: [1, 0.5, 0.42], Spiral: [3, 1.5, 1.2],
+  // 心臓（推定）: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
+  Heart: [0.42, 0.74, 1], HeartLarge: [0.42, 0.74, 1], HeartSmall: [0.42, 0.74, 1] };
 export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定、案 2c）
  
   color: { value: new THREE.Vector3(...(VISC_COLORS[DENT_Q.get("visccol") ?? "cream"] ?? VISC_COLORS.cream)) } };
+// B5 心臓の拍動: 心臓の中心（読み込んだ心臓の面の箱の中心）へ beat 倍だけ縮める。左右差・呼吸の変形と骨組みの変形の間
+export const organClock = { breath: { value: 0 }, beat: { value: 0 } };
+const heartVertex = vertex.replace("vec3 transformed = restWarp(position);",
+  "vec3 transformed = restWarp(position); transformed = heartC + (transformed - heartC) * (1. - beat);").replace("varying vec3 vViewPosition;", "varying vec3 vViewPosition;\nuniform vec3 heartC;\nuniform float beat;");
 const visceraFragment = `
 uniform float amount;
 uniform vec3 color;
@@ -221,10 +240,12 @@ void main() {
   float d = -vViewPosition.z - reference;
   gl_FragColor = vec4(amount * 7.5 * color * (gl_FrontFacing ? -d : d), 0.);
 }`;
-function visceraMaterial(reference, part) {
+function visceraMaterial(reference, part, heartCentre) {
+  const heart = HEARTS.includes(part);
   return new THREE.ShaderMaterial({
-    uniforms: { amount: visceraLook.amount, color: ORGAN_COLORS[part] ? { value: new THREE.Vector3(...ORGAN_COLORS[part]) } : visceraLook.color, reference, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
-    vertexShader: vertex, fragmentShader: visceraFragment, ...ADD,
+    uniforms: { amount: visceraLook.amount, color: ORGAN_COLORS[part] ? { value: new THREE.Vector3(...ORGAN_COLORS[part]) } : visceraLook.color, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg,
+      ...(heart ? { heartC: { value: heartCentre }, beat: organClock.beat } : {}) },
+    vertexShader: heart ? heartVertex : vertex, fragmentShader: visceraFragment, ...ADD,
   });
 }
 
@@ -238,11 +259,15 @@ export function applyHammerheadTissue(model, reference) {
     o.frustumCulled = false;
     const channel = new THREE.Vector4(0, 0, 0, 0);
     if (Array.isArray(CHANNEL[part])) channel.set(...CHANNEL[part]); else channel.setComponent(CHANNEL[part], WEIGHT[part] ?? 1);
-    o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
     o.userData.pathMaterial = o.material;
     if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
     if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
     if (["Viscera", "Liver", "Gut", "Spiral"].includes(part)) o.userData.organMaterial = visceraMaterial(reference, part);
+    if (HEARTS.includes(part)) {
+      o.geometry.computeBoundingBox();
+      o.userData.organMaterial = visceraMaterial(reference, part, o.geometry.boundingBox.getCenter(new THREE.Vector3()));
+    }
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p) && !OPTIONAL.has(p));
   if (missing.length) throw new Error(`specimen_hammerhead.glb に部位がありません: ${missing.join(", ")}`);

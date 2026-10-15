@@ -4,7 +4,7 @@ import { createOrbit } from "./orbit.js";
 import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
-import { createSwim, swimLook, mouthLook } from "./hammerhead-swim.js";
+import { createSwim, swimLook, mouthLook, heartLook, gillLook } from "./hammerhead-swim.js";
 
 // The smooth hammerhead as a cleared-and-stained specimen on a lightbox, without its dish (A6).
 // The mesh: blender/ct_hammerhead (CT of ZMA.PISC.108725, Kamminga et al. 2017, CC0).
@@ -91,6 +91,7 @@ async function start() {
   // ?pick=turnbend: 旋回で体を曲げる割合の案を、動かしたまま切り替えて見比べる（2026-10-15、プロデューサー「ブラウザで３つを切り替えてそれぞれの動作を確認できるようにして」）
   if (swim && query.get("pick") === "turnbend") turnBendPicker();
   if (swim && query.get("pick") === "mouth") mouthPicker();
+  if (swim && query.get("pick") === "organs") organPicker();
   document.body.dataset.ready = "1";
   window.hammerheadPage = {
     look: chameleonLook, renderer, lightbox, camera, model, swim, swimLook,
@@ -125,6 +126,14 @@ function pickerPanel(rows, noteText) {
   }
   const note = document.createElement("div"); note.style.cssText = "font-size:12px;color:#666;max-width:28em"; note.textContent = noteText;
   box.append(note); document.body.append(box);
+}
+// ?pick=organs: 心臓（推定）の案と拍動の回数、エラの動きの案を、動かしたまま切り替える（B5）。心臓の案は ?glb=specimen_hammerhead_heart
+function organPicker() {
+  pickerPanel([
+    ["心臓", [["実物に近い大きさ", "large"], ["小さく骨に当てない", "small"], ["なし", "none"]], () => heartLook.show, (v) => { heartLook.show = v; }],
+    ["拍動", [["毎分 37", 37], ["毎分 52", 52], ["止める", 0]], () => heartLook.bpm, (v) => { heartLook.bpm = v; }],
+    ["エラ", [["止める（出典どおり）", 0], ["口と同じ 1.25 Hz", 1.25], ["毎分 36", 0.6]], () => gillLook.hz, (v) => { gillLook.hz = v; }],
+  ], "心臓は形を BIODIDAC の Squalus の図から、置き場所を骨格から決めた推定の部品。拍動は近い種の安静時（ドチザメ類 37、レモンザメ 52 回/分）。泳いでいる間エラは開いたまま、が出典で、動かすのは創作");
 }
 // ?pick=mouth: 口の休みの開き・開け閉めの振れと回数の案を、動かしたまま切り替える（B5）
 function mouthPicker() {

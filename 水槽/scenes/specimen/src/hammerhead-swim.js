@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { organClock } from "./hammerhead-material.js";
 
 // B3 うねり（2026-10-15、プロデューサー「標本ページを骨組みで動かし、B2 のボンネットヘッドの値（尾の振り 1.25 Hz・片側 0.09 L・波長 0.91 L）でうねらせてください」）
 //  骨組みは blender/ct_hammerhead/b1_rig.py（頭・背骨 38・尾の鎖と、胸びれ・腹びれ）。B1 の試しのうねり（HH_RIG_TEST=1）と同じ式で骨を回す:
@@ -28,6 +29,12 @@ export const swimLook = {
 //  休みの開き（15°、2026-10-15 決定。A7 では 25°）を中心に ± mouthDeg°、mouthHz で開け閉めする。ラム換気のシュモクザメでは口と鰓孔は開いたまま（Dolce & Wilga 2013）で、
 //  決まった回数の出典は無い。?mouth= °、?mouthhz= Hz。既定 ±3°・1.25 Hz（尾の振りと同じ。2026-10-15 プロデューサー「口は ±3°、尾と同じ 1.25 Hz にしてください」）
 export const mouthLook = { deg: Number(Q.get("mouth") ?? 3), hz: Number(Q.get("mouthhz") ?? 1.25) };
+// B5 心臓とエラ（2026-10-15、案を見比べるところ）: 心臓（推定の部品）は beat の山で中心へ heartLook.squeeze 倍縮む。回数は近い種の安静時
+//  （ドチザメ類 36.6 回/分 Scharold et al. 1989、レモンザメ 52 回/分 Scharold & Gruber 1991）。エラはラム換気では開いたまま（Dolce & Wilga 2013）なので、
+//  動かすのは創作。gillLook.hz（0 で止める）、振れ gillLook.amp（体の横を外へ押し広げる割合）
+//  ?heart=large|small|none（見比べの glb だけ）、?heartbpm=、?gillhz=
+export const heartLook = { show: Q.get("heart") ?? "large", bpm: Number(Q.get("heartbpm") ?? 37), squeeze: 0.12 };
+export const gillLook = { hz: Number(Q.get("gillhz") ?? 0), amp: 0.06 };
 const NECK = 0.125, TURN_R = 0.374;   // 首（頭の骨だけの終わり、m）、旋回の半径（L）
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
 const L = 1.024;   // 全長（m）。b1_rig.py の尾の骨の終わり
@@ -57,6 +64,8 @@ export function createSwim(model) {
   }));
   const jawBone = byName.get("jaw") ?? null;
   const jaw = jawBone && { q0: jawBone.quaternion.clone(), axis: new THREE.Vector3(0, 0, 1).applyQuaternion(jawBone.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize() };
+  const hearts = [];
+  model.traverse((o) => { if (o.isMesh && /^Heart/.test(o.userData.hh_part ?? "")) hearts.push(o); });
   const basePos = model.position.clone();
   const tmp = new THREE.Quaternion();
   const slope = (s, t) => {
@@ -95,6 +104,11 @@ export function createSwim(model) {
     update(seconds) {
       if (!swimLook.on) return;
       this.mouth(mouthLook.deg * Math.sin(2 * Math.PI * (swimLook.phase ?? seconds * mouthLook.hz)));
+      const t = swimLook.phase != null ? swimLook.phase / swimLook.frequency : seconds;
+      const want = { large: "HeartLarge", small: "HeartSmall" }[heartLook.show];
+      for (const h of hearts) h.visible = heartLook.show !== "none" && (h.userData.hh_part === "Heart" || h.userData.hh_part === want);
+      organClock.beat.value = heartLook.bpm > 0 ? heartLook.squeeze * (0.5 + 0.5 * Math.sin(2 * Math.PI * t * heartLook.bpm / 60)) ** 4 : 0;
+      organClock.breath.value = gillLook.hz > 0 ? gillLook.amp * Math.sin(2 * Math.PI * t * gillLook.hz) : 0;
       this.pose(swimLook.phase ?? seconds * swimLook.frequency);
     },
   };
