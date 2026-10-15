@@ -51,11 +51,18 @@ vec3 asymWarp(vec3 p) {
   return p;
 }
 `;
+// B3 骨組み（2026-10-15）: glb に骨組み（blender/ct_hammerhead/b1_rig.py）があれば、左右差で曲げた休みの形を骨組みで動かす（three.js の skinning）。
+//  骨組みの無い glb では USE_SKINNING が付かず、前と同じ
 const vertex = `
+#include <common>
+#include <skinning_pars_vertex>
 varying vec3 vViewPosition;
 ${ASYM_GLSL}
 void main() {
-  vec4 mv = modelViewMatrix * vec4(asymWarp(position), 1.);
+  vec3 transformed = asymWarp(position);
+  #include <skinbase_vertex>
+  #include <skinning_vertex>
+  vec4 mv = modelViewMatrix * vec4(transformed, 1.);
   vViewPosition = mv.xyz;
   gl_Position = projectionMatrix * mv;
 }`;
@@ -85,16 +92,24 @@ export const denticleLook = {
   cell: { value: Number(DENT_Q.get("dentcell") ?? 1.2) / 1000 },
   radius: { value: Number(DENT_Q.get("dentsize") ?? 0.28) },   // 点の半径 ÷ 間隔
 };
+// 皮歯・まだら・鰓条の模様は休みの形の座標（vRest）で決めるので、うねっても体に貼り付いたまま
 const denticleVertex = `
+#include <common>
+#include <skinning_pars_vertex>
 varying vec3 vRest;
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
 ${ASYM_GLSL}
 void main() {
   vRest = position;
-  vec4 mv = modelViewMatrix * vec4(asymWarp(position), 1.);
+  vec3 transformed = asymWarp(position);
+  vec3 objectNormal = normal;
+  #include <skinbase_vertex>
+  #include <skinnormal_vertex>
+  #include <skinning_vertex>
+  vec4 mv = modelViewMatrix * vec4(transformed, 1.);
   vViewPosition = mv.xyz;
-  vViewNormal = normalMatrix * normal;
+  vViewNormal = normalMatrix * objectNormal;
   gl_Position = projectionMatrix * mv;
 }`;
 const denticleFragment = `

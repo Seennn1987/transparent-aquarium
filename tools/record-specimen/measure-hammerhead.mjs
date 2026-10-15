@@ -27,7 +27,10 @@ const browser = await chromium.launch({
 });
 try {
   await mkdir(out, { recursive: true });
-  const query = new URLSearchParams(process.env.EXTRA || ""); query.set("ss", "1");
+  const query = new URLSearchParams(process.env.EXTRA || "");
+  query.set("ss", "1");
+  // B3 から標本ページはうねる。?phase= か ?swim= の指定が無ければ休みの形（?swim=0）で測る
+  if (!query.has("phase") && !query.has("swim")) query.set("swim", "0");
   if (view !== "display") query.set("view", view);
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on("pageerror", (e) => console.error("pageerror:", e.message));

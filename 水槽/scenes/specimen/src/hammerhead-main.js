@@ -4,6 +4,7 @@ import { createOrbit } from "./orbit.js";
 import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
+import { createSwim, swimLook } from "./hammerhead-swim.js";
 
 // The smooth hammerhead as a cleared-and-stained specimen on a lightbox, without its dish (A6).
 // The mesh: blender/ct_hammerhead (CT of ZMA.PISC.108725, Kamminga et al. 2017, CC0).
@@ -58,6 +59,8 @@ async function start() {
   camera.position.copy(centre).addScaledVector(dir, distance);
   if (view === "top" || view === "below") camera.up.set(0, 0, -1);
   camera.lookAt(centre);
+  // B3 うねり（hammerhead-swim.js）。骨組みの無い glb では null。枠と視点は休みの形で決めたあと
+  const swim = createSwim(model);
   const orbit = createOrbit(camera, canvas, { target: centre.clone(), minDistance: distance * 0.15, maxDistance: distance * 2, minPolar: 0.02, maxPolar: Math.PI - 0.02 });
 
   function resize() {
@@ -71,6 +74,7 @@ async function start() {
   addEventListener("resize", resize);
   const v = new THREE.Vector3();
   function frame() {
+    swim?.update(performance.now() / 1000);
     v.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -v.z;
     lightbox.render(scene, camera);
@@ -78,10 +82,10 @@ async function start() {
   }
   if (view !== "top" && view !== "below") orbit.update();
   frame();
-  status.textContent = `${lightbox.precision} · ${view}`;
+  status.textContent = `${lightbox.precision} · ${view}${swim && swimLook.on ? ` · ${swimLook.frequency} Hz` : ""}`;
   document.body.dataset.ready = "1";
   window.hammerheadPage = {
-    look: chameleonLook, renderer, lightbox, camera, model,
+    look: chameleonLook, renderer, lightbox, camera, model, swim, swimLook,
     paths() {
       const t = lightbox.target; const out = new Float32Array(t.width * t.height * 4);
       renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, out);

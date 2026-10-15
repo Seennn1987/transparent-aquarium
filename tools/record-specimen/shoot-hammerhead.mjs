@@ -2,7 +2,8 @@
 //
 //   node shoot-hammerhead.mjs <out dir> [tag]     writes <tag>_top.png, <tag>_side.png, <tag>_display.png
 //
-// The page must be served first (cd 水槽 && npm start). The page has no motion, so no stepped clock:
+// The page must be served first (cd 水槽 && npm start). Since B3 the page swims: without phase= or swim= in EXTRA it is
+// taken at rest (swim=0); EXTRA="phase=0.25" holds the wave at that phase. No stepped clock:
 // it waits for body[data-ready], lets a few frames draw, and takes the canvas only (no status text).
 // Env: VIEWS (default "top,side,display"; "display" = the page with no ?view=), SIZE (default 1600x800,
 // the 2:1 of docs/hammerhead_ct/a6_*.jpg), BASE (default http://127.0.0.1:8080), EXTRA (more query, e.g. "focus=head"),
@@ -34,6 +35,8 @@ try {
   await mkdir(outDir, { recursive: true });
   for (const view of views) {
     const query = new URLSearchParams(process.env.EXTRA || "");
+    // B3 から標本ページはうねる。?phase= か ?swim= の指定が無ければ休みの形（?swim=0）で撮る
+    if (!query.has("phase") && !query.has("swim")) query.set("swim", "0");
     if (view !== "display") query.set("view", view);
     const url = `${base}/scenes/specimen/hammerhead.html${query.size ? `?${query}` : ""}`;
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
