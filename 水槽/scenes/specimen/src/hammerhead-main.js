@@ -17,6 +17,8 @@ async function start() {
   if (!renderer.capabilities.isWebGL2) throw new Error("WebGL2 が使えないため表示できません");
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   chameleonLook.boneT0.value = HH_BONE_T0;
+  // A8 皮歯の強さ（膜の層の通り道。hammerhead-material.js の denticleMaterial）。既定 0 = 皮歯なし
+  chameleonLook.film.value = Number(query.get("dent") ?? 0);
   const ss = Number(query.get("ss")) || 2;
   const lightbox = createLightbox(renderer, { stain: "hammerhead", supersample: ss });
   document.body.style.background = "rgb(253,247,251)";

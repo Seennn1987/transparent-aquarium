@@ -59,6 +59,8 @@ STAINS.hammerhead = {
   cartilage: { spectrum: HH_CARTILAGE_SPECTRUM, gain: HH_CARTILAGE_GAIN },
   skin: { spectrum: HH_SKIN_SPECTRUM, gain: HH_SKIN_GAIN },
   viscera: { spectrum: HH_HEAD_SPECTRUM, gain: HH_HEAD_GAIN },   // the head's cartilage (hammerhead-material.js)
-  film: { spectrum: [0, 0, 0], gain: 0 },
+  // A8 皮歯（hammerhead-material.js の denticleMaterial）。色は椎骨と同じアリザリンの赤紫（胚で皮歯は赤紫）。
+  //  強さはページの ?dent=（chameleonLook.film に入る。既定 0 で見え方は変わらない）。利得 0.25 は「?dent=1 で点の上の吸い方が緑で約 0.25」
+  film: { spectrum: HH_BONE_SPECTRUM, gain: 0.25 },
   organs: {},
 };

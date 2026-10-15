@@ -37,6 +37,55 @@ const ADD = {
   blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneFactor,
 };
 
+// A8 皮歯（皮膚の小さな歯）: 膜の表面に、体に貼り付いた細かい点として描く（chameleon-material.js の膜の層の通り道を使う）。
+//  胚（Eames et al. 2007 Fig. 2A・2E）では皮歯はアリザリンで赤紫に染まり、体の表面に点として並ぶ。シロシュモクザメの皮歯の
+//  大きさの数は見つかっていない（一般に 1 mm よりずっと小さい）ので、点の間隔は画面で見える最小として決めた（出典なし、2026-10-15）。
+//  点は、体の座標（glb のメートル）の 3 次元の格子のそれぞれの箱に 1 つ、決まった乱数でずらして置く（毎回同じ）。
+//  膜の表面を横切るたびに、点の上なら 1 / |cos|（表面と視線の角）を足す。強さは ?dent=（既定 0）、間隔は ?dentcell= mm（既定 1.2）
+const DENT_Q = new URLSearchParams(location.search);
+export const denticleLook = {
+  cell: { value: Number(DENT_Q.get("dentcell") ?? 1.2) / 1000 },
+  radius: { value: Number(DENT_Q.get("dentsize") ?? 0.28) },   // 点の半径 ÷ 間隔
+};
+const denticleVertex = `
+varying vec3 vRest;
+varying vec3 vViewPosition;
+varying vec3 vViewNormal;
+void main() {
+  vRest = position;
+  vec4 mv = modelViewMatrix * vec4(position, 1.);
+  vViewPosition = mv.xyz;
+  vViewNormal = normalMatrix * normal;
+  gl_Position = projectionMatrix * mv;
+}`;
+const denticleFragment = `
+uniform float cell;
+uniform float radius;
+uniform float filmMinCos;
+varying vec3 vRest;
+varying vec3 vViewPosition;
+varying vec3 vViewNormal;
+vec3 hash3(vec3 p) {
+  p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6)));
+  return fract(sin(p) * 43758.5453123);
+}
+void main() {
+  vec3 q = vRest / cell; vec3 b = floor(q); float dmin = 9.;
+  for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) for (int k = -1; k <= 1; k++) {
+    vec3 c = b + vec3(float(i), float(j), float(k));
+    dmin = min(dmin, length(q - (c + hash3(c))));
+  }
+  float dot_ = 1. - smoothstep(radius * .7, radius, dmin);
+  float cs = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
+  gl_FragColor = vec4(dot_ / max(cs, filmMinCos), 0., 0., 0.);
+}`;
+function denticleMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { cell: denticleLook.cell, radius: denticleLook.radius, filmMinCos: { value: 0.2 } },
+    vertexShader: denticleVertex, fragmentShader: denticleFragment, ...ADD,
+  });
+}
+
 export function applyHammerheadTissue(model, reference) {
   const found = new Set();
   model.traverse((o) => {
@@ -49,6 +98,7 @@ export function applyHammerheadTissue(model, reference) {
     if (Array.isArray(CHANNEL[part])) channel.set(...CHANNEL[part]); else channel.setComponent(CHANNEL[part], WEIGHT[part] ?? 1);
     o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
     o.userData.pathMaterial = o.material;
+    if (part === "Skin") o.userData.filmMaterial = denticleMaterial();
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
   if (missing.length) throw new Error(`specimen_hammerhead.glb に部位がありません: ${missing.join(", ")}`);
