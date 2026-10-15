@@ -237,7 +237,8 @@ export async function createJar({ envMap, lens, specimen = "squid", vessel = "ja
     mesh.receiveShadow = false;
   }
 
-  const optics = createJarOptics({ dims, lens });
+  // 蓋の無い器では、標本の板を上下も見る人へ向ける（寝て泳ぐサメを上から見たとき、つぶれて写らないように。C4）
+  const optics = createJarOptics({ dims, lens, facingUp: dims.hasLid ? 0 : 1 });
   for (const mesh of optics.meshes) root.add(mesh);
   if (!dims.hasLid) for (const mesh of optics.meshes) if (mesh.name === "jar-optics-lid") mesh.visible = false;   // 仮の蓋は描かない
   const label = createLabel(dims, specimen);

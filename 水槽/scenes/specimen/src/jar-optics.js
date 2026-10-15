@@ -142,6 +142,9 @@ const COLUMN_FRAGMENT = /* glsl */ `
   uniform float uRo, uRi, uFloor, uTop;
   uniform vec3 uSpecimen;
   uniform float uHaze, uTissueBend, uUnderGlow, uTissueGlow, uHasSpecimen, uSpot;
+  // 標本の板の向き: 0 = 見る人へ向いた縦の板（吊るした標本、瓶）。1 = 上下も見る人へまっすぐ向ける（蓋の無い器で寝て泳ぐ標本を上から見るとき、
+  // シュモクザメ C4、2026-10-15 プロデューサー「jar-optics.js を、蓋の無い器のときだけ働く形で変えてください」）
+  uniform float uFacingUp;
 
   // The block under the jar shines up through its floor: the liquid glows brightest low down,
   // and the stained tissue scatters some of that light toward the camera in its own colour.
@@ -245,7 +248,7 @@ const COLUMN_FRAGMENT = /* glsl */ `
     // In the liquid. The specimen is thin and hangs facing the viewer, so it is met where the
     // ray crosses the upright plane through its middle.
     vec3 facing = cameraPosition - uSpecimen;
-    facing.y = 0.;
+    facing.y *= uFacingUp;
     facing = normalize(facing);
     vec3 specimen = uSpecimen - uCentre;
     vec3 tissue = vec3(1.);
@@ -453,6 +456,7 @@ export function createJarOptics({
   lens,
   centre = new THREE.Vector3(),
   specimen = true,
+  facingUp = 0,   // 標本の板の向き（uFacingUp）。瓶は 0、蓋の無い器は 1（jar.js）
   block = { x: 0, z: 0, radius: PEDESTAL.frontRadius },
 }) {
   const shared = {
@@ -505,6 +509,7 @@ export function createJarOptics({
         uUnderGlow: OPTICS.underGlow,
         uTissueGlow: OPTICS.tissueGlow,
         uHasSpecimen: { value: specimen ? 1 : 0 },
+        uFacingUp: { value: facingUp },
         uSpot: STAGE.spot,
         uMeniscus: OPTICS.meniscus,
         uSwirl: OPTICS.swirl,
