@@ -55,6 +55,9 @@ export const VISCERA_GAIN = 4.8;
 
 // The colour patterns. "06" is the one above (photo 06); "01" is the user's jar photo, below.
 // Pages pick one with `?stain=01` (chameleon.html and the jar page); without it, "06".
+/** The hyoid cartilage's absorbance per model unit (photo 06's throat, fitted; see "06" below). */
+export const HYOID_CARTILAGE = [11.71, 3.77, 0.71];
+
 export const STAINS = {
   "06": {
     lightbox: LIGHTBOX,
@@ -63,7 +66,13 @@ export const STAINS = {
     skin: { spectrum: SKIN_SPECTRUM, gain: SKIN_GAIN },
     viscera: { spectrum: VISCERA_SPECTRUM, gain: VISCERA_GAIN },
     film: { spectrum: [0, 0, 0], gain: 0 },
-    organs: {},
+    // The hyoid's cartilage (entoglossal process, basihyal, ceratohyals; blender/ct_body_pipeline/hyoid_rebuild.py) is drawn
+    // as the organ hyoid_cartilage, so that it can have its own strength: with the rib-gap cartilage's (above) it came out
+    // about 4 times darker than the pale blue at photo 06's throat (red absorbance 1.9 against 0.46). Fitted to that patch
+    // (x 955–1005, y 480–525 px: 0.462 / 0.231 / 0.323 over the background), less the screen's own tissue there, by the
+    // median hyoid path off the bone (0.0328; ct_body_pipeline/fit_hyoidcart06.py, 2026-10-15). The patch lies behind the
+    // jaw, the modelled entoglossal process along it, so matched by strength, not by place: provisional.
+    organs: { hyoid_cartilage: HYOID_CARTILAGE },
   },
   // Measured on 01-user-jar-diaphonized.jpg (the user's jar photo, 447 px a side; watermarked, not
   // redistributed, docs/references/chameleon/SOURCES.md), 2026-10-13. Light let through = pixel / the
@@ -148,6 +157,8 @@ export const STAINS = {
       kidney_r: [0, 0.0496, 0.1000], kidney_l: [0, 0.0496, 0.1000],
       stomach: [3.16, 3.84, 4.79], intestine: [3.16, 3.84, 4.79], colon: [3.16, 3.84, 4.79],
       eye_r: [4.08, 4.63, 5.64], eye_l: [4.08, 4.63, 5.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
+      // Not measured on 01 (its throat is under the blue film): kept as "06", like the rib-gap cartilage.
+      hyoid_cartilage: HYOID_CARTILAGE,
     },
   },
 };

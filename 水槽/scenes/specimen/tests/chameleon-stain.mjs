@@ -38,6 +38,10 @@ near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 で�
 // The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });
 assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);
+// The hyoid cartilage (an organ, so that it has its own strength): photo 06's throat patch less the screen's tissue there,
+// over the median hyoid path (0.0328), and lighter in red than the rib-gap cartilage over the same path.
+nearA(transmitted({ organs: { hyoid_cartilage: 0.0328 } }), [0.384, 0.124, 0.023], 0.005, "06 の舌骨の軟骨");
+assert.ok(transmitted({ organs: { hyoid_cartilage: 0.0328 } })[0] > transmitted({ cartilage: 0.0328 })[0], "舌骨の軟骨が肋骨の軟骨より薄くない");
 // "06" stays as it was when no stain is named.
 near(transmitted({ skin: 0.56 }, { stain: "06" }), transmitted({ skin: 0.56 }), 1e-12, "06 の既定");
 console.log("chameleon-stain: ok");

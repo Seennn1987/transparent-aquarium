@@ -260,6 +260,10 @@ def build_cartilage(d, k, coll, rigob):
     verts, faces, owner = [], [], []
     NSEG = 8
     for a, b, r, nm in zip(A, Bv, R, names):
+        # 舌骨の軟骨（舌内突起・基舌骨・角舌骨、ct_body_pipeline/hyoid_rebuild.py）は臓器 hyoid_cartilage として描く
+        # （hyoidcart_mesh.py。色の型ごとに吸光度を写真 06 の喉の水色に合わせるため）。ここでは入れない
+        if nm == "hyoid":
+            continue
         ax = b - a; L = np.linalg.norm(ax)
         if L < 1e-6:
             continue
