@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { organClock } from "./hammerhead-material.js";
+import { createHammerheadClock, hhOrganLook } from "./hammerhead-organs.js";
 
 // B3 うねり（2026-10-15、プロデューサー「標本ページを骨組みで動かし、B2 のボンネットヘッドの値（尾の振り 1.25 Hz・片側 0.09 L・波長 0.91 L）でうねらせてください」）
 //  骨組みは blender/ct_hammerhead/b1_rig.py（頭・背骨 38・尾の鎖と、胸びれ・腹びれ）。B1 の試しのうねり（HH_RIG_TEST=1）と同じ式で骨を回す:
@@ -34,6 +35,8 @@ export const mouthLook = { deg: Number(Q.get("mouth") ?? 3), hz: Number(Q.get("m
 //  動かすのは創作。gillLook.hz（0 で止める）、振れ gillLook.amp（体の横を外へ押し広げる割合）
 //  ?heart=large|small|none（見比べの glb だけ）、?heartbpm=、?gillhz=
 export const heartLook = { show: Q.get("heart") ?? "large", bpm: Number(Q.get("heartbpm") ?? 37), squeeze: 0.12 };
+// 強さ（0 でその動きだけ止まる）: ?heartamt=、?mouthamt=、?gillamt=（hammerhead-organs.js の hhOrganLook）
+for (const [k, q] of [["heart", "heartamt"], ["mouth", "mouthamt"], ["gill", "gillamt"]]) if (Q.has(q)) hhOrganLook[k].value = Number(Q.get(q));
 export const gillLook = { hz: Number(Q.get("gillhz") ?? 0), amp: 0.06 };
 const NECK = 0.125, TURN_R = 0.374;   // 首（頭の骨だけの終わり、m）、旋回の半径（L）
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
@@ -66,6 +69,7 @@ export function createSwim(model) {
   const jaw = jawBone && { q0: jawBone.quaternion.clone(), axis: new THREE.Vector3(0, 0, 1).applyQuaternion(jawBone.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize() };
   const hearts = [];
   model.traverse((o) => { if (o.isMesh && /^Heart/.test(o.userData.hh_part ?? "")) hearts.push(o); });
+  const clock = createHammerheadClock();
   const basePos = model.position.clone();
   const tmp = new THREE.Quaternion();
   const slope = (s, t) => {
@@ -101,15 +105,18 @@ export function createSwim(model) {
     },
     /** 口: 開きの増し（°、+ で開く）。glTF の +Z（体の左）まわりの + が開く向き（Blender の +Y まわりの − と同じ） */
     mouth(deg) { if (jaw) jawBone.quaternion.copy(jaw.q0).multiply(tmp.setFromAxisAngle(jaw.axis, THREE.MathUtils.degToRad(deg))); },
-    update(seconds) {
+    clock,
+    /** dt 秒だけ時計を進めて姿を決める（一時停止は dt = 0 で、全部が止まる）。?phase= のときは、その位相の時刻に止める */
+    update(dt) {
       if (!swimLook.on) return;
-      this.mouth(mouthLook.deg * Math.sin(2 * Math.PI * (swimLook.phase ?? seconds * mouthLook.hz)));
-      const t = swimLook.phase != null ? swimLook.phase / swimLook.frequency : seconds;
+      Object.assign(clock.rates, { tailHz: swimLook.frequency, mouthHz: mouthLook.hz, mouthDeg: mouthLook.deg, heartBpm: heartLook.bpm, heartSqueeze: heartLook.squeeze, gillHz: gillLook.hz, gillAmp: gillLook.amp });
+      const st = swimLook.phase != null ? clock.at(swimLook.phase / swimLook.frequency) : clock.update(dt);
       const want = { large: "HeartLarge", small: "HeartSmall" }[heartLook.show];
       for (const h of hearts) h.visible = heartLook.show !== "none" && (h.userData.hh_part === "Heart" || h.userData.hh_part === want);
-      organClock.beat.value = heartLook.bpm > 0 ? heartLook.squeeze * (0.5 + 0.5 * Math.sin(2 * Math.PI * t * heartLook.bpm / 60)) ** 4 : 0;
-      organClock.breath.value = gillLook.hz > 0 ? gillLook.amp * Math.sin(2 * Math.PI * t * gillLook.hz) : 0;
-      this.pose(swimLook.phase ?? seconds * swimLook.frequency);
+      this.mouth(st.mouthDeg);
+      organClock.beat.value = st.beat;
+      organClock.breath.value = st.breath;
+      this.pose(st.tailCycles);
     },
   };
 }

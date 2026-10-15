@@ -78,8 +78,12 @@ async function start() {
   addEventListener("resize", resize);
   new ResizeObserver(resize).observe(canvas);   // 窓の大きさが変わらずに枠だけが変わるとき（隠れていた欄が開いたときなど）
   const v = new THREE.Vector3();
+  // B5 一時停止: スペースキーで止める・動かす（?still=1 で止めて始める）。止めている間は時計が進まず、うねり・口・心臓・エラが全部止まる
+  let paused = query.get("still") === "1", last = performance.now();
+  addEventListener("keydown", (e) => { if (e.code === "Space" && !e.target.closest?.("button")) { paused = !paused; e.preventDefault(); } });
   function frame() {
-    swim?.update(performance.now() / 1000);
+    const now = performance.now(), dt = paused ? 0 : Math.min((now - last) / 1000, 0.1); last = now;
+    swim?.update(dt);
     v.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -v.z;
     lightbox.render(scene, camera);
@@ -95,6 +99,7 @@ async function start() {
   document.body.dataset.ready = "1";
   window.hammerheadPage = {
     look: chameleonLook, renderer, lightbox, camera, model, swim, swimLook,
+    setPaused(v) { paused = Boolean(v); }, get paused() { return paused; },
     paths() {
       const t = lightbox.target; const out = new Float32Array(t.width * t.height * 4);
       renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, out);
