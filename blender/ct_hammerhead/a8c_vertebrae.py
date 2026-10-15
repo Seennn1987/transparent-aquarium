@@ -62,15 +62,32 @@ for i in range(len(mid)):
     for j, a in enumerate(ta):
         ax = (a - 0.5) * L_
         for q in th: P.append(c + ax * t + rr[j] * (np.cos(q) * s + np.sin(q) * d))
-    P.append(c - 0.5 * L_ * t); P.append(c + 0.5 * L_ * t); P = np.array(P)
+    SH = float(os.environ.get('HH_VERT_SHELL', 0))   # 2026-10-15 案 F2: 0 より大きいと、椎体を外側の厚さ SH mm の筒にする（実物で青いのは外側の層）
     F = []
     for j in range(NA - 1):
         for k in range(NT):
             a0 = j * NT + k; a1 = j * NT + (k + 1) % NT; b0 = a0 + NT; b1 = a1 + NT
             F += [[a0, a1, b1], [a0, b1, b0]]
-    c0, c1 = NA * NT, NA * NT + 1
-    for k in range(NT):
-        F.append([c0, (k + 1) % NT, k]); F.append([c1, (NA - 1) * NT + k, (NA - 1) * NT + (k + 1) % NT])
+    if SH > 0:
+        n0 = len(P)
+        for j, a in enumerate(ta):
+            ax = (a - 0.5) * L_
+            for q in th: P.append(c + ax * t + max(rr[j] - SH, 0.3) * (np.cos(q) * s + np.sin(q) * d))
+        P = np.array(P)
+        for j in range(NA - 1):              # 内側の面（向きを逆に）
+            for k in range(NT):
+                a0 = n0 + j * NT + k; a1 = n0 + j * NT + (k + 1) % NT; b0 = a0 + NT; b1 = a1 + NT
+                F += [[a0, b1, a1], [a0, b0, b1]]
+        for k in range(NT):                  # 両端の輪
+            o0, o1 = k, (k + 1) % NT; i0, i1 = n0 + k, n0 + (k + 1) % NT
+            F += [[o0, i1, o1], [o0, i0, i1]]
+            e = (NA - 1) * NT; o0, o1 = e + k, e + (k + 1) % NT; i0, i1 = n0 + e + k, n0 + e + (k + 1) % NT
+            F += [[o0, o1, i1], [o0, i1, i0]]
+    else:
+        P.append(c - 0.5 * L_ * t); P.append(c + 0.5 * L_ * t); P = np.array(P)
+        c0, c1 = NA * NT, NA * NT + 1
+        for k in range(NT):
+            F.append([c0, (k + 1) % NT, k]); F.append([c1, (NA - 1) * NT + k, (NA - 1) * NT + (k + 1) % NT])
     add('c', P, np.array(F))
     if not ARCH: continue
     # 背の弓（三角の板）と、腹側（胴は小さな突起、尾は腹の弓）

@@ -54,7 +54,9 @@ try {
     // The part's channel weights (a mixed-colour part writes weight × path into several channels)
     const wsum = await page.evaluate((p) => { let s = 1; window.hammerheadPage.model.traverse((o) => {
       if (!o.isMesh) return; o.visible = o.userData.hh_part === p;
-      if (o.visible) { const c = o.material.uniforms.channel.value; s = c.x + c.y + c.z + c.w; } }); return s; }, p);
+      if (o.visible) { const c = o.material.uniforms.channel.value; s = c.x + c.y + c.z + c.w;
+        // 内臓のように通り道に何も書かない部品は、形を測る間だけ骨の通り道に書く（2026-10-15）
+        if (s === 0) { o.userData.savedChannel = c.clone(); c.set(1, 0, 0, 0); s = 1; } } }); return s; }, p);
     await frames(4);
     const one = await readPaths();
     // The part's own path: the sum of the channels divided by the sum of its weights
@@ -62,7 +64,9 @@ try {
     for (let i = 0; i < m.length; i++) m[i] = (Math.max(0, f[4 * i]) + Math.max(0, f[4 * i + 1]) + Math.max(0, f[4 * i + 2]) + Math.max(0, f[4 * i + 3])) / wsum;
     await writeFile(join(out, `${view}_part_${p}.f32`), Buffer.from(m.buffer));
   }
-  await page.evaluate(() => window.hammerheadPage.model.traverse((o) => { if (o.isMesh) o.visible = true; }));
+  await page.evaluate(() => window.hammerheadPage.model.traverse((o) => {
+    if (!o.isMesh) return; o.visible = true;
+    if (o.userData.savedChannel) { o.material.uniforms.channel.value.copy(o.userData.savedChannel); delete o.userData.savedChannel; } }));
   const info = await page.evaluate(() => {
     const weights = {};   // each part's channel weights (bone, cartilage, skin, head)
     window.hammerheadPage.model.traverse((o) => { if (o.isMesh) { const c = o.material.uniforms.channel.value; weights[o.userData.hh_part] = [c.x, c.y, c.z, c.w]; } });
