@@ -6,9 +6,9 @@ import { createOrbit } from "./orbit.js";
 import { createJar } from "./jar.js";
 import { createSpecimen } from "./specimen.js";
 import { createChameleonSpecimen } from "./specimen-chameleon.js";
-import { createHammerheadSpecimen } from "./specimen-hammerhead.js";
+import { createHammerheadSpecimen, setHammerheadSpeed } from "./specimen-hammerhead.js";
 import { pickerPanel } from "./picker-panel.js";
-import { swimLook, mouthLook } from "./hammerhead-swim.js";
+import { swimLook } from "./hammerhead-swim.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
@@ -172,8 +172,8 @@ async function start() {
     const speeds = [0.8, 0.6, 0.4, 0.25];   // L/s
     pickerPanel([
       ["泳ぐ速さ", speeds.map((v) => [`${v} L/s（尾 ${(v / 0.64).toFixed(2)} Hz）`, v]), () => +(swimLook.frequency * 0.64).toFixed(2),
-        (v) => { swimLook.frequency = v / 0.64; mouthLook.hz = swimLook.frequency; }],
-    ], "0.8 L/s がいま（出典のボンネットヘッドの水槽での速さ、尾 1.25 Hz）。遅いほど 1 周が長い（2 倍の器で 0.8 L/s は 5.9 秒）。速さを変えた瞬間は位置がとぶ");
+        (v) => setHammerheadSpeed(v)],
+    ], "既定は 0.4 L/s（2026-10-15 決定）。0.8 L/s は出典のボンネットヘッドの水槽での速さ（尾 1.25 Hz）。遅いほど 1 周が長い。アドレスの ?speed= でも変えられる");
   }
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);

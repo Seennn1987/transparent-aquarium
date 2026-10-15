@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
-import { createSwim, swimLook } from "./hammerhead-swim.js";
+import { createSwim, swimLook, mouthLook } from "./hammerhead-swim.js";
 import { circlePose, circleSpeed, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
 
 // シロシュモクザメ（hammerhead.html）を、ギャラリーの前の台の低い器（dish.glb）に入れる。`?specimen=hammerhead`（C、2026-10-15）。
@@ -18,7 +18,12 @@ export const HH_DISH = {
   // 器の大きさの、サメに対する倍率（C1 の大きさを 1）。器の形はそのままでサメを 1 / 倍率に描くので、直径も高さもサメに対してこの倍率になる。
   //  既定 2（2026-10-15 プロデューサー「2倍、高さも2倍」）。?dish= で変える
   ratio: Number(new URLSearchParams(location.search).get("dish") ?? 2),
+  // 器の中を回る速さ（全長 / 秒）。既定 0.4（2026-10-15 プロデューサー「0.４で。後で調整できるようにしておいて」）。?speed= で変える（調整の欄では ?pick=speed）。
+  //  1 回の尾の振りで 0.64 L 進む（Webb & Keyes 1982）ので、尾の振りの回数は 速さ / 0.64（0.4 で 0.63 Hz）。口は「尾と同じ回数」（B5 の決定）で尾に合わせる
+  speed: Number(new URLSearchParams(location.search).get("speed") ?? 0.4),
 };
+/** 泳ぐ速さ（L/s）を決める: 尾の振りと口の回数をそろえる。 */
+export function setHammerheadSpeed(v) { swimLook.frequency = v / 0.64; mouthLook.hz = swimLook.frequency; }
 
 /**
  * `facing`: 見る人への水平の向き。サメは背を上に、左の体側（glTF の +Z）を見る人へ向けて、器の真ん中に浮かぶ。
@@ -77,6 +82,7 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
     pivot.position.set(centre.x + pose.at.x, centre.y, centre.z + pose.at.z);
     pivot.rotation.set(0, pose.yaw, 0);
   }
+  setHammerheadSpeed(HH_DISH.speed);
   const swim = createSwim(model);
   let lightbox = null;
   setDishRatio(HH_DISH.ratio);
