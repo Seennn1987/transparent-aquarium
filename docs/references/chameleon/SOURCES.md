@@ -114,3 +114,16 @@
 - Digimorph, *Chamaeleo calyptratus*, TNHC 62768（凍結標本の CT。http://digimorph.org）: 肋骨は平行にそろい、背側と腹側（胸骨側）の部分が曲がり目でつながる。舌骨は顎の後ろの喉の中
 - Williston, S. W. (1925). *The Osteology of the Reptiles*. Harvard University Press: カメレオンの腹肋は V 字で、ふつう軟骨
 - madcham.de（https://www.madcham.de）: ほとんどの肋骨は胸骨か反対側の肋骨の軟骨につながり、仙椎の近くまで並ぶ
+
+## 舌骨（2026-10-15）
+
+- Herrel, A., Meyers, J. J., Nishikawa, K. C. & De Vree, F. (2001). Morphology and histochemistry of the hyolingual apparatus in chameleons. *Journal of Morphology* 249:154–170. https://in.nau.edu/wp-content/uploads/sites/44/2018/08/Herrel-et-al.-2001a-ek.pdf
+  - 強く小さくなった基舌骨、2 対の角、長い舌内突起。角舌骨（前の対）は軟骨だけで短く、横から見て上へ伸び前へ傾く（基舌骨の前の背側に付く）。角鰓骨（後ろの対）は骨で、長軸にほぼ直角に付く。舌内突起は硝子軟骨で一部が石灰化し、先の 2〜3 mm だけ細くなる
+- Herrel, A., Deban, S. M., Schaerlaeken, V., Timmermans, J.-P. & Adriaens, D. (2009). Are morphological specializations of the hyolingual system in chameleons and salamanders tuned to demands on performance? *Physiological and Biochemical Zoology* 82:29–39. https://digitalcommons.usf.edu/cgi/viewcontent.cgi?article=1002&context=bin_facpub
+  - *C. calyptratus* を含む。角舌骨が短く、第 1 角鰓骨が前背側へ回り、第 2 角鰓骨は無い
+- Meyers, J. J. & Nishikawa, K. C. (2000). Comparative study of tongue protrusion in three iguanian lizards. *Journal of Experimental Biology*. https://in.nau.edu/wp-content/uploads/sites/44/2018/08/Meyers-and-Nishikawa-2000-ek.pdf — カメレオンの模式図（Fig. 6C）に CBI・CBII。2009 と食い違う。CT に 2 対目は無いので足さない
+- chameleons.info, Gular Pouch in Chameleons and its Function（P. Nečas, 2024）https://www.chameleons.info/l/gular-pouch-in-chameleons-and-its-function/ — *C. calyptratus* の喉の図に CBI・CBII の記号（図の出典は書かれていない）
+- Digimorph, *Chamaeleo calyptratus*, head https://digimorph.geo.utexas.edu/specimens/Chamaeleo_calyptratus/head — Estes, de Queiroz & Gauthier 1988 の引用: 舌内突起が長い。舌を引いたときの第 1 角鰓骨は後背側でなく前背側へ向く
+- madcham.de, The chameleon's tongue shot https://www.madcham.de/en/?p=7032 — 舌内突起はかなり軟骨、角鰓骨 2 本は骨、角舌骨の突起は小さく軟らかい軟骨
+- Huskey 2020, Gular pouch diversity in the Chamaeleonidae, *Anat. Rec.* https://anatomypubs.onlinelibrary.wiley.com/doi/10.1002/ar.24313 — 本文は読めていない
+- 乾燥骨格の写真（プロデューサーから、比較だけ。入れない）: 口を開けた頭骨で、あごの角から喉へ細い角鰓骨

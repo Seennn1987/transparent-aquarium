@@ -121,26 +121,14 @@ st_tail = int(np.ceil(J[23] / secmm))                        # 最初の尾椎�
 ih = bn.index('head'); Mh = Mof('head')
 h0 = Hm[ih]; th_ = Tm[ih] - h0; th_ /= np.linalg.norm(th_)
 hP = apply(Mh, h0[None])[0]; tP = Mh[:3, :3] @ th_
-# 舌骨を前（喉の中、頭の膜へ）と後ろ（角、頸・胴の膜へ）に分ける: 頭骨の軸で後頭顆から HYOID_SPLIT_MM より前が前
-HYOID_SPLIT_MM = -3.0
-sh_hy = (PX['hyoid'] - hP) @ tP / MM
-HY_FRONT = PX['hyoid'][sh_hy >= HYOID_SPLIT_MM]; HY_BACK = PX['hyoid'][sh_hy < HYOID_SPLIT_MM]
-# 第 1 角鰓骨（舌骨の角、左右 1 本ずつ、長さ 約 14 mm）: CT では頭骨のメッシュの部品で、上の端が頭骨の後ろに触れ、下の端は
-#   喉の中の舌骨の体へ向かう（Digimorph の Chamaeleo calyptratus: 舌を引いたときの第 1 角鰓骨は前背側へ向く）。展示の姿勢で
-#   下の端が下あごの後ろより 3 mm 下に出て、頭の膜がその先だけを鉤のように包んだ。喉は下あごから角の下の端までなめらかな面に
-#   なるように、角の点は頸の膜にも入れ、頭の膜の後ろの断面は窓を広げて下あごとつなぐ
-import scipy.sparse as _sp
-from scipy.sparse.csgraph import connected_components as _cc
-_f = d['head__f']; _n = len(d['head__v'])
-_A = _sp.coo_matrix((np.ones(3 * len(_f)), (_f[:, [0, 1, 2]].ravel(), _f[:, [1, 2, 0]].ravel())), shape=(_n, _n))
-_nc, _lab = _cc(_A, directed=False); _sz = np.bincount(_lab)
-_r = rest['head']; CB_mask = np.zeros(_n, bool)
-for _c in np.argsort(-_sz)[1:12]:
-    _m = _lab == _c; _x = _r[_m] / MM
-    _L = np.ptp((_x - _x.mean(0)) @ np.linalg.svd(_x - _x.mean(0), full_matrices=False)[2][0])
-    if 2000 <= _sz[_c] <= 8000 and _L > 10: CB_mask |= _m
-CERATO = PX['head'][:len(_r)][CB_mask]
-print('first ceratobranchials (from the skull mesh): %d points' % len(CERATO), flush=True)
+# 舌骨（2026-10-15 に作り直し、hyoid_rebuild.py）: 骨は左右の第 1 角鰓骨（長さ 約 13.5 mm）だけ、軟骨は舌内突起・基舌骨・角舌骨。
+#   どれも喉と下あごの間にあり頭について動くので、頭の膜に入れる（HY_FRONT）。胸へ伸びる棒はもう無い（HY_BACK は空）
+#   第 1 角鰓骨は上の端が頭骨の後ろに触れ、下の端が下あごの後ろより 3 mm 下に出る（Digimorph の Chamaeleo calyptratus:
+#   舌を引いたときの第 1 角鰓骨は前背側へ向く）。喉が下あごから角の下の端までなめらかな面になるように、角の点は頸の膜にも入れ
+#   （CERATO）、頭の膜の後ろの断面は窓を広げて下あごとつなぐ
+HY_FRONT = PX['hyoid']; HY_BACK = np.zeros((0, 3))
+CERATO = apply(Mof('hyoid'), rest['hyoid'])
+print('first ceratobranchials (hyoid bone): %d points' % len(CERATO), flush=True)
 # 眼球（eyes.py）: 球の面の点
 EY = json.load(open('eyes.json'))
 def sphere_pts(c, r, n=800):
@@ -384,7 +372,7 @@ FH = -kS * np.log(np.maximum(accH, 1e-30)); del accH
 HEAD_CLOSE_MM = 2.0
 lat = np.array(EY['eye_r']['centre_model']) - np.array(EY['eye_l']['centre_model']); lat /= np.linalg.norm(lat)
 e1 = tP - lat * (tP @ lat); e1 /= np.linalg.norm(e1); e2 = np.cross(lat, e1)
-hp = np.concatenate([PX['head'], EYE_PTS])
+hp = np.concatenate([PX['head'], HY_FRONT, EYE_PTS])                  # 舌骨（骨と軟骨）も頭の像に入れる（喉の下の舌の芯・基舌骨）
 hb = grid_pts(np.min([CH.min(0), hp.min(0)], 0) - HEAD.RA.max() - MM, np.max([CH.max(0), hp.max(0)], 0) + HEAD.RA.max() + MM)
 xq = gmin + hb * vox; ih_ = tuple(hb.T)
 # 横・上・前の 3 つの向きから写した像の外へ出さない（3 つの像を押し出した形の重なり。横だけだと頬が頭骨より 1.5〜3 mm 外へ出た）
