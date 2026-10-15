@@ -16,7 +16,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 VIEW_NAMES = {"top": "背中から（view=top）", "side": "横から（view=side）", "display": "展示の姿勢（指定なし）",
               "below": "腹から（view=below）", "front": "前から（view=front）",
-              "sidezoom": "横から・拡大（view=side）"}
+              "sidezoom": "横から・拡大（view=side）",
+              "belowzoom": "腹から・拡大（view=below）", "frontzoom": "前から・拡大（view=front）",
+              "displayzoom": "展示の姿勢・拡大（指定なし）"}
 FONT_PATHS = ["/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"]
 
 

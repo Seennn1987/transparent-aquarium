@@ -94,7 +94,8 @@ step py a6b_split_head.py
 step py a7f_gill_field.py
 step fig a7g_gill_frag.py
 step py a7g2_gill_air.py
-step py a7h_gill_arches.py
+# エラの骨は案 B（150〜215 mm。2026-10-15 プロデューサー決定）。前の形（a7h_gill_arches.py）は使わない
+step py a7h2_gill_options.py B 150 215 2 53.4
 # A6 glb に書き出す（Blender）
 step blender a6a_export_gltf.py
 # Blender の確認の図（a4f → a5b は同じシーン、a7e → a7i も同じシーンなので、1 つの Blender で続けて走らせる）

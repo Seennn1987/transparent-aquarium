@@ -6,6 +6,7 @@
 // it waits for body[data-ready], lets a few frames draw, and takes the canvas only (no status text).
 // Env: VIEWS (default "top,side,display"; "display" = the page with no ?view=), SIZE (default 1600x800,
 // the 2:1 of docs/hammerhead_ct/a6_*.jpg), BASE (default http://127.0.0.1:8080), EXTRA (more query, e.g. "focus=head"),
+// PARTS (only these glb parts, e.g. "Gill,HeadCartilage"; the others are not drawn),
 // PLAYWRIGHT points at a playwright module, CHROME_CHANNEL (default "chrome").
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -58,6 +59,20 @@ try {
         camera: camera.position.toArray().map((v) => +v.toFixed(4)),
       };
     });
+    if (process.env.PARTS) {
+      // 部品（glb の hh_part）を絞って写す。ページの色の計算はそのまま、ほかの部品を描かないだけ
+      const shown = await page.evaluate((keep) => {
+        const names = new Set(keep.split(","));
+        const seen = [];
+        window.hammerheadPage.model.traverse((o) => {
+          if (!o.isMesh) return;
+          o.visible = names.has(o.userData.hh_part);
+          if (o.visible) seen.push(o.userData.hh_part);
+        });
+        return seen;
+      }, process.env.PARTS);
+      if (!shown.length) throw new Error(`PARTS=${process.env.PARTS} に当たる部品がありません`);
+    }
     await page.addStyleTag({ content: "#status { display: none !important; }" });
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
     const file = join(outDir, `${tag}_${view}.png`);

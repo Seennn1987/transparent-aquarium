@@ -1,470 +1,455 @@
 {
- "source": "BIODIDAC Squalus acanthias visceral skeleton (I. Livingstone, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/5134 / position from CT left gill air (a7_slit.npy)",
- "z_dorsal_mm": [
-  128,
-  134,
-  140,
-  146,
-  152
+ "tag": "B",
+ "front_z": 150.0,
+ "fifth_ceratobranchial_back_z": 215.0,
+ "dorsal_v": 2.0,
+ "ventral_v_max": 53.4,
+ "spacing_mm": 12.72,
+ "heights_mm": [
+  31.6,
+  47.0,
+  45.2,
+  42.1,
+  39.1
  ],
- "slope": 0.36,
+ "pharyngobranchial_mm": 26.0,
+ "plate_mm": 5.5,
+ "body_ventral_at_front_mm": [
+  39.6,
+  58.0,
+  63.2,
+  63.9,
+  66.1
+ ],
+ "faces": 233280,
  "elements": [
   {
    "arch": 1,
-   "part": "pharyngobranchial",
-   "points_zuv_mm": [
-    [
-     137.0,
-     -6.0,
-     4.0
-    ],
-    [
-     131.0,
-     -11.0,
-     2.5
-    ],
-    [
-     128.7,
-     -16.0,
-     2.0
-    ]
-   ],
-   "radius_mm": 1.0
-  },
-  {
-   "arch": 1,
-   "part": "epibranchial",
-   "points_zuv_mm": [
-    [
-     128.7,
-     -16.0,
-     2.0
-    ],
-    [
-     131.2,
-     -27.2,
-     8.0
-    ],
-    [
-     135.9,
-     -34.5,
-     22.0
-    ]
-   ],
-   "radius_mm": 1.2
-  },
-  {
-   "arch": 1,
-   "part": "ceratobranchial",
-   "points_zuv_mm": [
-    [
-     135.9,
-     -34.5,
-     22.0
-    ],
-    [
-     140.2,
-     -31.5,
-     34.0
-    ],
-    [
-     143.8,
-     -15.0,
-     44.0
-    ]
-   ],
-   "radius_mm": 1.4
-  },
-  {
-   "arch": 1,
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     143.8,
-     -15.0,
-     44.0
-    ],
-    [
-     148.3,
-     -9.0,
-     48.0
-    ],
-    [
-     153.0,
+     157.9,
      -3.0,
-     50.0
+     35.6
+    ],
+    [
+     150.0,
+     -15.0,
+     33.6
     ]
    ],
-   "radius_mm": 1.1
+   "radius_mm": 1.0,
+   "plate_mm": 0
   },
   {
-   "arch": 2,
-   "part": "pharyngobranchial",
-   "points_zuv_mm": [
-    [
-     143.0,
-     -6.0,
-     4.0
-    ],
-    [
-     137.0,
-     -11.0,
-     2.5
-    ],
-    [
-     134.7,
-     -16.0,
-     2.0
-    ]
-   ],
-   "radius_mm": 1.0
-  },
-  {
-   "arch": 2,
-   "part": "epibranchial",
-   "points_zuv_mm": [
-    [
-     134.7,
-     -16.0,
-     2.0
-    ],
-    [
-     137.2,
-     -25.0,
-     8.0
-    ],
-    [
-     141.6,
-     -30.0,
-     21.1
-    ]
-   ],
-   "radius_mm": 1.2
-  },
-  {
-   "arch": 2,
+   "arch": 1,
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     141.6,
-     -30.0,
-     21.1
-    ],
-    [
-     145.8,
-     -27.0,
-     32.6
-    ],
-    [
-     149.2,
+     150.0,
      -15.0,
-     42.2
+     33.6
+    ],
+    [
+     153.8,
+     -21.5,
+     21.0
+    ],
+    [
+     157.0,
+     -24.5,
+     13.1
     ]
    ],
-   "radius_mm": 1.4
+   "radius_mm": 1.0,
+   "plate_mm": 5.5
+  },
+  {
+   "arch": 1,
+   "part": "epibranchial",
+   "points_zuv_mm": [
+    [
+     157.0,
+     -24.5,
+     13.1
+    ],
+    [
+     162.7,
+     -22.2,
+     5.8
+    ],
+    [
+     167.4,
+     -16.0,
+     2.6
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 4.4
+  },
+  {
+   "arch": 1,
+   "part": "pharyngobranchial",
+   "points_zuv_mm": [
+    [
+     167.4,
+     -16.0,
+     2.0
+    ],
+    [
+     193.4,
+     -6.0,
+     3.0
+    ]
+   ],
+   "radius_mm": 0.9,
+   "plate_mm": 0
   },
   {
    "arch": 2,
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     149.2,
-     -15.0,
-     42.2
+     174.5,
+     -3.0,
+     51.0
     ],
     [
-     153.6,
-     -9.0,
+     162.7,
+     -15.0,
+     49.0
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 0
+  },
+  {
+   "arch": 2,
+   "part": "ceratobranchial",
+   "points_zuv_mm": [
+    [
+     162.7,
+     -15.0,
+     49.0
+    ],
+    [
+     168.4,
+     -21.5,
+     30.2
+    ],
+    [
+     173.1,
+     -24.5,
+     18.5
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 5.5
+  },
+  {
+   "arch": 2,
+   "part": "epibranchial",
+   "points_zuv_mm": [
+    [
+     173.1,
+     -24.5,
+     18.5
+    ],
+    [
+     181.5,
+     -22.2,
+     7.6
+    ],
+    [
+     188.6,
+     -16.0,
+     2.9
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 4.4
+  },
+  {
+   "arch": 2,
+   "part": "pharyngobranchial",
+   "points_zuv_mm": [
+    [
+     188.6,
+     -16.0,
+     2.0
+    ],
+    [
+     212.0,
+     -6.0,
+     3.0
+    ]
+   ],
+   "radius_mm": 0.9,
+   "plate_mm": 0
+  },
+  {
+   "arch": 3,
+   "part": "hypobranchial",
+   "points_zuv_mm": [
+    [
+     186.7,
+     -3.0,
+     49.2
+    ],
+    [
+     175.4,
+     -15.0,
+     47.2
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 0
+  },
+  {
+   "arch": 3,
+   "part": "ceratobranchial",
+   "points_zuv_mm": [
+    [
+     175.4,
+     -15.0,
+     47.2
+    ],
+    [
+     180.9,
+     -21.5,
+     29.1
+    ],
+    [
+     185.4,
+     -24.5,
+     17.8
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 5.5
+  },
+  {
+   "arch": 3,
+   "part": "epibranchial",
+   "points_zuv_mm": [
+    [
+     185.4,
+     -24.5,
+     17.8
+    ],
+    [
+     193.5,
+     -22.2,
+     7.4
+    ],
+    [
+     200.3,
+     -16.0,
+     2.9
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 4.4
+  },
+  {
+   "arch": 3,
+   "part": "pharyngobranchial",
+   "points_zuv_mm": [
+    [
+     200.3,
+     -16.0,
+     2.0
+    ],
+    [
+     221.1,
+     -6.0,
+     3.0
+    ]
+   ],
+   "radius_mm": 0.9,
+   "plate_mm": 0
+  },
+  {
+   "arch": 4,
+   "part": "hypobranchial",
+   "points_zuv_mm": [
+    [
+     198.7,
+     -3.0,
      46.1
     ],
     [
-     158.3,
-     -3.0,
-     48.0
-    ]
-   ],
-   "radius_mm": 1.1
-  },
-  {
-   "arch": 3,
-   "part": "pharyngobranchial",
-   "points_zuv_mm": [
-    [
-     149.0,
-     -6.0,
-     4.0
-    ],
-    [
-     143.0,
-     -11.0,
-     2.5
-    ],
-    [
-     140.7,
-     -16.0,
-     2.0
-    ]
-   ],
-   "radius_mm": 1.0
-  },
-  {
-   "arch": 3,
-   "part": "epibranchial",
-   "points_zuv_mm": [
-    [
-     140.7,
-     -16.0,
-     2.0
-    ],
-    [
-     143.2,
-     -24.2,
-     8.0
-    ],
-    [
-     147.3,
-     -28.5,
-     20.2
-    ]
-   ],
-   "radius_mm": 1.2
-  },
-  {
-   "arch": 3,
-   "part": "ceratobranchial",
-   "points_zuv_mm": [
-    [
-     147.3,
-     -28.5,
-     20.2
-    ],
-    [
-     151.3,
-     -25.5,
-     31.3
-    ],
-    [
-     154.6,
+     188.2,
      -15.0,
-     40.5
+     44.1
     ]
    ],
-   "radius_mm": 1.4
-  },
-  {
-   "arch": 3,
-   "part": "hypobranchial",
-   "points_zuv_mm": [
-    [
-     154.6,
-     -15.0,
-     40.5
-    ],
-    [
-     158.9,
-     -9.0,
-     44.2
-    ],
-    [
-     163.6,
-     -3.0,
-     46.0
-    ]
-   ],
-   "radius_mm": 1.1
-  },
-  {
-   "arch": 4,
-   "part": "pharyngobranchial",
-   "points_zuv_mm": [
-    [
-     155.0,
-     -6.0,
-     4.0
-    ],
-    [
-     149.0,
-     -11.0,
-     2.5
-    ],
-    [
-     146.7,
-     -16.0,
-     2.0
-    ]
-   ],
-   "radius_mm": 1.0
-  },
-  {
-   "arch": 4,
-   "part": "epibranchial",
-   "points_zuv_mm": [
-    [
-     146.7,
-     -16.0,
-     2.0
-    ],
-    [
-     149.2,
-     -22.0,
-     8.0
-    ],
-    [
-     153.0,
-     -24.0,
-     19.4
-    ]
-   ],
-   "radius_mm": 1.2
+   "radius_mm": 1.0,
+   "plate_mm": 0
   },
   {
    "arch": 4,
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     153.0,
-     -24.0,
-     19.4
-    ],
-    [
-     156.8,
-     -21.0,
-     29.9
-    ],
-    [
-     159.9,
+     188.2,
      -15.0,
-     38.7
+     44.1
+    ],
+    [
+     193.2,
+     -21.5,
+     27.3
+    ],
+    [
+     197.4,
+     -24.5,
+     16.8
     ]
    ],
-   "radius_mm": 1.4
+   "radius_mm": 1.0,
+   "plate_mm": 5.5
   },
   {
    "arch": 4,
-   "part": "hypobranchial",
-   "points_zuv_mm": [
-    [
-     159.9,
-     -15.0,
-     38.7
-    ],
-    [
-     164.2,
-     -9.0,
-     42.2
-    ],
-    [
-     168.8,
-     -3.0,
-     44.0
-    ]
-   ],
-   "radius_mm": 1.1
-  },
-  {
-   "arch": 5,
-   "part": "pharyngobranchial",
-   "points_zuv_mm": [
-    [
-     161.0,
-     -6.0,
-     4.0
-    ],
-    [
-     155.0,
-     -11.0,
-     2.5
-    ],
-    [
-     152.7,
-     -16.0,
-     2.0
-    ]
-   ],
-   "radius_mm": 1.0
-  },
-  {
-   "arch": 5,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     152.7,
+     197.4,
+     -24.5,
+     16.8
+    ],
+    [
+     205.0,
+     -22.2,
+     7.1
+    ],
+    [
+     211.3,
+     -16.0,
+     2.8
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 4.4
+  },
+  {
+   "arch": 4,
+   "part": "pharyngobranchial",
+   "points_zuv_mm": [
+    [
+     211.3,
      -16.0,
      2.0
     ],
     [
-     155.2,
-     -19.2,
-     8.0
-    ],
-    [
-     158.7,
-     -18.5,
-     18.5
+     229.5,
+     -6.0,
+     3.0
     ]
    ],
-   "radius_mm": 1.2
+   "radius_mm": 0.9,
+   "plate_mm": 0
+  },
+  {
+   "arch": 5,
+   "part": "hypobranchial",
+   "points_zuv_mm": [
+    [
+     210.6,
+     -3.0,
+     43.1
+    ],
+    [
+     200.9,
+     -15.0,
+     41.1
+    ]
+   ],
+   "radius_mm": 1.0,
+   "plate_mm": 0
   },
   {
    "arch": 5,
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     158.7,
-     -18.5,
-     18.5
-    ],
-    [
-     162.3,
-     -15.5,
-     28.6
-    ],
-    [
-     165.3,
+     200.9,
      -15.0,
-     37.0
+     41.1
+    ],
+    [
+     205.6,
+     -21.5,
+     25.4
+    ],
+    [
+     209.5,
+     -24.5,
+     15.7
     ]
    ],
-   "radius_mm": 1.4
+   "radius_mm": 1.0,
+   "plate_mm": 5.5
   },
   {
    "arch": 5,
-   "part": "hypobranchial",
+   "part": "epibranchial",
    "points_zuv_mm": [
     [
-     165.3,
-     -15.0,
-     37.0
+     209.5,
+     -24.5,
+     15.7
     ],
     [
-     169.5,
-     -9.0,
-     40.3
+     216.5,
+     -22.2,
+     6.7
     ],
     [
-     174.1,
-     -3.0,
-     42.0
+     222.4,
+     -16.0,
+     2.8
     ]
    ],
-   "radius_mm": 1.1
+   "radius_mm": 1.0,
+   "plate_mm": 4.4
+  },
+  {
+   "arch": 5,
+   "part": "pharyngobranchial",
+   "points_zuv_mm": [
+    [
+     222.4,
+     -16.0,
+     2.0
+    ],
+    [
+     238.0,
+     -6.0,
+     3.0
+    ]
+   ],
+   "radius_mm": 0.9,
+   "plate_mm": 0
   },
   {
    "arch": 0,
    "part": "basibranchial",
    "points_zuv_mm": [
     [
-     149.0,
-     0,
-     50.5
+     157.9,
+     0.0,
+     35.6
     ],
     [
-     184.12,
-     0,
-     48
+     223.6,
+     0.0,
+     43.1
     ]
    ],
-   "radius_mm": 1.8
+   "radius_mm": 1.6
   }
- ]
+ ],
+ "source": "BIODIDAC Squalus acanthias visceral skeleton (I. Livingstone, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/5134"
 }

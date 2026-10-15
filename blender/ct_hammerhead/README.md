@@ -70,7 +70,8 @@ blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
 | 40 | a7d_skel_mesh.py | 骨格の面を、顎・歯・舌の弓を除いて作り直す（HH_skeleton.ply）。このあと a6b_split_head.py |
 | 41 | a7f_gill_field.py ／ a7g_gill_frag.py | エラのまわりを 0.5 mm の格子で（小さな塊も入れて）作り、エラの空気とかけらを見る |
 | 41b | a7g2_gill_air.py | エラの空気（a7_slit.npy）と、左のエラの空気の内と外の端（a7_uin.npy）（2026-10-15 書き起こし。前の work/ と一致） |
-| 42 | a7h_gill_arches.py | エラの骨 5 対と底鰓を作る（並び方は BIODIDAC の Squalus の図、置き場所は左のエラの空気の帯）→ mesh/HH_gill.ply、docs/hammerhead_ct/a7_gill_arches.json |
+| 42 | a7h_gill_arches.py | （旧）エラの骨 5 対と底鰓の 1 回目（細い棒、置き場所は左のエラの空気の帯）。2026-10-15 に 42b で置き換え |
+| 42b | a7h2_gill_options.py B 150 215 2 53.4 | エラの骨（案 B、2026-10-15 決定）。形は BIODIDAC の Squalus の図を読んだ板、吻端から 150〜215 mm、腹の端は体の膜の 6 mm 内側 → mesh/HH_gill.ply、a7_gill_arches_B.json（docs/hammerhead_ct/a7_gill_arches.json に写す） |
 | 43 | a7e_render_head.py ／ a7i_mouth_options.py | 頭の部品を色分けした不透明の静止画（Blender の別シーン HH_HEAD）、口の開き方の案 → docs/hammerhead_ct/a7_head_*.png・a7_mouth_*.png |
 
 確かめた図は `docs/hammerhead_ct/`（comps_named.png、spine_cpr2.png、roll_check.png、pect_posed.png）と `~/transparent-aquarium/シュモクザメ/_確認/`。
