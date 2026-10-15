@@ -186,11 +186,12 @@ function gillRayMaterial() {
 
 // A8 内臓（2026-10-15）: 閉じた面の通り道（表と裏の深さの差）× 色（RGB の吸い方、1 m あたり）を、内臓の通り道に足す。
 //  透明標本の内臓の色の出典はまだ無い。案: ?visccol=cream（体の組織と同じ色）・yellow（黄み、肝臓の油）・blue（青み、消化管の粘液のアルシアン、推定）
-//  強さ ?visc=（既定 0）。1 で 40 mm 通ると、いちばん吸う色で約 0.3 吸う
+//  強さ ?visc=（既定 2、2026-10-15 決定）。1 で 40 mm 通ると、いちばん吸う色で約 0.3 吸う
 const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1, 0.5, 0.42] };
 // 案 2 の部品ごとの色（仮、出典なし）: 肝臓は黄みのクリーム、消化管は淡い青、らせん弁の仕切りは濃い青（強さ 3 倍）
 const ORGAN_COLORS = { Liver: [0.25, 0.45, 1], Gut: [1, 0.5, 0.42], Spiral: [3, 1.5, 1.2] };
-export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 0) },
+export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定、案 2c）
+ 
   color: { value: new THREE.Vector3(...(VISC_COLORS[DENT_Q.get("visccol") ?? "cream"] ?? VISC_COLORS.cream)) } };
 const visceraFragment = `
 uniform float amount;

@@ -96,6 +96,9 @@ step fig a7g_gill_frag.py
 step py a7g2_gill_air.py
 # エラの骨は案 B2（139〜215 mm。2026-10-15 プロデューサー決定。前の B は 150〜215 mm）。前の形（a7h_gill_arches.py）は使わない
 step py a7h2_gill_options.py B2 139 215 2 53.4
+# A8 内臓（案 2c、2026-10-15 プロデューサー決定）: a8a は体腔の形（a8b が読む）、a8b が肝臓・消化管・らせん弁を作る
+HH_VISC_SIGMA=10,3,3 HH_VISC_GAPDIL=0 HH_VISC_OPEN=0 step py a8a_viscera.py
+HH_ORGANS=B HH_SPIRAL=bowl step py a8b_viscera_organs.py
 # A6 glb に書き出す（Blender）
 step blender a6a_export_gltf.py
 # Blender の確認の図（a4f → a5b は同じシーン、a7e → a7i も同じシーンなので、1 つの Blender で続けて走らせる）

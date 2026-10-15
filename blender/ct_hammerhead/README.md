@@ -73,6 +73,8 @@ blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
 | 42 | a7h_gill_arches.py | （旧）エラの骨 5 対と底鰓の 1 回目（細い棒、置き場所は左のエラの空気の帯）。2026-10-15 に 42b で置き換え |
 | 42b | a7h2_gill_options.py B2 139 215 2 53.4 | エラの骨（案 B2、2026-10-15 決定。前の B は 150〜215 mm）。形は BIODIDAC の Squalus の図を読んだ板、吻端から 139〜215 mm（顎のすぐ後ろから）、腹の端は体の膜の 6 mm 内側。7・8 番目の引数で鰓条（使っていない）→ mesh/HH_gill.ply、a7_gill_arches_B2.json（docs/hammerhead_ct/a7_gill_arches.json に写す） |
 | 43 | a7e_render_head.py ／ a7i_mouth_options.py | 頭の部品を色分けした不透明の静止画（Blender の別シーン HH_HEAD）、口の開き方の案 → docs/hammerhead_ct/a7_head_*.png・a7_mouth_*.png |
+| 44 | a8a_viscera.py（HH_VISC_SIGMA=10,3,3 HH_VISC_GAPDIL=0 HH_VISC_OPEN=0） | 体腔の形（CT のすき間を包む形）→ a8_viscera_ct.npy。mesh を付けると CT から取り出した内臓の面（案 1、使っていない） |
+| 45 | a8b_viscera_organs.py（HH_ORGANS=B HH_SPIRAL=bowl） | 内臓（案 2c、2026-10-15 決定）。並び方は BIODIDAC の Squalus の消化器の図、置き場所は CT。肝臓・消化管・らせん弁の仕切り → mesh/HH_liver.ply・HH_gut.ply・HH_spiral.ply、a8_organs.json。このあと a6a_export_gltf.py |
 
 確かめた図は `docs/hammerhead_ct/`（comps_named.png、spine_cpr2.png、roll_check.png、pect_posed.png）と `~/transparent-aquarium/シュモクザメ/_確認/`。
 
