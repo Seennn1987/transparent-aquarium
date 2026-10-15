@@ -1,0 +1,28 @@
+{
+ "source": "BIODIDAC Squalus sp. trunk vertebrae photo (J. Houseman, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/3946; positions and radii from CT",
+ "vertebrae": 199,
+ "z_mm": [
+  101.0,
+  1009.5
+ ],
+ "length_median_mm": 4.5,
+ "radius_mm": {
+  "150": 7.0,
+  "300": 5.2,
+  "500": 5.9,
+  "700": 4.7,
+  "900": 3.2
+ },
+ "gap_mm": 0.5,
+ "arches": true,
+ "jitter": 2.0,
+ "seed": 20261015,
+ "HH_vert_centra": {
+  "faces": 78008,
+  "volume_ml": 54.71
+ },
+ "HH_vert_arches": {
+  "faces": 7960,
+  "volume_ml": 12.12
+ }
+}

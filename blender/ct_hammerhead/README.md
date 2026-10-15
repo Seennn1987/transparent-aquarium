@@ -79,3 +79,4 @@ blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
 確かめた図は `docs/hammerhead_ct/`（comps_named.png、spine_cpr2.png、roll_check.png、pect_posed.png）と `~/transparent-aquarium/シュモクザメ/_確認/`。
 
 注意: 前の担当の Mac 上の Linux（メモリ約 4 GB）では、全体の体積（2093×512×512）に 3D の塊分けをかけるとメモリが足りないため、体の範囲に切った zyg_clean.npy（2093×108×430）で行っていた。24 GB の Mac でも同じ手順で動き、結果を変えないため切ったままにしている。
+| 46 | a8c_vertebrae.py（HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8） | 背骨（案 E、2026-10-15 決定）。形は BIODIDAC の Squalus の椎骨の写真、位置と太さは CT。中の詰まった椎体 → mesh/HH_vert_centra.ply（glb の部品 Centrum、a6a に HH_VERT_CENTRA_PART=Centrum）、背と腹の弓 → mesh/HH_vert_arches.ply（Cartilage に足す）。CT の殻 HH_bone は Bone のまま |

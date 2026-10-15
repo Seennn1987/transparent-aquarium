@@ -99,6 +99,9 @@ step py a7h2_gill_options.py B2 139 215 2 53.4
 # A8 内臓（案 2c、2026-10-15 プロデューサー決定）: a8a は体腔の形（a8b が読む）、a8b が肝臓・消化管・らせん弁を作る
 HH_VISC_SIGMA=10,3,3 HH_VISC_GAPDIL=0 HH_VISC_OPEN=0 step py a8a_viscera.py
 HH_ORGANS=B HH_SPIRAL=bowl step py a8b_viscera_organs.py
+# A8 背骨（案 E、2026-10-15 プロデューサー決定）: 椎体と弓を部品から作り、椎体は別の部品 Centrum（CT の殻は Bone のまま）
+HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8 step py a8c_vertebrae.py
+export HH_VERT_CENTRA_PART=Centrum
 # A6 glb に書き出す（Blender）
 step blender a6a_export_gltf.py
 # Blender の確認の図（a4f → a5b は同じシーン、a7e → a7i も同じシーンなので、1 つの Blender で続けて走らせる）
