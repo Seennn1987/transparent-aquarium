@@ -15,7 +15,8 @@ const HAMMERHEAD_URL = new URL("../assets/specimen_hammerhead.glb", import.meta.
 export const HH_DISH = {
   clearance: 0.12,        // 器の単位。カメレオンの瓶と同じ空き（計画書 第 4 節 C2 の目安）
   tailSwing: 0.09,        // 尾の先の片側の振れ（全長に対して、hammerhead-swim.js の既定）
-  // 器の直径の、サメに対する倍率（C1 の大きさを 1）。決まるまでの仮の既定 2。?dish= で変える
+  // 器の大きさの、サメに対する倍率（C1 の大きさを 1）。器の形はそのままでサメを 1 / 倍率に描くので、直径も高さもサメに対してこの倍率になる。
+  //  既定 2（2026-10-15 プロデューサー「2倍、高さも2倍」）。?dish= で変える
   ratio: Number(new URLSearchParams(location.search).get("dish") ?? 2),
 };
 
