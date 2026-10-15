@@ -24,9 +24,9 @@ SEGMENTS = 200
 BODY_R = 1.0
 # ガラスの厚み: 既定は瓶と同じ（壁 0.045、底 0.12）。2026-10-15 プロデューサー「先にびんをもっと薄くして欲しいかも」→ 案を環境変数で作る
 #  DISH_WALL（壁の厚み）、DISH_FLOOR（内側の底の高さ = 底のガラスの厚み）。台座は底に合わせて薄くする
-WALL = float(os.environ.get("DISH_WALL", 0.045))
-FLOOR_Z = float(os.environ.get("DISH_FLOOR", 0.12))
-# 台座と口の縁は、既定の寸法（台座の張り出し 0.06・円盤 0.06・角 0.025、口の丸み 0.012）を厚みに比例して縮める（既定の厚みでは前と同じ形）
+WALL = float(os.environ.get("DISH_WALL", 0.012))   # 2026-10-15 決定「とても薄い（壁 0.012）＋縁控えめ」（前は瓶と同じ 0.045）
+FLOOR_Z = float(os.environ.get("DISH_FLOOR", 0.035))   # 同（前は 0.12）
+# 台座と口の縁は、壁 0.045・底 0.12 のときの寸法（台座の張り出し 0.06・円盤 0.06・角 0.025、口の丸み 0.012）を厚みに比例して縮める
 FOOT_R = BODY_R + 0.06 * WALL / 0.045
 FOOT_DISC = 0.06 * FLOOR_Z / 0.12
 FOOT_ROUND = 0.025 * FLOOR_Z / 0.12
@@ -38,8 +38,8 @@ LIQUID_TOP = RIM_Z - 0.05
 LIQUID_GAP = 0.004
 # 液の縁（メニスカス）: 瓶では蓋の下に隠れるが、蓋の無い器では上から白い帯がガラスの二重のように見えた（2026-10-15、プロデューサー「ガラス部分が二重になっていないでしょうか？」）。
 #  DISH_MENISCUS（高さ、既定 0.018）・DISH_MENISCUS_W（幅、既定 0.07。液の面の縁の曲がりは幅の 6/7）で案を作る
-MENISCUS = float(os.environ.get("DISH_MENISCUS", 0.018))
-MENISCUS_W = float(os.environ.get("DISH_MENISCUS_W", 0.07))
+MENISCUS = float(os.environ.get("DISH_MENISCUS", 0.006))   # 同（前は 0.018）
+MENISCUS_W = float(os.environ.get("DISH_MENISCUS_W", 0.025))   # 同（前は 0.07）
 
 
 def arc(cx, cz, r, a0, a1, steps):
