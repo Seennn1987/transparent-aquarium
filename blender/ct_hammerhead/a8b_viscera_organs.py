@@ -46,6 +46,8 @@ ORGANS_B = {
 SPIRAL_B = dict(z=(352, 462), pitch=10.0, center=(2, 34), slope=0.6, thick=0.8)   # 漏斗形の段: 10 mm おきに、後ろへ開く浅い円錐
 if os.environ.get('HH_ORGANS') == 'B':
     ORGANS = ORGANS_B; SPIRAL = SPIRAL_B
+if os.environ.get('HH_SPIRAL') == 'bowl':   # 2026-10-15 案 2c（プロデューサー「まだ直線的で角があるように見えます」）
+    SPIRAL = dict(z=(352, 462), pitch=10.0, center=(2, 34), shape='bowl', depth=9.0, thick=0.9)
 def tube(pts, r, a):
     P = np.array(pts, float); R = np.array(r, float)
     lo = P.min(0) - R.max() - 2; hi = P.max(0) + R.max() + 2
@@ -79,7 +81,13 @@ for k in range(int(z0s / VX), int(z1s / VX)):
     if not inside.any(): continue
     UU, VVv = np.meshgrid(us, vs); du, dv = UU - cu, VVv - cv
     ang = np.arctan2(dv, du); rad = np.hypot(du, dv)
-    if 'slope' in SPIRAL:   # 漏斗形: 段 i の円錐は z = z_i + slope × 中心からの距離（後ろへ開く）。いちばん近い段だけを見る
+    if SPIRAL.get('shape') == 'bowl':   # 2026-10-15 お椀形: 段の面を放物面にし（中心から外へなだらかに曲がる）、段を回してずらす（らせんでつながる）
+        Rl = max(float(rad[inside].max()), 3.0)
+        off = (z - z0s) - SPIRAL['depth'] * (rad / Rl) ** 2 - SPIRAL['pitch'] * ang / (2 * np.pi)
+        rem = off - SPIRAL['pitch'] * np.round(off / SPIRAL['pitch'])
+        thick = SPIRAL['thick'] * (1 - 0.5 * (rad / Rl) ** 2)       # ふちほど薄く
+        sheet = inside & (np.abs(rem) < thick) & (rad > 1.0)
+    elif 'slope' in SPIRAL:   # 漏斗形: 段 i の円錐は z = z_i + slope × 中心からの距離（後ろへ開く）。いちばん近い段だけを見る
         off = (z - z0s) - SPIRAL['slope'] * rad
         rem = off - SPIRAL['pitch'] * np.round(off / SPIRAL['pitch'])
         sheet = inside & (np.abs(rem) < SPIRAL['thick']) & (rad > 1.5)
@@ -106,7 +114,7 @@ for li, name in enumerate(names, start=1):
     zz, yy, xx = np.nonzero(OUTL == li)
     if len(zz) == 0: info['organs'][name] = 0; continue
     lo = np.array([zz.min(), yy.min(), xx.min()]) - 3; hi = np.array([zz.max(), yy.max(), xx.max()]) + 4
-    sub = nd.gaussian_filter((OUTL[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]] == li).astype(np.float32), 0.8 if name == 'spiral' else 1.2)
+    sub = nd.gaussian_filter((OUTL[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]] == li).astype(np.float32), (1.1 if SPIRAL.get('shape') == 'bowl' else 0.8) if name == 'spiral' else 1.2)
     if sub.max() < 0.5: continue
     v, f, _, _ = marching_cubes(np.pad(sub, 1), 0.5, allow_degenerate=False); v = v - 1 + lo + np.array([k0, 0, 0])
     Vs.append((name, v, f)); info['organs'][name] = round(float(len(zz) * VX ** 3 / 1000), 1)

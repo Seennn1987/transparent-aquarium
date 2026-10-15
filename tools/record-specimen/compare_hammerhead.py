@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 VIEW_NAMES = {"top": "背中から（view=top）", "side": "横から（view=side）", "display": "展示の姿勢（指定なし）",
               "below": "腹から（view=below）", "front": "前から（view=front）",
               "sidezoom": "横から・拡大（view=side）",
-              "topzoom": "背中から・拡大（view=top）", "headtop": "頭を背中から（focus=head）", "headfront": "頭を前から（focus=head）", "mirrortop": "背中から折り返し\n（違う所が赤）", "moved": "強さ 0 から\n動いた所（赤）", "headbelow": "頭を腹から（focus=head）", "headside": "横から・拡大", "sidehead": "横から（focus=head）", "belowhead": "腹から（focus=head）", "gillside": "エラの骨だけ（横から）", "gillbelow": "エラの骨だけ（腹から）", "movedtop": "背中から：\n動いた所（赤）", "movedfront": "前から：\n動いた所（赤）", "mirrorbelow": "腹から折り返し\n（違う所が赤）", "belowzoom": "腹から・拡大（view=below）", "frontzoom": "前から・拡大（view=front）",
+              "topzoom": "背中から・拡大（view=top）", "headtop": "頭を背中から（focus=head）", "headfront": "頭を前から（focus=head）", "mirrortop": "背中から折り返し\n（違う所が赤）", "moved": "強さ 0 から\n動いた所（赤）", "headbelow": "頭を腹から（focus=head）", "headside": "横から・拡大", "spiralzoom": "らせん弁を拡大\n（横から）", "sidehead": "横から（focus=head）", "belowhead": "腹から（focus=head）", "gillside": "エラの骨だけ（横から）", "gillbelow": "エラの骨だけ（腹から）", "movedtop": "背中から：\n動いた所（赤）", "movedfront": "前から：\n動いた所（赤）", "mirrorbelow": "腹から折り返し\n（違う所が赤）", "belowzoom": "腹から・拡大（view=below）", "frontzoom": "前から・拡大（view=front）",
               "displayzoom": "展示の姿勢・拡大（指定なし）"}
 FONT_PATHS = ["/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"]
 
