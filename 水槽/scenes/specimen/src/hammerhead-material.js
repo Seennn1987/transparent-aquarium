@@ -157,8 +157,9 @@ function mottleMaterial() {
 // A8 鰓条（2026-10-15、プロデューサー「鰓条は今は入れず、A8 で質感として扱ってください」）: エラの骨の表面に、体に貼り付いた細い縞を足す。
 //  エラの骨は咽頭のまわりを輪のように回るので、輪の中心（背腹 25 mm 腹側、正中）のまわりの角度で縞を作ると、骨の輪に直角な線（鰓条の向き）になる。
 //  出典の図（BIODIDAC の Squalus）では鰓条は角鰓・上鰓の後ろのふちに並ぶ。間隔は ?rayspace= mm（既定 1.8、出典なし）。
-//  色はエラの骨と同じ（hammerhead-stain.js の organs.gillray）。強さ ?rays=（既定 0）
-export const gillRayLook = { amount: { value: Number(DENT_Q.get("rays") ?? 0) }, space: { value: Number(DENT_Q.get("rayspace") ?? 1.8) / 1000 } };
+//  色はエラの骨と同じ（hammerhead-stain.js の organs.gillray）。強さ ?rays=（既定 2、2026-10-15 決定）
+export const gillRayLook = { amount: { value: Number(DENT_Q.get("rays") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定）
+  space: { value: Number(DENT_Q.get("rayspace") ?? 1.8) / 1000 } };
 const gillRayFragment = `
 uniform float amount;
 uniform float space;
