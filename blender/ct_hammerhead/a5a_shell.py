@@ -51,6 +51,31 @@ Rs=ndi.median_filter(Rs,size=(5,1),mode='nearest'); Rs=ndi.gaussian_filter1d(Rs,
 # 角度方向にもならす（6°）。尾びれ（700 mm〜）は板の縁を残すためならさない
 for i in range(len(zs)):
     if 120<=zmm[i]<700: Rs[i]=ndi.gaussian_filter1d(Rs[i],3,mode='wrap')
+# 2026-10-16（プロデューサー「胴の表面に不自然な凹凸があったり、波打ったりしています。そんなサメいないですよね。もう一度自己検証して修正方針を立てて」→「進めて」）:
+#  HH_SHELL_FIT=smooth で、120〜720 mm の断面を、上の「60° の中央値で切る」代わりに、なめらかな閉じた曲線で当てる（計画書 第 9 節「胴の表面の凹凸の自己検証」）。
+#  中央値で切ると、背骨から遠い腹（CT で 76〜79 mm）が横の値まで削られ（54〜58 mm）、切り口が約 57 mm おきに波打っていた。
+#   - 断面ごとに、左右対称の項（1, sinθ, cos2θ, sin3θ, cos4θ, sin5θ, cos6θ。θ は横 0°・腹 90°）を当てる。曲線より 2.5 mm より外に出た所
+#     （背びれ・臀びれ・腹びれの肉）は重みを 0.05 にして当て直す（5 回）
+#   - 胸びれの肉が垂れた区間（CT の 205〜290 mm、腹が 107〜115 mm に飛ぶ）は、前後の断面の係数を直線でつなぐ
+#   - 係数を体軸方向に σ 20 mm（HH_SHELL_SIGMA）でならす。115〜135 mm と 690〜720 mm で前のやり方と混ぜる
+import os as _os2
+if _os2.environ.get('HH_SHELL_FIT')=='smooth':
+    _A=np.stack([np.ones(NT),np.sin(TH),np.cos(2*TH),np.sin(3*TH),np.cos(4*TH),np.sin(5*TH),np.cos(6*TH)],1)
+    _C=np.zeros((len(zs),_A.shape[1]))
+    for i in range(len(zs)):
+        r=(R[i]+R[i][mirror])/2; w=(r>0).astype(float)
+        if w.sum()<20: continue
+        for _ in range(5):
+            c=np.linalg.lstsq(_A*w[:,None],r*w,rcond=None)[0]; res=r-_A@c
+            w=np.where(r<=0,0,np.where(res>2.5,0.05,1.0))
+        _C[i]=c
+    _a,_b=np.searchsorted(zmm,205),np.searchsorted(zmm,290)
+    for j in range(_C.shape[1]): _C[_a:_b,j]=np.interp(zmm[_a:_b],[zmm[_a-1],zmm[_b]],[_C[_a-1,j],_C[_b,j]])
+    _Cs=ndi.gaussian_filter1d(_C,float(_os2.environ.get('HH_SHELL_SIGMA',20))/(STEP*VX),axis=0,mode='nearest')   # HH_SHELL_SIGMA mm（既定 20。10 では 90 mm おきの ±1.5 mm の波が残った）
+    _Rf=np.maximum(_Cs@_A.T,0.5)
+    _t=np.clip((zmm-115)/20,0,1)*(1-np.clip((zmm-690)/30,0,1))
+    Rs=(1-_t[:,None])*Rs+_t[:,None]*_Rf
+
 def kfac(z):
     if z<=150: return 1.0
     if z<=175: return 1+0.55*(z-150)/25
@@ -133,7 +158,7 @@ if _os.environ.get('HH_TRUNK_PROFILE')=='ref':
     _Wt=PchipInterpolator(_fw,_ww)(np.clip(_f,_fw[0],_fw[-1]))*TLf
     _cw=np.maximum(np.interp(_zk,zmm,ct_w),1)
     _kr=_Wt/_cw; _kr=np.maximum(_kr,np.where(_f<0.16,1.0,0.85))
-    _a=np.clip((_zk-125)/15,0,1)*(1-np.clip((_f-0.70)/0.04,0,1))
+    _a=(np.clip((_zk-115)/60,0,1) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.clip((_zk-125)/15,0,1))*(1-np.clip((_f-0.70)/0.04,0,1))   # smooth: 115〜175 mm でゆっくり（首の段を作らない）
     _K=_old+MIX*_a*(_kr-_old)
     _K=np.where(_zk<115,_old,ndi.gaussian_filter1d(_K,3))
     # 高さ
@@ -145,7 +170,7 @@ if _os.environ.get('HH_TRUNK_PROFILE')=='ref':
     kboth=_Dt/(Dd+Db); kback=(_Dt-Db)/Dd
     wb=np.clip((_f-0.22)/0.06,0,1)*(1-np.clip((_f-0.42)/0.06,0,1))
     kd=(1-wb)*kboth+wb*kback; kb=(1-wb)*kboth+wb*1.0
-    _g=np.clip((_zk-120)/15,0,1)*(1-np.clip((_f-0.68)/0.03,0,1))
+    _g=(np.clip((_zk-110)/80,0,1) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.clip((_zk-120)/15,0,1))*(1-np.clip((_f-0.68)/0.03,0,1))
     kd=1+_g*(np.clip(kd,0.8,2.0)-1); kb=1+_g*(np.clip(kb,0.8,2.0)-1)
     LOBE=float(_os.environ.get('HH_TRUNK_LOBE',1.35))
     kb=kb*(1+(LOBE-1)*np.interp(_zk,[720,760,820],[0,1,0]))
@@ -162,17 +187,43 @@ if STAGE=='2':
     S0=np.lib.format.open_memmap('a5_S0.npy',mode='w+',dtype=np.bool_,shape=(NZ,NV,NU))
     for k in range(NZ):
         z=k*VX
-        if z<115:
+        NB0,NB1=(100.0,140.0) if _os.environ.get('HH_SHELL_FIT')=='smooth' else (115.0,115.0)
+        if z<NB1:
             # 頭: 翼の後ろの端は断面で左右の離れた島になるので、最大の塊だけでなく 30 ボクセル以上の塊をすべて残す
             m=ndi.binary_fill_holes(np.asarray(F[k])>-400); lab,n=ndi.label(m)
             if n:
                 sz=ndi.sum(m,lab,range(1,n+1)); m=np.isin(lab,1+np.nonzero(sz>=30)[0]); m=m|m[:,::-1]
-            S[k]=m; S0[k]=m; continue
+            if z<NB0: S[k]=m; S0[k]=m; continue
+            # 口の中の空洞は 142 mm まで外へ開いていて、142.6 mm で閉じる。穴を埋める前に小さな口を閉じないと、そこで断面が 5 割増しに跳び、輪の線になった
+            #  → 体の正中に近い塊（重心が正中から 50 mm 以内）をまとめて外形で包む（翼の端の離れた島はそのまま）
+            from skimage.morphology import convex_hull_image
+            _lb,_n=ndi.label(m)
+            if _n:
+                _cu=np.array(ndi.center_of_mass(m,_lb,range(1,_n+1)))[:,1]*VX+U0
+                _mid=np.isin(_lb,1+np.nonzero(np.abs(_cu)<50)[0])
+                if _mid.any(): mh=(m&~_mid)|convex_hull_image(_mid)
+                else: mh=m
+            else: mh=m
+            # 2026-10-16 HH_SHELL_FIT=smooth: 100〜140 mm で（CT の頭の断面は 142.6 mm で横へ ±41 → ±64 mm に跳ぶので、その前で胴へ移り終える）、頭の断面（CT）と胴の曲線を符号つき距離で少しずつ混ぜる（115 mm の段をなくす）
+            r=np.array([np.interp(z,zmm,Rs[:,j]) for j in range(NT)]); kk=kfac(z); vc=vc_of(z); _kd,_kb=kdv(z)
+            tr=np.zeros((NV,NU),bool)
+            pu=r*np.cos(TH)*kk; pv=r*np.sin(TH)*((_kd+_kb)/2+(_kb-_kd)/2*np.sin(TH))+vc
+            if z>=120:
+                from scipy.spatial import ConvexHull
+                _h=ConvexHull(np.c_[pu,pv]).vertices; pu,pv=pu[_h],pv[_h]
+            rr,cc=skpoly((pv-V0)/VX,(pu-U0)/VX,shape=(NV,NU)); tr[rr,cc]=True
+            sd=lambda a: ndi.distance_transform_edt(~a)-ndi.distance_transform_edt(a)
+            t=(z-NB0)/(NB1-NB0); t=t*t*(3-2*t)
+            mm=((1-t)*((1-t)*sd(m)+t*sd(mh))+t*sd(tr))<0   # 100 mm では CT の頭の断面そのもの → 包んだ形 → 胴の曲線
+            S[k]=mm; S0[k]=mm; continue
         r=np.array([np.interp(z,zmm,Rs[:,j]) for j in range(NT)]); kk=kfac(z); vc=vc_of(z)
         if r.max()<1: continue
         _kd,_kb=kdv(z)
         for arr,kx,kd_,kb_ in ((S0,1.0,1.0,1.0),(S,kk,_kd,_kb)):
-            pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)*np.where(np.sin(TH)<0,kd_,kb_)+vc
+            pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)*((kd_+kb_)/2+(kb_-kd_)/2*np.sin(TH) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.where(np.sin(TH)<0,kd_,kb_))+vc
+            if _os.environ.get('HH_SHELL_FIT')=='smooth' and 120<=z<700:   # 胴の断面は外へ膨らんだ形（ひれは別に足す）。くびれを残さず外形で包む
+                from scipy.spatial import ConvexHull
+                _h=ConvexHull(np.c_[pu,pv]).vertices; pu,pv=pu[_h],pv[_h]
             rr,cc=skpoly((pv-V0)/VX,(pu-U0)/VX,shape=(NV,NU)); arr[k,rr,cc]=True
     S.flush(); S0.flush(); print('stage2 ok')
 if STAGE=='3':
