@@ -7,14 +7,16 @@
 #   高さ 0.79、咽鰓の長さ 0.40、板の幅 0.085
 #  左右の位置（前から見た輪）は a7h_gill_arches.py と同じ（外の角はエラの空気の内側の端のすぐ内）
 #  座標: z 吻端→尾、u 左右（左が負）、v 背−/腹+（背骨の中心が 0）、mm
-#  使い方: python3 a7h2_gill_options.py <名前> <前の端 z> <5 番目の角鰓の後ろ z> <背の高さ v> <腹の高さ v>
+#  使い方: python3 a7h2_gill_options.py <名前> <前の端 z> <5 番目の角鰓の後ろ z> <背の高さ v> <腹の高さ v> [鰓条の長さ（並びの長さに対する比）] [鰓条の半径 mm（既定 0.45）]
+#  鰓条（2026-10-15 足した）: 出典の図で角鰓と上鰓の板の後ろのふちに並ぶ細い突起。板のふちから後ろへ少し外向きに、約 2.5 mm おき、半径 0.45 mm。
+#   長さを省くか 0 にすると作らない
 #   出力: HH_MESH/HH_gill.ply、a7_gill_arches_<名前>.json。腹の端は体の膜（a5_S_open.npy）の 6 mm 内側までに切る
 import hh_paths; hh_paths.cd_work()
 import numpy as np, json, sys
 from scipy import ndimage as nd
 from skimage.measure import marching_cubes
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
-TAG = sys.argv[1]; ZF, ZB, VT, VB = map(float, sys.argv[2:6])
+TAG = sys.argv[1]; ZF, ZB, VT, VB = map(float, sys.argv[2:6]); RAY = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0; RAY_R = float(sys.argv[7]) if len(sys.argv) > 7 else 0.45
 d = np.load('a7_gill_field.npz'); og = d['origin']; Gg = float(d['step'])
 uin, uout = np.load('a7_uin.npy')
 def u_inner(z, v):
@@ -48,6 +50,13 @@ for k, (z0, h) in enumerate(zip(z0s, hs)):
     pb = [(z0 + 0.55 * h, -16, VT), (z0 + 0.55 * h + LP * (1 - 0.1 * k), -6, VT + 1)]
     for name, pts, r, w in (('hypobranchial', hb, 1.0, 0), ('ceratobranchial', cb, 1.0, WP), ('epibranchial', eb, 1.0, WP * 0.8), ('pharyngobranchial', pb, 0.9, 0)):
         segs.append((poly(pts, 60), r, w)); arches.append(dict(arch=k + 1, part=name, points_zuv_mm=np.round(np.asarray(pts, float), 1).tolist(), radius_mm=r, plate_mm=round(w, 1)))
+        if RAY > 0 and w > 0:                       # 鰓条: 板の後ろのふち（線から +z へ w）から、後ろへ少し外向きに
+            L = RAY * SPAN0; P = poly(pts, 200); t = np.r_[0, np.cumsum(np.linalg.norm(np.diff(P, axis=0), axis=1))]
+            dirv = np.array([1.0, -0.3, 0.0]); dirv /= np.linalg.norm(dirv)
+            for s_ in np.arange(1.2, t[-1] - 1.2, 2.5):
+                q = np.array([np.interp(s_, t, P[:, i]) for i in range(3)]) + np.array([w, 0, 0])
+                segs.append((poly([q, q + L * dirv], 20), RAY_R, 0))
+                ray_n = globals().get('ray_n', 0) + 1; globals()['ray_n'] = ray_n
 bb0 = (z0s[0] + 0.25 * hs[0], 0, VT + hs[0] + 2); bb1 = (z0s[4] + 0.25 * hs[4] + 0.2 * SPAN0, 0, VT + hs[4] + 2)
 segs.append((poly([bb0, bb1], 60), 1.6, 0)); arches.append(dict(arch=0, part='basibranchial', points_zuv_mm=np.round([bb0, bb1], 1).tolist(), radius_mm=1.6))
 # 体積にして面を作る（0.35 mm）。板は、線から後ろ（+z）へ幅 w の帯
@@ -68,7 +77,7 @@ R = rad[ind[0], ind[1], ind[2]]; fld = nd.gaussian_filter((R - dist).astype(np.f
 v, f, _, _ = marching_cubes(np.pad(fld, 1, constant_values=-5), 0.0, allow_degenerate=False); v -= 1
 Pm = np.stack([Z0 + v[:, 0] * G, U0b + v[:, 2] * G, -(V0b + v[:, 1] * G)], 1) / 1000
 write_ply(f'{OUT}/HH_gill.ply', Pm, f)
-rep = dict(tag=TAG, front_z=ZF, fifth_ceratobranchial_back_z=ZB, dorsal_v=VT, ventral_v_max=VB, spacing_mm=round(sp, 2),
+rep = dict(tag=TAG, rays=dict(length_frac=RAY, length_mm=round(RAY * SPAN0, 1), count_one_side=int(globals().get('ray_n', 0)), spacing_mm=2.5, radius_mm=RAY_R), front_z=ZF, fifth_ceratobranchial_back_z=ZB, dorsal_v=VT, ventral_v_max=VB, spacing_mm=round(sp, 2),
            heights_mm=[round(x, 1) for x in hs], pharyngobranchial_mm=round(LP, 1), plate_mm=round(WP, 1),
            body_ventral_at_front_mm=[round(body_ventral(z), 1) for z in z0s], faces=int(len(f)), elements=arches,
            source='BIODIDAC Squalus acanthias visceral skeleton (I. Livingstone, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/5134')
