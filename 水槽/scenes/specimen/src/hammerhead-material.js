@@ -89,7 +89,7 @@ function denticleMaterial() {
 
 // A8 まだら: 体の膜の表面に、体に貼り付いた大きなむら（数 cm）を足す。chameleon-material.js の内臓の通り道（organ、色を自由に
 //  決められる RGB の吸い方）を使い、膜の表面を横切るたびに「むら × 1 / |cos|」× 色を足す（皮歯と同じ考え方）。
-//  むらは体の座標の 3 次元のなめらかな乱数（2 段、決まった種）。色は hammerhead-stain.js の organs.mottle。強さは ?mottle=（既定 0）、
+//  むらは体の座標の 3 次元のなめらかな乱数（2 段、決まった種）。色は hammerhead-stain.js の organs.mottle。強さは ?mottle=（既定 0.5、2026-10-15 決定）、
 //  むらの大きさは ?mottlecell= mm（既定 40）
 // 輪郭（表面を斜めに見る所）で色がたまらないよう、1 / |cos| の上限を ?mottlecos=（既定 0.6 = 最大 1.7 倍）で抑える（0.2 では輪郭が茶色く縁取られた）
 export const mottleLook = { cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };

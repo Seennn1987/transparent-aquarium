@@ -19,8 +19,8 @@ async function start() {
   chameleonLook.boneT0.value = HH_BONE_T0;
   // A8 皮歯の強さ（膜の層の通り道。hammerhead-material.js の denticleMaterial）。既定 1（2026-10-15 プロデューサー決定）。?dent=0 で皮歯なし
   chameleonLook.film.value = Number(query.get("dent") ?? 1);
-  // A8 まだらの強さ（内臓の通り道。hammerhead-material.js の mottleMaterial）。既定 0 = まだらなし
-  chameleonLook.organs.value = Number(query.get("mottle") ?? 0);
+  // A8 まだらの強さ（内臓の通り道。hammerhead-material.js の mottleMaterial）。既定 0.5（2026-10-15 プロデューサー決定）。?mottle=0 でまだらなし
+  chameleonLook.organs.value = Number(query.get("mottle") ?? 0.5);
   const ss = Number(query.get("ss")) || 2;
   const lightbox = createLightbox(renderer, { stain: "hammerhead", supersample: ss });
   document.body.style.background = "rgb(253,247,251)";
