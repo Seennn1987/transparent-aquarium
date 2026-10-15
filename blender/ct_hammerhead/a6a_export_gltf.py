@@ -21,12 +21,15 @@ MESH = hh_paths.MESH
 OUT = hh_paths.GLB
 PARTS = {
     "Bone": (["HH_bone"], 60000),
-    "Cartilage": (["HH_skel_rest", "HH_girdle", "HH_pect_L", "HH_pect_R", "HH_pelv_L", "HH_pelv_R", "HH_dfin1", "HH_dfin2", "HH_anal"], 110000),
+    "Cartilage": (["HH_skel_rest", "HH_girdle", "HH_pect_L", "HH_pect_R", "HH_dfin1", "HH_dfin2", "HH_anal"], 103200),   # 減らす割合は分ける前（110000 / 250025）と同じ
+    # 2026-10-15 腹びれの軟骨と膜は別の部品（プロデューサー「パーツ種別ごとに色や濃さを調整できるようにしたい」「腹鰭がかなり透明」）
+    "PelvicCartilage": (["HH_pelv_L", "HH_pelv_R"], 6800),
     "HeadCartilage": (["HH_skel_head"], 150000),
     "Jaw": (["HH_jaw_upper", "HH_jaw_lower"], 90000),
     "Teeth": (["HH_teeth_upper", "HH_teeth_lower"], 40000),
     "Gill": (["HH_hyoid", "HH_gill"], 60000),
-    "Skin": (["HH_body", "HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R"], 160000),
+    "Skin": (["HH_body", "HH_pectmem_L", "HH_pectmem_R"], 152300),   # 同（160000 / 1540502）
+    "PelvicSkin": (["HH_pelvmem_L", "HH_pelvmem_R"], 7700),
 }
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):

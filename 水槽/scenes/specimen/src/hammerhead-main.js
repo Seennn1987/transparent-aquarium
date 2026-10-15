@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createOrbit } from "./orbit.js";
-import { createLightbox, chameleonLook } from "./chameleon-material.js";
+import { chameleonLook } from "./chameleon-material.js";
+import { createHammerheadLightbox } from "./hammerhead-lightbox.js";
+import { installHammerheadTune } from "./hammerhead-tune.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
 import { createSwim, swimLook, mouthLook, heartLook, gillLook } from "./hammerhead-swim.js";
@@ -26,7 +28,8 @@ async function start() {
   // A8 内臓の通り道（まだら・鰓条）。強さはそれぞれの式の中（hammerhead-material.js の mottleLook・gillRayLook）にあるので、ここは 1
   chameleonLook.organs.value = 1;
   const ss = Number(query.get("ss")) || 2;
-  const lightbox = createLightbox(renderer, { stain: "hammerhead", supersample: ss });
+  // 2026-10-15 色の層を 8 つにしたシュモクザメ専用のライトボックス（hammerhead-lightbox.js）
+  const lightbox = createHammerheadLightbox(renderer, { supersample: ss });
   document.body.style.background = "rgb(253,247,251)";
 
   const gltf = await new GLTFLoader().loadAsync(URL_GLB);
@@ -115,13 +118,19 @@ async function start() {
     ["胴の色", [["A 前の色", "A"], ["B 胴の真ん中", "B"], ["C 胴全体", "C"], ["D 胴全体（画面で合わせる、決定）", "D"]], () => query.get("tissue") ?? "D",
       (v) => { const q = new URLSearchParams(location.search); if (v === "D") q.delete("tissue"); else q.set("tissue", v); location.search = q.toString(); }],
   ], "参考の胚の体の組織: 前に測った 1 点 0.79 / 0.66 / 0.57（A）、胴の真ん中 0.81 / 0.76 / 0.69（B）、胴全体 0.80 / 0.81 / 0.75（C）。D は皮歯・まだら・内臓の分を差し引いて、画面で C の値になるようにした");
+  // 色と濃さの調整の欄（右上の「調整」。?tune=1 で開いて始める、?tune=0 で出さない）。撮る道具は ?tune=0 を付けなくても欄は閉じている
+  const tune = query.get("tune") !== "0" ? installHammerheadTune({ open: query.get("tune") === "1" }) : null;
   document.body.dataset.ready = "1";
   window.hammerheadPage = {
     look: chameleonLook, renderer, lightbox, camera, model, swim, swimLook,
-    setPaused(v) { paused = Boolean(v); }, get paused() { return paused; },
+    setPaused(v) { paused = Boolean(v); }, get paused() { return paused; }, tune,
+    // 測る道具（measure-hammerhead.mjs）のために、前の 4 層の並び（r 骨＋歯、g 軟骨＋顎＋エラ＋腹びれの軟骨、b 肉、a 頭骨）にまとめて返す
     paths() {
-      const t = lightbox.target; const out = new Float32Array(t.width * t.height * 4);
+      const t = lightbox.target, t2 = lightbox.target2, n = t.width * t.height * 4;
+      const out = new Float32Array(n), b = new Float32Array(n);
       renderer.readRenderTargetPixels(t, 0, 0, t.width, t.height, out);
+      renderer.readRenderTargetPixels(t2, 0, 0, t2.width, t2.height, b);
+      for (let i = 0; i < n; i += 4) { out[i] += b[i + 3]; out[i + 1] += b[i] + b[i + 1] + b[i + 2]; }
       return { width: t.width, height: t.height, data: out };
     },
   };

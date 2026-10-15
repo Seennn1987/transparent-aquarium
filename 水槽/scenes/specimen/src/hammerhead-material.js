@@ -22,9 +22,19 @@ const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE
   Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0.3), Number(new URLSearchParams(location.search).get("arch") ?? 0.08), 0, 0] };   // 既定 骨 0.3・軟骨 0.08（同「H1」）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
 const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（推定、b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
 for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描く
-const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", ...HEARTS]);   // 2026-10-15 前の glb には無い
+const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", ...HEARTS]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
+// 2026-10-15 色の層を 8 つにした（hammerhead-lightbox.js）。部品ごとの、層 A（背骨・ひれの軟骨・肉・頭骨）と層 B（顎・エラの骨・腹びれの軟骨・歯）への重み。
+//  顎・エラの骨の色の混ぜ方（?jawbone=・?gillbone=・?gillcart=）は、層の色（HH_CHANNELS）の方に入る。腹びれの軟骨と膜は別の部品にした（a6a_export_gltf.py）
+CHANNEL.PelvicCartilage = 1; CHANNEL.PelvicSkin = 2;
+const LAYERS = {
+  Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: CHANNEL.Arch }, Cartilage: { a: [0, 1, 0, 0] },
+  Skin: { a: [0, 0, 1, 0] }, PelvicSkin: { a: [0, 0, 1, 0] }, HeadCartilage: { a: [0, 0, 0, 1] },
+  Jaw: { b: [1, 0, 0, 0] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
+};
+/** 部品ごとの濃さの倍率（調整の欄。既定 1）。 */
+export const hhPartLook = Object.fromEntries([...Object.keys(LAYERS), "Liver", "Gut", "Spiral", "Heart", "HeartLarge", "HeartSmall", "Viscera"].map((k) => [k, { value: 1 }]));
 
 const ASYM_GLSL = `
 // A8 左右差（2026-10-15）: 鏡映で作った左右を、左側（glTF の z > 0。z = −u）だけ決まった量なめらかに曲げる。すべての部品で同じ式なので、
@@ -84,10 +94,11 @@ void main() {
 const fragment = `
 uniform vec4 channel;
 uniform float reference;
+uniform float partGain;
 varying vec3 vViewPosition;
 void main() {
   float d = -vViewPosition.z - reference;
-  gl_FragColor = channel * (gl_FrontFacing ? -d : d);
+  gl_FragColor = partGain * channel * (gl_FrontFacing ? -d : d);
 }`;
 const ADD = {
   transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
@@ -235,17 +246,21 @@ const heartVertex = vertex.replace("vec3 transformed = restWarp(position);",
   "vec3 transformed = restWarp(position); transformed = heartC + (transformed - heartC) * (1. - beat);").replace("varying vec3 vViewPosition;", "varying vec3 vViewPosition;\nuniform vec3 heartC;\nuniform float beat;");
 const visceraFragment = `
 uniform float amount;
+uniform float partGain;
 uniform vec3 color;
 uniform float reference;
 varying vec3 vViewPosition;
 void main() {
   float d = -vViewPosition.z - reference;
-  gl_FragColor = vec4(amount * 7.5 * color * (gl_FrontFacing ? -d : d), 0.);
+  gl_FragColor = vec4(partGain * amount * 7.5 * color * (gl_FrontFacing ? -d : d), 0.);
 }`;
+/** 内臓の色（部品ごと、調整の欄が動かす。既定は ORGAN_COLORS）。 */
+export const hhOrganColor = {};
 function visceraMaterial(reference, part, heartCentre) {
   const heart = HEARTS.includes(part);
   return new THREE.ShaderMaterial({
-    uniforms: { amount: visceraLook.amount, color: ORGAN_COLORS[part] ? { value: new THREE.Vector3(...ORGAN_COLORS[part]) } : visceraLook.color, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg,
+    uniforms: { amount: visceraLook.amount, partGain: hhPartLook[part] ?? { value: 1 },
+      color: ORGAN_COLORS[part] ? (hhOrganColor[part] ??= { value: new THREE.Vector3(...ORGAN_COLORS[part]), defaults: [...ORGAN_COLORS[part]] }) : visceraLook.color, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg,
       ...(heart ? { heartC: { value: heartCentre }, beat: organClock.beat } : {}) },
     vertexShader: heart ? heartVertex : vertex, fragmentShader: visceraFragment, ...ADD,
   });
@@ -259,11 +274,13 @@ export function applyHammerheadTissue(model, reference) {
     if (!(part in CHANNEL)) throw new Error(`specimen_hammerhead.glb の部位 ${part ?? o.name} に組織の設定がありません`);
     found.add(part);
     o.frustumCulled = false;
-    const channel = new THREE.Vector4(0, 0, 0, 0);
-    if (Array.isArray(CHANNEL[part])) channel.set(...CHANNEL[part]); else channel.setComponent(CHANNEL[part], WEIGHT[part] ?? 1);
-    o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    const layer = LAYERS[part] ?? {};
+    const partGain = hhPartLook[part] ?? { value: 1 };
+    const pathMat = (w) => new THREE.ShaderMaterial({ uniforms: { channel: { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    o.material = pathMat(layer.a);
     o.userData.pathMaterial = o.material;
-    if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
+    o.userData.path2Material = layer.b ? pathMat(layer.b) : null;
+    if (part === "Skin" || part === "PelvicSkin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
     if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
     if (["Viscera", "Liver", "Gut", "Spiral"].includes(part)) o.userData.organMaterial = visceraMaterial(reference, part);
     if (HEARTS.includes(part)) {

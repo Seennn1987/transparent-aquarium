@@ -31,6 +31,7 @@ try {
   query.set("ss", "1");
   // B3 から標本ページはうねる。?phase= か ?swim= の指定が無ければ休みの形（?swim=0）で測る
   if (!query.has("phase") && !query.has("swim")) query.set("swim", "0");
+  if (!query.has("tune")) query.set("tune", "0");   // 調整の欄（右上の「調整」）を出さない（2026-10-15）
   if (view !== "display") query.set("view", view);
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on("pageerror", (e) => console.error("pageerror:", e.message));
@@ -58,6 +59,8 @@ try {
     const wsum = await page.evaluate((p) => { let s = 1; window.hammerheadPage.model.traverse((o) => {
       if (!o.isMesh) return; o.visible = o.userData.hh_part === p;
       if (o.visible) { const c = o.material.uniforms.channel.value; s = c.x + c.y + c.z + c.w;
+        // 2026-10-15 から顎・エラの骨・腹びれの軟骨・歯は層 B（path2Material）に書く。paths() は層 B を前の並びにまとめるので、その重みを使う
+        const c2 = o.userData.path2Material?.uniforms.channel.value; if (s === 0 && c2) s = c2.x + c2.y + c2.z + c2.w;
         // 内臓のように通り道に何も書かない部品は、形を測る間だけ骨の通り道に書く（2026-10-15）
         if (s === 0) { o.userData.savedChannel = c.clone(); c.set(1, 0, 0, 0); s = 1; } } }); return s; }, p);
     await frames(4);
@@ -72,7 +75,9 @@ try {
     if (o.userData.savedChannel) { o.material.uniforms.channel.value.copy(o.userData.savedChannel); delete o.userData.savedChannel; } }));
   const info = await page.evaluate(() => {
     const weights = {};   // each part's channel weights (bone, cartilage, skin, head)
-    window.hammerheadPage.model.traverse((o) => { if (o.isMesh) { const c = o.material.uniforms.channel.value; weights[o.userData.hh_part] = [c.x, c.y, c.z, c.w]; } });
+    window.hammerheadPage.model.traverse((o) => { if (o.isMesh) { const c = o.material.uniforms.channel.value, c2 = o.userData.path2Material?.uniforms.channel.value;
+      // 層 B は前の並びへ（顎・エラ・腹びれの軟骨 → 軟骨、歯 → 骨）
+      weights[o.userData.hh_part] = c2 ? [c.x + c2.w, c.y + c2.x + c2.y + c2.z, c.z, c.w] : [c.x, c.y, c.z, c.w]; } });
     return { status: document.querySelector("#status").textContent, weights };
   });
   await writeFile(join(out, `${view}.json`), JSON.stringify({ view, width, height, parts, channels: CH, ...info }));

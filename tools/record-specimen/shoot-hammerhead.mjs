@@ -37,6 +37,7 @@ try {
     const query = new URLSearchParams(process.env.EXTRA || "");
     // B3 から標本ページはうねる。?phase= か ?swim= の指定が無ければ休みの形（?swim=0）で撮る
     if (!query.has("phase") && !query.has("swim")) query.set("swim", "0");
+    if (!query.has("tune")) query.set("tune", "0");   // 調整の欄（右上の「調整」）を出さない（2026-10-15）
     if (view !== "display") query.set("view", view);
     const url = `${base}/scenes/specimen/hammerhead.html${query.size ? `?${query}` : ""}`;
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });

@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { createLightbox, chameleonLook } from "./chameleon-material.js";
+import { chameleonLook } from "./chameleon-material.js";
+import { createHammerheadLightbox } from "./hammerhead-lightbox.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
 import { createSwim, swimLook, mouthLook } from "./hammerhead-swim.js";
 import { circlePose, circleSpeed, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
 
 // シロシュモクザメ（hammerhead.html）を、ギャラリーの前の台の低い器（dish.glb）に入れる。`?specimen=hammerhead`（C、2026-10-15）。
-//  描き方はカメレオンと同じ: 透かしの通り道（chameleon-material.js の createLightbox、色は hammerhead-stain.js）を、器の屈折が引く画像に描く。
+//  描き方はカメレオンと同じ考え方: 透かしの通り道（hammerhead-lightbox.js、色の層 8 つ。色は hammerhead-stain.js）を、器の屈折が引く画像に描く。
 //  泳ぎは標本ページと同じ（hammerhead-swim.js: その場のうねり・口・心臓。回る道すじは C2 でまだ）。
 //  大きさ: 器の液の中で、吻端〜尾（尾の振れを含む）が壁から、背〜腹が底と液面から HH_DISH.clearance 離れる、いちばん大きい縮尺
 //  （器の単位 / m）。標本は縮めて描くので、組織の通り道は 1 / 縮尺 倍に数えて、本当の大きさの濃さにする（pathScale）。
@@ -116,7 +117,7 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
     },
     /** 体を通った光（白の上、線形）を `target` に描く */
     renderImage(renderer, target, camera, scene) {
-      lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: 1 / state.scale, stain: "hammerhead" });
+      lightbox ??= createHammerheadLightbox(renderer, { linear: true, alphaScale: 1, pathScale: 1 / state.scale });   // 色の層 8 つ（2026-10-15）
       if (lightbox.size.width !== target.width || lightbox.size.height !== target.height)
         lightbox.setSize(target.width, target.height);
       pivot.getWorldPosition(view).applyMatrix4(camera.matrixWorldInverse);
