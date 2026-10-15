@@ -29,6 +29,23 @@ ORGANS = {
     'spleen':   dict(pts=[(300, -12, 48), (320, -13, 50), (340, -11, 50)], r=[3, 4, 3], a=0.7),
 }
 SPIRAL = dict(z=(350, 465), pitch=15.0, center=(2, 41), inner=0.15, thick=0.9)   # らせん弁の仕切り（腸の中）
+# 2026-10-15 案 2b（プロデューサー「内臓の高さを CT の体腔に合わせ、らせん弁を漏斗形の段にした案を作って」）:
+#  CT の体腔（背骨の真下 ±10 mm）は上の端が背骨の中心から 12〜18 mm、下の端が 51〜62 mm。案 2 は 300 mm より後ろで上の端が 29〜34 mm と低かった。
+#  消化管の中心を上げて太くし、肝臓も上げて下へ厚くし、体腔を上から下まで埋める
+ORGANS_B = {
+    'liver_L':  dict(pts=[(195, -9, 20), (240, -14, 24), (320, -15, 26), (400, -13, 26), (450, -9, 26)], r=[10, 12, 11, 9, 4], a=0.7),
+    'liver_R':  dict(pts=[(195, 9, 20), (240, 14, 24), (320, 15, 26), (400, 13, 26), (440, 9, 26)], r=[10, 12, 11, 9, 4], a=0.7),
+    'liver_M':  dict(pts=[(188, 0, 20), (205, 0, 24), (222, 0, 28)], r=[8, 9, 6], a=1.2),
+    'stomach':  dict(pts=[(205, -3, 28), (240, -4, 32), (290, -4, 33), (330, -2, 34), (343, 3, 36)], r=[9, 15, 17, 15, 9], a=0.85),
+    'pylorus':  dict(pts=[(343, 3, 36), (335, 8, 44), (315, 9, 47), (300, 7, 46)], r=[6, 5, 5, 5], a=1.0),
+    'duodenum': dict(pts=[(300, 7, 46), (318, 4, 42), (345, 2, 36)], r=[5, 5, 7], a=1.0),
+    'intestine': dict(pts=[(345, 2, 33), (380, 2, 33), (420, 2, 34), (455, 1, 37), (470, 0, 42)], r=[12, 17, 17, 14, 8], a=0.85),
+    'rectum':   dict(pts=[(470, 0, 42), (490, 0, 48), (510, 0, 54)], r=[6, 5, 3], a=1.0),
+    'spleen':   dict(pts=[(300, -13, 46), (320, -14, 48), (340, -12, 47)], r=[3, 4, 3], a=0.7),
+}
+SPIRAL_B = dict(z=(352, 462), pitch=10.0, center=(2, 34), slope=0.6, thick=0.8)   # 漏斗形の段: 10 mm おきに、後ろへ開く浅い円錐
+if os.environ.get('HH_ORGANS') == 'B':
+    ORGANS = ORGANS_B; SPIRAL = SPIRAL_B
 def tube(pts, r, a):
     P = np.array(pts, float); R = np.array(r, float)
     lo = P.min(0) - R.max() - 2; hi = P.max(0) + R.max() + 2
@@ -62,8 +79,13 @@ for k in range(int(z0s / VX), int(z1s / VX)):
     if not inside.any(): continue
     UU, VVv = np.meshgrid(us, vs); du, dv = UU - cu, VVv - cv
     ang = np.arctan2(dv, du); rad = np.hypot(du, dv)
-    dth = np.abs(((ang - th) + np.pi) % (2 * np.pi) - np.pi)
-    sheet = inside & (dth * np.maximum(rad, 1) < SPIRAL['thick'] * 1.5) & (rad > 1.5)
+    if 'slope' in SPIRAL:   # 漏斗形: 段 i の円錐は z = z_i + slope × 中心からの距離（後ろへ開く）。いちばん近い段だけを見る
+        off = (z - z0s) - SPIRAL['slope'] * rad
+        rem = off - SPIRAL['pitch'] * np.round(off / SPIRAL['pitch'])
+        sheet = inside & (np.abs(rem) < SPIRAL['thick']) & (rad > 1.5)
+    else:
+        dth = np.abs(((ang - th) + np.pi) % (2 * np.pi) - np.pi)
+        sheet = inside & (dth * np.maximum(rad, 1) < SPIRAL['thick'] * 1.5) & (rad > 1.5)
     LAB[k - k0][sheet] = li_sp
 # 2026-10-15 直し: 体腔で切ると内臓の上下が平らに切れて箱に見えたので、体腔では切らない（体の膜の内側に収めるだけ）
 if os.environ.get('HH_ORGAN_CLIP') == 'cavity': LAB[~CAV] = 0
