@@ -84,7 +84,7 @@ step fig a5a_check.py
 step py a5c_photo_pect.py
 step py a5d_pect_membrane.py
 step py a5e_pelv_membrane.py
-# A7 顎・歯・舌の弓（口は 25° 開く。この角度の決定の記録はまだ無い）、エラの骨
+# A7 顎・歯・舌の弓（口は 25° 開く。2026-10-15 プロデューサー決定）、エラの骨
 step py a7a_jaw_fine.py
 step py a7b_jaw_seg.py
 step py a7c_open_mesh.py 25 mesh
