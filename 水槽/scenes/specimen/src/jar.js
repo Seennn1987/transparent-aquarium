@@ -206,8 +206,10 @@ function readDims(glass) {
 }
 
 /** `specimen`: whose label the jar carries ("squid" or "chameleon"). `vessel`: "jar"（イカ・カメレオンの瓶）または "dish"（シュモクザメの蓋の無い低い器、C1） */
-export async function createJar({ envMap, lens, specimen = "squid", vessel = "jar" }) {
-  const gltf = await new GLTFLoader().loadAsync(new URL(vessel === "dish" ? "../assets/dish.glb" : "../assets/jar.glb", import.meta.url).href);
+export async function createJar({ envMap, lens, specimen = "squid", vessel = "jar", file = vessel === "dish" ? "dish" : "jar" }) {
+  // file: assets/<file>.glb（器の案を見比べるとき、例 dish_w25。英数字と _ だけ）
+  if (!/^[A-Za-z0-9_]+$/.test(file)) throw new Error(`器のファイル名が正しくありません: ${file}`);
+  const gltf = await new GLTFLoader().loadAsync(new URL(`../assets/${file}.glb`, import.meta.url).href);
   const root = gltf.scene;
   root.name = "specimen-jar";
   const parts = {};

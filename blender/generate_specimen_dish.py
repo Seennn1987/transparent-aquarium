@@ -22,11 +22,15 @@ import bpy
 SEGMENTS = 200
 
 BODY_R = 1.0
-WALL = 0.045           # 瓶と同じ
-FLOOR_Z = 0.12         # 内側の底（その下は無垢の厚いガラス）
-FOOT_R = 1.06
-FOOT_DISC = 0.06
-FOOT_ROUND = 0.025
+# ガラスの厚み: 既定は瓶と同じ（壁 0.045、底 0.12）。2026-10-15 プロデューサー「先にびんをもっと薄くして欲しいかも」→ 案を環境変数で作る
+#  DISH_WALL（壁の厚み）、DISH_FLOOR（内側の底の高さ = 底のガラスの厚み）。台座は底に合わせて薄くする
+WALL = float(os.environ.get("DISH_WALL", 0.045))
+FLOOR_Z = float(os.environ.get("DISH_FLOOR", 0.12))
+# 台座と口の縁は、既定の寸法（台座の張り出し 0.06・円盤 0.06・角 0.025、口の丸み 0.012）を厚みに比例して縮める（既定の厚みでは前と同じ形）
+FOOT_R = BODY_R + 0.06 * WALL / 0.045
+FOOT_DISC = 0.06 * FLOOR_Z / 0.12
+FOOT_ROUND = 0.025 * FLOOR_Z / 0.12
+RIM_ROUND = 0.012 * WALL / 0.045
 # 高さ（2026-10-15 プロデューサー「瓶の高さが変わっていません。瓶の高さをまず2倍にして」）: 全高（口）を 0.725 から 2 倍の 1.45 に。
 #  底の厚み 0.12 と、液面から口までの 0.05 はそのまま。液の深さは 0.555 → 1.28
 RIM_Z = 2 * 0.725
@@ -62,8 +66,8 @@ def dish_profile():
     inner_r = BODY_R - WALL
     pts = base_outline()
     pts += [(BODY_R, RIM_Z - 0.02)]
-    pts += arc(BODY_R - 0.012, RIM_Z - 0.012, 0.012, 0, math.pi / 2, 5)            # 丸めた口の縁
-    pts += arc(inner_r + 0.012, RIM_Z - 0.012, 0.012, math.pi / 2, math.pi, 5)
+    pts += arc(BODY_R - RIM_ROUND, RIM_Z - RIM_ROUND, RIM_ROUND, 0, math.pi / 2, 5)            # 丸めた口の縁
+    pts += arc(inner_r + RIM_ROUND, RIM_Z - RIM_ROUND, RIM_ROUND, math.pi / 2, math.pi, 5)
     pts += arc(inner_r - 0.05, FLOOR_Z + 0.05, 0.05, 0, -math.pi / 2, 8)
     pts += [(0.0, FLOOR_Z)]
     return pts

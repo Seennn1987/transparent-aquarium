@@ -133,7 +133,9 @@ async function start() {
   // `?specimen=chameleon`: the cleared-and-stained chameleon (specimen-chameleon.js) instead of the squid.
   // `?specimen=hammerhead`: シロシュモクザメ（specimen-hammerhead.js）を、前の台だけ低い円柱の器（dish.glb）に入れる。後ろの台はいまの液だけの瓶（2026-10-15）
   const specimenKind = ["chameleon", "hammerhead"].includes(query.get("specimen")) ? query.get("specimen") : "squid";
-  const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind, vessel: specimenKind === "hammerhead" ? "dish" : "jar" });
+  // ?dishfile=: 器の案（assets/<名前>.glb）。ガラスの厚みの案を見比べるとき（2026-10-15）
+  const dishFile = /^[A-Za-z0-9_]+$/.test(query.get("dishfile") ?? "") ? query.get("dishfile") : "dish";
+  const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind, vessel: specimenKind === "hammerhead" ? "dish" : "jar", ...(specimenKind === "hammerhead" ? { file: dishFile } : {}) });
   // 後ろの台の瓶の形（gallery-jars.js が写す）。シュモクザメのときも、前の器ではなくいつもの瓶
   const rowJar = specimenKind === "hammerhead" ? await createJar({ envMap, lens: LENS, specimen: "squid" }) : jar;
   // The chameleon's label hid its face; left off for now (2026-10-13, at the user's request).
@@ -164,6 +166,13 @@ async function start() {
     pickerPanel([
       ["器の直径", [["1 倍", 1], ["1.5 倍", 1.5], ["2 倍（決定）", 2], ["2.5 倍", 2.5]], () => specimen.dishRatio, (v) => specimen.setDishRatio(v)],
     ], "器はこのままで、サメを小さく描く（器の直径がサメに対して何倍か）。1 倍は回れないので真ん中でその場の泳ぎ。回る円の半径は、体のどこも壁から 0.12 より近づかない、いちばん大きい円");
+  }
+  // ?pick=glass: 器のガラスの厚みの案（プロデューサー「先にびんをもっと薄くして欲しいかも」）。押すと器を読み直す
+  if (specimenKind === "hammerhead" && picks.includes("glass")) {
+    pickerPanel([
+      ["ガラスの厚み", [["いま（壁 0.045・底 0.12）", "dish"], ["薄い（壁 0.025・底 0.07）", "dish_w25"], ["とても薄い（壁 0.012・底 0.035）", "dish_w12"]], () => dishFile,
+        (v) => { const q = new URLSearchParams(location.search); if (v === "dish") q.delete("dishfile"); else q.set("dishfile", v); location.search = q.toString(); }],
+    ], "壁と底のガラスを薄くした器。台座と口の縁の丸みも厚みに合わせて小さい。サメの大きさ・回る円は器の内側の大きさから決め直す");
   }
   // ?pick=speed: 泳ぐ速さの案（2026-10-15、プロデューサー「泳ぐスピードが速いのでもう少し遅いパターンを何パターンか提案して」）。
   //  1 回の尾の振りで進む長さ（0.64 L、Webb & Keyes 1982）はそのままで、尾の振りの回数を速さに合わせて下げる（遅く泳ぐほど尾の振りは少ない、Webb & Keyes 1982・Lowe 1996）。
