@@ -13,8 +13,10 @@ import { chameleonOrgans } from "./chameleon-material.js";
 const GILL_MIX = [Number(new URLSearchParams(location.search).get("gillbone") ?? 1.67), Number(new URLSearchParams(location.search).get("gillcart") ?? 1.518), 0, 0];
 // 顎: 既定はひれの軟骨と同じ淡い青。?jawbone= で骨の色を混ぜる（2026-10-15、顎の色の案を見比べるため）
 const JAW_BONE = Number(new URLSearchParams(location.search).get("jawbone") ?? 0);
-const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE, 1, 0, 0] : 1, Gill: GILL_MIX, Skin: 2, HeadCartilage: 3, Viscera: [0, 0, 0, 0], Liver: [0, 0, 0, 0], Gut: [0, 0, 0, 0], Spiral: [0, 0, 0, 0] };   // 内臓は内臓の通り道で描く（下の visceraMaterial）
-const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral"]);   // 2026-10-15 前の glb には無い
+const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE, 1, 0, 0] : 1, Gill: GILL_MIX, Skin: 2, HeadCartilage: 3, Viscera: [0, 0, 0, 0], Liver: [0, 0, 0, 0], Gut: [0, 0, 0, 0], Spiral: [0, 0, 0, 0],   // 内臓は内臓の通り道で描く（下の visceraMaterial）
+  // 2026-10-15 背骨の案 E: 椎体の外側の軟骨（a8c_vertebrae.py の椎体）を軟骨の色で淡く。中の石灰化した砂時計形（CT の殻）は Bone のまま
+  Centrum: [0, Number(new URLSearchParams(location.search).get("centrum") ?? 0.3), 0, 0] };
+const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum"]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 

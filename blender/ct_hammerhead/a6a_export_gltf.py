@@ -33,7 +33,9 @@ if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)
 # A8 背骨を部品から作った場合（a8c_vertebrae.py）: 椎体は CT の殻（HH_bone）の代わり、弓は軟骨に足す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_vert_centra.ply"):
-    if os.environ.get("HH_VERT_CENTRA_PART") == "Cartilage":   # 案 D: CT の殻（砂時計形）は骨のまま、詰めた椎体は軟骨として重ねる
+    if os.environ.get("HH_VERT_CENTRA_PART") == "Centrum":   # 案 E: CT の殻（砂時計形）は骨のまま、詰めた椎体は別の部品（ページで淡い青に）
+        PARTS["Centrum"] = (["HH_vert_centra"], 60000)
+    elif os.environ.get("HH_VERT_CENTRA_PART") == "Cartilage":   # 案 D: CT の殻（砂時計形）は骨のまま、詰めた椎体は軟骨として重ねる
         PARTS["Cartilage"] = (PARTS["Cartilage"][0] + ["HH_vert_centra"], 130000)
     else:
         PARTS["Bone"] = (["HH_vert_centra"], 60000)
