@@ -10,7 +10,9 @@ import { chameleonOrgans } from "./chameleon-material.js";
 // 数のときはその組織の通り道 1 つ。配列のときは 4 つの通り道（骨・軟骨・膜・頭の軟骨）への重みで、組織の色を混ぜた色になる。
 // 2026-10-15 エラの骨: 胚の鰓弓（Eames et al. 2007 Fig. 2A、x 58〜100・y 22〜40 px の帯の暗い半分の中央値 0.05 / 0.24 / 0.44、
 //  濃い紺）に合わせ、骨と軟骨の色を混ぜる（骨 1.67・軟骨 1.518。骨の利得 166 のとき画面で約 0.05 / 0.26 / 0.40。青は使える組織の色では目標まで上げられない）。前の目標 0.50 / 0.73 / 0.83（点 72, 28）は鰓弓の棒の間のすき間だった（計画書 第 9 節 A7）
-const GILL_MIX = [Number(new URLSearchParams(location.search).get("gillbone") ?? 1.67), Number(new URLSearchParams(location.search).get("gillcart") ?? 1.518), 0, 0];
+// 2026-10-15 プロデューサー決定「３３％、青緑」（「鰓骨の色が他の色対比で濃すぎないでしょうか？」から）: エラの骨は青緑（骨 0・軟骨 1、画面で 0.12 / 0.84 / 0.68）。
+//  前の濃い紺（骨 1.67・軟骨 1.518）は ?gillbone=1.67&gillcart=1.518
+const GILL_MIX = [Number(new URLSearchParams(location.search).get("gillbone") ?? 0), Number(new URLSearchParams(location.search).get("gillcart") ?? 1), 0, 0];
 // 顎: 既定はひれの軟骨と同じ淡い青。?jawbone= で骨の色を混ぜる（2026-10-15、顎の色の案を見比べるため）
 const JAW_BONE = Number(new URLSearchParams(location.search).get("jawbone") ?? 0);
 const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE, 1, 0, 0] : 1, Gill: GILL_MIX, Skin: 2, HeadCartilage: 3, Viscera: [0, 0, 0, 0], Liver: [0, 0, 0, 0], Gut: [0, 0, 0, 0], Spiral: [0, 0, 0, 0],   // 内臓は内臓の通り道で描く（下の visceraMaterial）
