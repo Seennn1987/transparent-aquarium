@@ -29,12 +29,14 @@ for k in range(k0, k1):
     if gap.sum() < 20: continue
     M[k - k0] = convex_hull_image(gap) & nd.binary_erosion(m, iterations=4)
 # 2026-10-15 直し: 断面ごとの凸の形を 3 次元でならし（段・平らな切り口を消す）、すき間を境に内臓を別々の塊に分ける
-H = nd.gaussian_filter(M.astype(np.float32), (4, 2, 2)) > 0.5
+SIG = tuple(float(x) for x in os.environ.get('HH_VISC_SIGMA', '4,2,2').split(','))   # 2026-10-15 案 1: 10,3,3
+H = nd.gaussian_filter(M.astype(np.float32), SIG) > 0.5
 GAP = np.zeros_like(H); TIS = np.zeros_like(H)
 for k in range(k0, k1):
     f = np.asarray(F[k]); GAP[k - k0] = f < -150; TIS[k - k0] = f > -150
-M = H & TIS & ~nd.binary_dilation(GAP & H, iterations=1)
-M = nd.binary_opening(M, iterations=1)
+GD = int(os.environ.get('HH_VISC_GAPDIL', '1'))   # 案 1: 0（すき間を広げない）
+M = H & TIS & ~(nd.binary_dilation(GAP & H, iterations=GD) if GD > 0 else (GAP & H))
+if os.environ.get('HH_VISC_OPEN', '1') == '1': M = nd.binary_opening(M, iterations=1)
 lab, n = nd.label(M); sz = nd.sum(M, lab, range(1, n + 1)); big = 1 + np.nonzero(sz >= 2000)[0]
 M = np.isin(lab, big); LAB = np.zeros(lab.shape, np.uint8)
 for i, b in enumerate(big[np.argsort(-sz[big - 1])]): LAB[lab == b] = min(i + 1, 255)
@@ -65,7 +67,7 @@ if 'mesh' in sys.argv:
         if len(zz) == 0: continue
         lo = np.array([zz.min(), yy.min(), xx.min()]) - 3; hi = np.array([zz.max(), yy.max(), xx.max()]) + 4
         sub = (outl[k0 - 4 + lo[0]:k0 - 4 + hi[0], lo[1]:hi[1], lo[2]:hi[2]] == li).astype(np.float32)
-        sub = nd.gaussian_filter(sub, 1.0)
+        sub = nd.gaussian_filter(sub, float(os.environ.get('HH_VISC_MESHBLUR', '1.0')))   # 案 1: 0.6
         if sub.max() < 0.5: continue
         v, f, _, _ = marching_cubes(np.pad(sub, 1), 0.5, allow_degenerate=False); v = v - 1 + lo + np.array([k0 - 4, 0, 0])
         Vs.append(v); Fs.append(f + n); n += len(v)

@@ -31,6 +31,8 @@ PARTS = {
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)
+for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000)):   # 案 2（a8b_viscera_organs.py）
+    if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 sc = hh_paths.blender_scene("HH_EXPORT")
 coll = bpy.data.collections.get("HH_EXPORT")
 if coll is None:
