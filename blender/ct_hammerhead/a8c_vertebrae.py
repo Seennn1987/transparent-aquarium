@@ -46,6 +46,12 @@ VV = {'c': [], 'a': []}; FF = {'c': [], 'a': []}
 def add(key, V, F):
     n = sum(len(v) for v in VV[key]); VV[key].append(V); FF[key].append(F + n)
 NT, NA = 28, 7
+# 2026-10-15 案 C の乱れ（プロデューサー「歯車のような規則正しさを崩してから並べてください」）: 決まった種の、隣どうしでなめらかに変わる乱数で
+#  弓の高さ（× 1 ± 0.15 J）、峰の前後の位置（± 0.25 J × 半分の長さ）、幅（× 1 ± 0.15 J）を変え、峰を後ろへ 0.3 J × 高さ寝かせる（神経棘は後ろへ傾く）。
+#  J = HH_VERT_JITTER（0 で乱れなし）
+J = float(os.environ.get('HH_VERT_JITTER', 0)); rng = np.random.default_rng(20261015)
+def smooth_noise(n, w): return nd.gaussian_filter1d(rng.standard_normal(n), w) / max(nd.gaussian_filter1d(rng.standard_normal(4000), w).std(), 1e-6)
+NH, NP, NW = (np.clip(smooth_noise(len(mid), 1.5), -2, 2) for _ in range(3))
 for i in range(len(mid)):
     z0, z1 = B[i] + GAP / 2, B[i + 1] - GAP / 2; L_ = z1 - z0; zc = mid[i]; r = R[i]
     t, s, d = frame(zc); c = np.array([zc, 0.0, vc(zc)])
@@ -72,7 +78,9 @@ for i in range(len(mid)):
     for side, hgt in ((1, AH * r), (-1, (AH * 0.83 if zc > 520 else 0.45) * r)):
         w = 0.35 * r; base = 0.75 * r; hl = (0.5 * L_ + GAP / 2) if SOFT else 0.45 * L_
         if SOFT:   # 2026-10-15 案 C: 付け根を隣とつなぎ（すき間なし）、先を丸めた山（6 点の外形）
-            tri = [(-hl, base), (hl, base), (0.55 * hl, base + 0.55 * hgt), (0.2 * hl, base + 0.92 * hgt), (-0.2 * hl, base + 0.92 * hgt), (-0.55 * hl, base + 0.55 * hgt)]
+            hgt = hgt * (1 + 0.15 * J * NH[i] / 2); w = w * (1 + 0.15 * J * NW[i] / 2)
+            pk = 0.25 * J * NP[i] / 2 * hl + 0.3 * J * hgt * (1 if side > 0 else 0.5)      # 峰の位置（後ろへ寝かせる分を含む）
+            tri = [(-hl, base), (hl, base), (0.55 * hl + 0.5 * pk, base + 0.55 * hgt), (0.2 * hl + pk, base + 0.92 * hgt), (-0.2 * hl + pk, base + 0.92 * hgt), (-0.55 * hl + 0.5 * pk, base + 0.55 * hgt)]
         else:
             tri = [(-hl, base), (hl, base), (0.0, base + hgt)]            # (軸の位置, 中心からの高さ)
         m = len(tri); P = []
@@ -89,7 +97,7 @@ def signed_vol(V, F):
     return np.einsum('ij,ij->i', a, np.cross(b_, c_)).sum() / 6
 info = dict(source='BIODIDAC Squalus sp. trunk vertebrae photo (J. Houseman, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/3946; positions and radii from CT',
             vertebrae=int(len(mid)), z_mm=[round(float(B[0]), 1), round(float(B[-1]), 1)], length_median_mm=round(float(np.median(np.diff(B))), 2),
-            radius_mm={str(z): round(float(np.interp(z, mid, R)), 1) for z in (150, 300, 500, 700, 900)}, gap_mm=GAP, arches=ARCH)
+            radius_mm={str(z): round(float(np.interp(z, mid, R)), 1) for z in (150, 300, 500, 700, 900)}, gap_mm=GAP, arches=ARCH, jitter=J, seed=20261015)
 for key, name in (('c', 'HH_vert_centra'), ('a', 'HH_vert_arches')):
     if not VV[key]: continue
     V = np.concatenate(VV[key]); F = np.concatenate(FF[key])
