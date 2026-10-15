@@ -113,7 +113,8 @@ def signed_vol(V, F):
     a, b_, c_ = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
     return np.einsum('ij,ij->i', a, np.cross(b_, c_)).sum() / 6
 info = dict(source='BIODIDAC Squalus sp. trunk vertebrae photo (J. Houseman, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/3946; positions and radii from CT',
-            vertebrae=int(len(mid)), z_mm=[round(float(B[0]), 1), round(float(B[-1]), 1)], length_median_mm=round(float(np.median(np.diff(B))), 2),
+            vertebrae=int(len(mid)), z_mm=[round(float(B[0]), 1), round(float(B[-1]), 1)], bounds_mm=[round(float(x), 2) for x in B],
+            spine_v_mm={str(int(z)): round(float(vc(z)), 2) for z in range(0, 1001, 5)}, length_median_mm=round(float(np.median(np.diff(B))), 2),
             radius_mm={str(z): round(float(np.interp(z, mid, R)), 1) for z in (150, 300, 500, 700, 900)}, gap_mm=GAP, arches=ARCH, jitter=J, seed=20261015)
 for key, name in (('c', 'HH_vert_centra'), ('a', 'HH_vert_arches')):
     if not VV[key]: continue

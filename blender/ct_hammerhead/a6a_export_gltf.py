@@ -74,11 +74,15 @@ for part, (names, target) in PARTS.items():
     ob["hh_part"] = part
     bm = bmesh.new(); bm.from_mesh(ob.data)
     report[part] = (n0, len(ob.data.polygons), sum(1 for e in bm.edges if e.is_boundary)); bm.free()
+# B1 骨組み（2026-10-15）: HH_RIG=1 で骨組みと重みを付けて書き出す（b1_rig.py）
+RIG = os.environ.get("HH_RIG") == "1"
+if RIG:
+    exec(compile(open(hh_paths.script("b1_rig.py"), encoding="utf-8").read(), hh_paths.script("b1_rig.py"), "exec"))
 bpy.ops.object.select_all(action="DESELECT")
 for ob in coll.objects: ob.select_set(True)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 # 選択は他のシーン（開いているカメレオン）のものまで拾うので、このシーンのこのコレクションだけを書き出す
 bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[coll.name]
 bpy.ops.export_scene.gltf(filepath=OUT, export_format="GLB", use_active_scene=True, use_active_collection=True, export_extras=True,
-                          export_apply=True, export_normals=True, export_texcoords=False, export_materials="NONE")
+                          export_apply=not RIG, export_normals=True, export_texcoords=False, export_materials="NONE")
 print("parts (faces before, after, open edges):", report, "->", OUT, os.path.getsize(OUT))
