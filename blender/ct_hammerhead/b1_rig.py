@@ -30,7 +30,9 @@ VJ = json.load(open(os.path.join(_work, "a8_vertebrae.json")))
 B = np.array(VJ["bounds_mm"]); SV = {int(k): v for k, v in VJ["spine_v_mm"].items()}
 def spine_z(xmm):                       # 背骨の中心の Blender z（m）
     ks = np.array(sorted(SV)); return -float(np.interp(xmm, ks, [SV[k] for k in ks])) / 1000.0
-PE = json.load(open(os.path.join(hh_paths.DOCS, "pect_posed.json"))); PV = json.load(open(os.path.join(hh_paths.DOCS, "pelvic_posed.json")))
+# ひれの付け根: a3d・a3f が作業フォルダに書く（docs/hammerhead_ct/ の同じ名前の写しは古い作り方のもの。作り直しの通しでは作業フォルダのものを使う）
+_posed = lambda n: os.path.join(_work, n) if os.path.exists(os.path.join(_work, n)) else os.path.join(hh_paths.DOCS, n)
+PE = json.load(open(_posed("pect_posed.json"))); PV = json.load(open(_posed("pelvic_posed.json")))
 cuts = [0.0] + [float(B[i]) for i in range(5, len(B), 5)] + [1024.0]
 cuts = sorted(set([round(c, 2) for c in cuts]))
 names = ["head"] + [f"spine_{i:02d}" for i in range(len(cuts) - 3)] + ["tail"]

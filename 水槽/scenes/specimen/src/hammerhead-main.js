@@ -8,7 +8,9 @@ import { createSwim, swimLook, mouthLook } from "./hammerhead-swim.js";
 
 // The smooth hammerhead as a cleared-and-stained specimen on a lightbox, without its dish (A6).
 // The mesh: blender/ct_hammerhead (CT of ZMA.PISC.108725, Kamminga et al. 2017, CC0).
-const URL_GLB = new URL("../assets/specimen_hammerhead.glb", import.meta.url).href;
+// ?glb=<名前>: assets/<名前>.glb を読む（案の glb を見比べるとき。英数字と _ だけ）
+const GLB_NAME = /^[A-Za-z0-9_]+$/.test(new URLSearchParams(location.search).get("glb") ?? "") ? new URLSearchParams(location.search).get("glb") : "specimen_hammerhead";
+const URL_GLB = new URL(`../assets/${GLB_NAME}.glb`, import.meta.url).href;
 const canvas = document.querySelector("#scene");
 const status = document.querySelector("#status");
 const query = new URLSearchParams(location.search);
@@ -126,11 +128,15 @@ function pickerPanel(rows, noteText) {
 }
 // ?pick=mouth: 口の開け閉めの振れと回数の案を、動かしたまま切り替える（B5）
 function mouthPicker() {
-  if (!new URLSearchParams(location.search).has("mouth")) mouthLook.deg = 3;
+  const base = { specimen_hammerhead: 25, specimen_hammerhead_m20: 20, specimen_hammerhead_m15: 15 }[GLB_NAME] ?? 25;
   pickerPanel([
+    ["休みの開き", [["25°", 25], ["20°", 20], ["15°", 15]], () => base, (v) => {
+      const q = new URLSearchParams(location.search); if (v === 25) q.delete("glb"); else q.set("glb", `specimen_hammerhead_m${v}`);
+      location.search = q.toString();   // 開きの違う glb を読み直す
+    }],
     ["口の振れ", [["0°", 0], ["±2°", 2], ["±3°", 3], ["±5°", 5]], () => mouthLook.deg, (v) => { mouthLook.deg = v; }],
     ["回数", [["尾と同じ 1.25 Hz", 1.25], ["毎分 36 回", 0.6]], () => mouthLook.hz, (v) => { mouthLook.hz = v; }],
-  ], "口は 25° を中心に開け閉め。毎分 36 回はドチザメ類の呼吸（ポンプ）の速さ。シュモクザメの口の動きの回数の出典は無い");
+  ], "口は休みの開きを中心に開け閉め（休みの開きを変えると読み直す）。毎分 36 回はドチザメ類の呼吸（ポンプ）の速さ。シュモクザメの口の動きの回数の出典は無い");
 }
 function canvasShown(el) {
   if (el.clientWidth > 0 && el.clientHeight > 0) return Promise.resolve();

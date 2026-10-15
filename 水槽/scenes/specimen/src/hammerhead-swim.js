@@ -26,8 +26,8 @@ export const swimLook = {
 };
 // B5 口（2026-10-15、プロデューサー「口も僅かに動かすことを計画に含めて下さい」）: 下あごの骨（b1_rig.py の jaw、顎の関節が付け根）を、
 //  A7 で決めた開き 25° を中心に ± mouthDeg°、mouthHz で開け閉めする。ラム換気のシュモクザメでは口と鰓孔は開いたまま（Dolce & Wilga 2013）で、
-//  決まった回数の出典は無い。案を見比べるため ?mouth= °（既定 0 = 動かさない）、?mouthhz= Hz
-export const mouthLook = { deg: Number(Q.get("mouth") ?? 0), hz: Number(Q.get("mouthhz") ?? 1.25) };
+//  決まった回数の出典は無い。?mouth= °、?mouthhz= Hz。既定 ±3°・1.25 Hz（尾の振りと同じ。2026-10-15 プロデューサー「口は ±3°、尾と同じ 1.25 Hz にしてください」）
+export const mouthLook = { deg: Number(Q.get("mouth") ?? 3), hz: Number(Q.get("mouthhz") ?? 1.25) };
 const NECK = 0.125, TURN_R = 0.374;   // 首（頭の骨だけの終わり、m）、旋回の半径（L）
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
 const L = 1.024;   // 全長（m）。b1_rig.py の尾の骨の終わり
