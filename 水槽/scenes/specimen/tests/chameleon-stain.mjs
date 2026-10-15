@@ -22,17 +22,18 @@ assert.ok(Math.abs(transmitted({ viscera: 0.15, skin: 0.45 })[2] - 0.38) < 0.06,
 near(transmitted({}), [1, 1, 1], 1e-9, "空");
 
 // "01" (the jar photo 01): the four classes it was fitted on (chameleon-stain.js). Green and blue are met;
-// red is not met in the blue class (0.333 against 0.477) and the pale class (0.251 against 0.213).
+// red is not met in the blue class (0.336 against 0.477) and the pale class (0.251 against 0.213).
+// Rows after the hyoid rebuild (2026-10-15).
 const ab = (t) => t.map((v) => -Math.log(v));
 const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
-nearA(transmitted({ film: 2.9617, skin: 0.3091 }, { stain: "01" }), [0.347, 0.241, 0.175], 0.02, "01 の青（輪郭）");
-nearA(transmitted({ film: 2.1256, skin: 0.7014 }, { stain: "01" }), [0.249, 0.202, 0.175], 0.02, "01 の淡い所");
-nearA(transmitted({ bone: 0.1323, film: 2.3186, skin: 0.6845 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
+nearA(transmitted({ film: 2.8251, skin: 0.3541 }, { stain: "01" }), [0.336, 0.241, 0.175], 0.02, "01 の青（輪郭）");
+nearA(transmitted({ film: 2.1105, skin: 0.7076 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
+nearA(transmitted({ bone: 0.1323, film: 2.2691, skin: 0.6267 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
 // "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the gut).
-nearA(transmitted({ organs: { liver_r: 0.2309 } }, { stain: "01" }), [0.172, 0.271, 0.442], 0.01, "01 の肝臓（C）");
-nearA(transmitted({ organs: { intestine: 0.1648 } }, { stain: "01" }), [0.503, 0.611, 0.750], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
+nearA(transmitted({ organs: { liver_r: 0.2259 } }, { stain: "01" }), [0.150, 0.231, 0.415], 0.01, "01 の肝臓（C）");
+nearA(transmitted({ organs: { intestine: 0.1560 } }, { stain: "01" }), [0.494, 0.599, 0.746], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
 // The eye (C. 01: the ring of photo 01 over the median eye path).
-nearA(transmitted({ organs: { eye_r: 0.1724 } }, { stain: "01" }), [0.659, 0.722, 0.890], 0.01, "01 の目");
+nearA(transmitted({ organs: { eye_r: 0.166 } }, { stain: "01" }), [0.677, 0.769, 0.936], 0.01, "01 の目");
 near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 では内臓の一塊を描かない");
 // The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });

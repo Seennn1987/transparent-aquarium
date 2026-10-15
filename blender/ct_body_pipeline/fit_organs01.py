@@ -3,6 +3,7 @@ import numpy as np, json, math, sys
 from PIL import Image
 p=np.asarray(Image.open('/mnt/user-data/uploads/transparent-aquarium/transparent-aquarium/docs/references/chameleon/01-user-jar-diaphonized.jpg').convert('RGB')).astype(float)
 Aph=-np.log(np.clip(p/224.0,1e-3,1))
+# cal01.npz: organcal.py の書き出し。2026-10-15 の版は 1600×1912 で出たので、2×2 の平均で 800×956 に戻してから使った（lm01.json と同じ画素）
 cal=np.load('web/cal01.npz'); paths=np.maximum(cal['paths'],0); film=np.maximum(cal['film'][...,0],0)
 org={k[4:]:np.maximum(cal[k],0) for k in cal.files if k.startswith('org_')}
 lm=json.load(open('web/lm01.json'))
@@ -14,7 +15,7 @@ R=np.array([[math.cos(ang),-math.sin(ang)],[math.sin(ang),math.cos(ang)]])
 T=lambda q: s*R@(np.asarray(q,float)-ph_g)+sc_g
 print('photo->screen scale',round(s,3),'rot',round(math.degrees(ang),1))
 # "01" の膜・膜の層・骨（chameleon-stain.js STAINS["01"]）
-G={'film':np.array([0.1173,0.0751,0.0484]),'skin':np.array([0,0.0606,0.1031]),'bone':np.array([14.79,30.86,24.66])}   # fit_stain01.py（膜 6・目・臓器の作り直しの後、2026-10-14）
+G={'film':np.array([0.1189,0.0791,0.0495]),'skin':np.array([0,0.0496,0.1000]),'bone':np.array([14.86,31.02,24.89])}   # fit_stain01.py（舌骨の作り直しの後、2026-10-15）
 t0=0.042; F=t0*(1-np.exp(-paths[...,0]/t0))
 base=film[...,None]*G['film']+paths[...,2][...,None]*G['skin']+F[...,None]*G['bone']
 H,W=film.shape

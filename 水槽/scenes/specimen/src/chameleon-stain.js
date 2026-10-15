@@ -93,20 +93,24 @@ export const STAINS = {
   // And again after the head was given a skin of its own, eyes, coiled gut and red ventral ribs (skinbody.py 6,
   // 2026-10-14). The one viscera mass is no longer drawn, so three classes: blue film 2.96, skin 0.309; pale 2.13,
   // 0.701; red bone 0.0403 after the saturation, film 2.32, skin 0.685:
-  //   film 0.1173 / 0.0751 / 0.0484, skin 0 / 0.0606 / 0.1031, bone 14.8 / 30.9 / 24.7 (used below)
+  //   film 0.1173 / 0.0751 / 0.0484, skin 0 / 0.0606 / 0.1031, bone 14.8 / 30.9 / 24.7
+  // And again after the hyoid was rebuilt (blender/ct_body_pipeline/hyoid_rebuild.py, 2026-10-15: the five rods in the
+  // chest were taken out, the entoglossal process, basihyal and ceratohyals added as cartilage, and the head skin
+  // reaches the throat). Blue film 2.83, skin 0.354; pale 2.11, 0.708; red bone 0.0403, film 2.27, skin 0.627:
+  //   film 0.1189 / 0.0791 / 0.0495, skin 0 / 0.0496 / 0.1000, bone 14.9 / 31.0 / 24.9 (used below)
   // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
   // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.479, 1, 0.799], gain: 30.86 },
+    bone: { spectrum: [0.479, 1, 0.802], gain: 31.02 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.588, 1], gain: 0.1031 },
+    skin: { spectrum: [0, 0.496, 1], gain: 0.1000 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.640, 0.413], gain: 0.1173 },
+    film: { spectrum: [1, 0.666, 0.416], gain: 0.1189 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -118,29 +122,32 @@ export const STAINS = {
     // (ct_body_pipeline/fit_organs01.py), each patch less the screen's skin, film and bone there:
     //   C (t 0.35, brown mottle) 0.172 / 0.271 / 0.442 over the liver's median path in that band (0.231)
     //                                                                            → liver 0.75 / 1.17 / 1.91
+    //     (after the hyoid rebuild, 2026-10-15: 0.150 / 0.231 / 0.415 over 0.226 → liver 0.66 / 1.02 / 1.84, used)
     //   A (t 0.85, dark grey) 0.567 / 0.593 / 0.695 and B (t 0.60, brown mottle) 0.440 / 0.629 / 0.806; mean
     //     0.503 / 0.611 / 0.750. 01's trunk bends unlike the model's, so the same places on screen do not catch the
     //     gut; matched by share instead, as for the film and bone above: over the median gut path of the screen's
     //     gut pixels (0.165)                                                     → gut 3.06 / 3.71 / 4.55
+    //     (after the hyoid rebuild: 0.494 / 0.599 / 0.746 over 0.156 → gut 3.16 / 3.84 / 4.79, used)
     //   (values after the head skin, eyes and coiled gut, skinbody.py 6, 2026-10-14)
     // The eyes (blender/ct_body_pipeline/eyes.py: a ball in each orbit, centred on the scleral ring, radius the
     // orbit's 2.94 mm; the lens a ball of 0.45 of that inside): photo 01's eye (centre x 243, y 368) lets through a
     // ring (r 7–10 px) of absorbance 1.135 / 1.48 / 1.48 and a darker middle (r < 4 px) 1.24 / 1.70 / 1.89. Over the
     // screen's eye-only pixels, less the skin, film and bone there, by the median eye path (0.172)
     //                                                                            → eye 3.82 / 4.19 / 5.16
+    //     (after the hyoid rebuild: base 0.377 / 0.460 / 0.380, eye path 0.166 → eye 4.08 / 4.63 / 5.64, used)
     // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
     // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.0606 / 0.1031) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.0496 / 0.1000) once more: faint, provisional.
     organs: {
-      liver_r: [0.75, 1.17, 1.91], liver_l: [0.75, 1.17, 1.91],
+      liver_r: [0.66, 1.02, 1.84], liver_l: [0.66, 1.02, 1.84],
       contents: [0, 0, 0],
-      heart: [0, 0.0606, 0.1031], gallbladder: [0, 0.0606, 0.1031], fat_r: [0, 0.0606, 0.1031], fat_l: [0, 0.0606, 0.1031],
-      kidney_r: [0, 0.0606, 0.1031], kidney_l: [0, 0.0606, 0.1031],
-      stomach: [3.06, 3.71, 4.55], intestine: [3.06, 3.71, 4.55], colon: [3.06, 3.71, 4.55],
-      eye_r: [3.82, 4.19, 5.16], eye_l: [3.82, 4.19, 5.16], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
+      heart: [0, 0.0496, 0.1000], gallbladder: [0, 0.0496, 0.1000], fat_r: [0, 0.0496, 0.1000], fat_l: [0, 0.0496, 0.1000],
+      kidney_r: [0, 0.0496, 0.1000], kidney_l: [0, 0.0496, 0.1000],
+      stomach: [3.16, 3.84, 4.79], intestine: [3.16, 3.84, 4.79], colon: [3.16, 3.84, 4.79],
+      eye_r: [4.08, 4.63, 5.64], eye_l: [4.08, 4.63, 5.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
     },
   },
 };
