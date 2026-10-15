@@ -6,6 +6,7 @@ import { createOrbit } from "./orbit.js";
 import { createJar } from "./jar.js";
 import { createSpecimen } from "./specimen.js";
 import { createChameleonSpecimen } from "./specimen-chameleon.js";
+import { createHammerheadSpecimen } from "./specimen-hammerhead.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
@@ -128,10 +129,13 @@ async function start() {
   scene.environment = envMap;
   scene.environmentIntensity = 0.6;
   // `?specimen=chameleon`: the cleared-and-stained chameleon (specimen-chameleon.js) instead of the squid.
-  const specimenKind = query.get("specimen") === "chameleon" ? "chameleon" : "squid";
-  const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind });
+  // `?specimen=hammerhead`: シロシュモクザメ（specimen-hammerhead.js）を、前の台だけ低い円柱の器（dish.glb）に入れる。後ろの台はいまの液だけの瓶（2026-10-15）
+  const specimenKind = ["chameleon", "hammerhead"].includes(query.get("specimen")) ? query.get("specimen") : "squid";
+  const jar = await createJar({ envMap, lens: LENS, specimen: specimenKind, vessel: specimenKind === "hammerhead" ? "dish" : "jar" });
+  // 後ろの台の瓶の形（gallery-jars.js が写す）。シュモクザメのときも、前の器ではなくいつもの瓶
+  const rowJar = specimenKind === "hammerhead" ? await createJar({ envMap, lens: LENS, specimen: "squid" }) : jar;
   // The chameleon's label hid its face; left off for now (2026-10-13, at the user's request).
-  if (specimenKind === "chameleon") jar.label.visible = false;
+  if (specimenKind !== "squid") jar.label.visible = false;
   scene.add(jar.root);
   const gallery = createGallery({
     jarRadius: jar.dims.bodyRadius,
@@ -150,6 +154,7 @@ async function start() {
   };
   const specimen = specimenKind === "chameleon"
     ? await createChameleonSpecimen({ ...specimenOptions, stain: query.get("stain") === "01" ? "01" : "06" })
+    : specimenKind === "hammerhead" ? await createHammerheadSpecimen(specimenOptions)
     : await createSpecimen(specimenOptions);
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);
@@ -157,7 +162,7 @@ async function start() {
 
   // The row of jars behind; the specimen's pose is baked for the front jar's mirror image
   // before it starts to move.
-  const galleryJars = createGalleryJars({ jar, specimen, envMap, lens: LENS });
+  const galleryJars = createGalleryJars({ jar: rowJar, specimen, envMap, lens: LENS });
   scene.add(galleryJars.root);
   galleryJars.setQuality(jarQuality(profile));
   // Turned further than ORBIT_TURN from the default view (the chameleon's full orbit), the row of

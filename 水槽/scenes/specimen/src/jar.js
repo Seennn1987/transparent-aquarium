@@ -196,14 +196,18 @@ function readDims(glass) {
   if (!Array.isArray(extras.jar_lid_profile)) unknown.push("jar_lid_profile");
   if (!Array.isArray(extras.jar_base_profile)) unknown.push("jar_base_profile");
   if (unknown.length) throw new Error(`jar.glb に寸法がありません: ${unknown.join(", ")}（generate_specimen_jar.py で書き出し直してください）`);
+  // 蓋の無い器（dish.glb、generate_specimen_dish.py）: 屈折の計算（jar-optics.js）は蓋の断面を使うので、口より上に小さな仮の円盤を渡し、
+  // その面は描かない（createJar が隠す）
+  dims.hasLid = extras.jar_lid_profile.length > 0;
+  if (!dims.hasLid) extras.jar_lid_profile = [0, dims.rimHeight + 1, 0.01, dims.rimHeight + 1, 0.01, dims.rimHeight + 1.01, 0, dims.rimHeight + 1.01];
   dims.lidProfile = profilePoints(extras.jar_lid_profile);
   dims.baseProfile = profilePoints(extras.jar_base_profile);
   return dims;
 }
 
-/** `specimen`: whose label the jar carries ("squid" or "chameleon"). */
-export async function createJar({ envMap, lens, specimen = "squid" }) {
-  const gltf = await new GLTFLoader().loadAsync(new URL("../assets/jar.glb", import.meta.url).href);
+/** `specimen`: whose label the jar carries ("squid" or "chameleon"). `vessel`: "jar"（イカ・カメレオンの瓶）または "dish"（シュモクザメの蓋の無い低い器、C1） */
+export async function createJar({ envMap, lens, specimen = "squid", vessel = "jar" }) {
+  const gltf = await new GLTFLoader().loadAsync(new URL(vessel === "dish" ? "../assets/dish.glb" : "../assets/jar.glb", import.meta.url).href);
   const root = gltf.scene;
   root.name = "specimen-jar";
   const parts = {};
@@ -211,7 +215,7 @@ export async function createJar({ envMap, lens, specimen = "squid" }) {
     const name = object.userData?.jar_part;
     if (object.isMesh && name) parts[name] = object;
   });
-  const missing = JAR_PARTS.filter((name) => !parts[name]);
+  const missing = JAR_PARTS.filter((name) => !parts[name] && !(vessel === "dish" && name === "Jar_Lid"));
   if (missing.length) throw new Error(`jar.glb に部位がありません: ${missing.join(", ")}`);
   const dims = readDims(parts.Jar_Glass);
 
@@ -219,13 +223,13 @@ export async function createJar({ envMap, lens, specimen = "squid" }) {
   // The liquid is traced by the optics column; its mesh only gives the bounds.
   parts.Jar_Liquid.visible = false;
   parts.Jar_Glass.material = glassSurface(envMap, "specimen-glass-wall");
-  parts.Jar_Lid.material = glassSurface(envMap, "specimen-glass-lid", thickGlassEdge);
+  if (parts.Jar_Lid) parts.Jar_Lid.material = glassSurface(envMap, "specimen-glass-lid", thickGlassEdge);
   parts.Jar_Meniscus.material = meniscusMaterial(envMap);
 
   // Blended layers over the opaque optics: the meniscus, then the glass surfaces.
   parts.Jar_Meniscus.renderOrder = 19;
   parts.Jar_Glass.renderOrder = 20;
-  parts.Jar_Lid.renderOrder = 21;
+  if (parts.Jar_Lid) parts.Jar_Lid.renderOrder = 21;
   for (const mesh of Object.values(parts)) {
     mesh.castShadow = false;
     mesh.receiveShadow = false;
@@ -233,6 +237,7 @@ export async function createJar({ envMap, lens, specimen = "squid" }) {
 
   const optics = createJarOptics({ dims, lens });
   for (const mesh of optics.meshes) root.add(mesh);
+  if (!dims.hasLid) for (const mesh of optics.meshes) if (mesh.name === "jar-optics-lid") mesh.visible = false;   // 仮の蓋は描かない
   const label = createLabel(dims, specimen);
   root.add(label);
 
@@ -241,6 +246,7 @@ export async function createJar({ envMap, lens, specimen = "squid" }) {
   const depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true });
   for (const name of ["Jar_Glass", "Jar_Lid"]) {
     const source = parts[name];
+    if (!source) continue;
     const proxy = new THREE.Mesh(source.geometry, depthOnly);
     proxy.name = `${name}-depth`;
     proxy.renderOrder = 100;
