@@ -15,8 +15,8 @@ for (const t of [0.005, 0.05, 0.3]) {
   const a = transmitted({ bone: t }).map((v) => -Math.log(v));
   a.forEach((v, i) => assert.ok(Math.abs(v / a[1] - BONE_SPECTRUM[i]) < 1e-9));
 }
-// The neck, about 0.56 model units of tissue side-on.
-near(transmitted({ skin: 0.56 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
+// The neck, about 0.627 model units of tissue side-on (skinbody.py 7).
+near(transmitted({ skin: 0.627 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
 // The viscera at its thickest side-on, behind the skin: the jar photo 01's brown mass, blue 0.38.
 assert.ok(Math.abs(transmitted({ viscera: 0.15, skin: 0.45 })[2] - 0.38) < 0.06, "内臓の褐色が瓶写真 01 と合わない");
 near(transmitted({}), [1, 1, 1], 1e-9, "空");
@@ -40,8 +40,8 @@ const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0
 assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);
 // The hyoid cartilage (an organ, so that it has its own strength): photo 06's throat patch less the screen's tissue there,
 // over the median hyoid path (0.0328), and lighter in red than the rib-gap cartilage over the same path.
-nearA(transmitted({ organs: { hyoid_cartilage: 0.0328 } }), [0.384, 0.124, 0.023], 0.005, "06 の舌骨の軟骨");
+nearA(transmitted({ organs: { hyoid_cartilage: 0.0328 } }), [0.393, 0.135, 0.054], 0.005, "06 の舌骨の軟骨");
 assert.ok(transmitted({ organs: { hyoid_cartilage: 0.0328 } })[0] > transmitted({ cartilage: 0.0328 })[0], "舌骨の軟骨が肋骨の軟骨より薄くない");
 // "06" stays as it was when no stain is named.
-near(transmitted({ skin: 0.56 }, { stain: "06" }), transmitted({ skin: 0.56 }), 1e-12, "06 の既定");
+near(transmitted({ skin: 0.627 }, { stain: "06" }), transmitted({ skin: 0.627 }), 1e-12, "06 の既定");
 console.log("chameleon-stain: ok");

@@ -42,7 +42,10 @@ export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // Per model unit of tissue crossed side-on. The skin is a closed shell (ct_body_pipeline/skinloft2.py);
 // on screen the neck behind the skull crosses about 0.56 units side-on (view=photo06), and the photo's
 // neck absorbs 0.371 in blue. (Before the skin was rebuilt from the thickness tables, 0.38 and 0.98.)
-export const SKIN_GAIN = 0.66;
+// Measured again on the skin built from the bones (ct_body_pipeline/skinbody.py 7, after the hyoid rebuild, 2026-10-15):
+// below the neck vertebrae v02–v04, off the bone, the skin crosses 0.627 units (median of 1328 screen pixels,
+// quartile 0.687), so 0.371 / 0.627. (Was 0.66 over 0.56.)
+export const SKIN_GAIN = 0.592;
 
 // The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
 // only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,
@@ -56,7 +59,7 @@ export const VISCERA_GAIN = 4.8;
 // The colour patterns. "06" is the one above (photo 06); "01" is the user's jar photo, below.
 // Pages pick one with `?stain=01` (chameleon.html and the jar page); without it, "06".
 /** The hyoid cartilage's absorbance per model unit (photo 06's throat, fitted; see "06" below). */
-export const HYOID_CARTILAGE = [11.71, 3.77, 0.71];
+export const HYOID_CARTILAGE = [11.98, 4.11, 1.65];
 
 export const STAINS = {
   "06": {
@@ -70,7 +73,8 @@ export const STAINS = {
     // as the organ hyoid_cartilage, so that it can have its own strength: with the rib-gap cartilage's (above) it came out
     // about 4 times darker than the pale blue at photo 06's throat (red absorbance 1.9 against 0.46). Fitted to that patch
     // (x 955–1005, y 480–525 px: 0.462 / 0.231 / 0.323 over the background), less the screen's own tissue there, by the
-    // median hyoid path off the bone (0.0328; ct_body_pipeline/fit_hyoidcart06.py, 2026-10-15). The patch lies behind the
+    // median hyoid path off the bone (0.0328; ct_body_pipeline/fit_hyoidcart06.py, 2026-10-15, with the skin at 0.592;
+    // 11.71 / 3.77 / 0.71 with the skin at 0.66). The patch lies behind the
     // jaw, the modelled entoglossal process along it, so matched by strength, not by place: provisional.
     organs: { hyoid_cartilage: HYOID_CARTILAGE },
   },
