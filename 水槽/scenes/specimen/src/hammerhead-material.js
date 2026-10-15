@@ -13,7 +13,8 @@ import { chameleonOrgans } from "./chameleon-material.js";
 const GILL_MIX = [Number(new URLSearchParams(location.search).get("gillbone") ?? 1.67), Number(new URLSearchParams(location.search).get("gillcart") ?? 1.518), 0, 0];
 // 顎: 既定はひれの軟骨と同じ淡い青。?jawbone= で骨の色を混ぜる（2026-10-15、顎の色の案を見比べるため）
 const JAW_BONE = Number(new URLSearchParams(location.search).get("jawbone") ?? 0);
-const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE, 1, 0, 0] : 1, Gill: GILL_MIX, Skin: 2, HeadCartilage: 3 };
+const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE, 1, 0, 0] : 1, Gill: GILL_MIX, Skin: 2, HeadCartilage: 3, Viscera: [0, 0, 0, 0] };   // 内臓は内臓の通り道で描く（下の visceraMaterial）
+const OPTIONAL = new Set(["Viscera"]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 
@@ -183,6 +184,28 @@ function gillRayMaterial() {
   });
 }
 
+// A8 内臓（2026-10-15）: 閉じた面の通り道（表と裏の深さの差）× 色（RGB の吸い方、1 m あたり）を、内臓の通り道に足す。
+//  透明標本の内臓の色の出典はまだ無い。案: ?visccol=cream（体の組織と同じ色）・yellow（黄み、肝臓の油）・blue（青み、消化管の粘液のアルシアン、推定）
+//  強さ ?visc=（既定 0）。1 で 40 mm 通ると、いちばん吸う色で約 0.3 吸う
+const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1, 0.5, 0.42] };
+export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 0) },
+  color: { value: new THREE.Vector3(...(VISC_COLORS[DENT_Q.get("visccol") ?? "cream"] ?? VISC_COLORS.cream)) } };
+const visceraFragment = `
+uniform float amount;
+uniform vec3 color;
+uniform float reference;
+varying vec3 vViewPosition;
+void main() {
+  float d = -vViewPosition.z - reference;
+  gl_FragColor = vec4(amount * 7.5 * color * (gl_FrontFacing ? -d : d), 0.);
+}`;
+function visceraMaterial(reference) {
+  return new THREE.ShaderMaterial({
+    uniforms: { amount: visceraLook.amount, color: visceraLook.color, reference, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    vertexShader: vertex, fragmentShader: visceraFragment, ...ADD,
+  });
+}
+
 export function applyHammerheadTissue(model, reference) {
   const found = new Set();
   model.traverse((o) => {
@@ -197,7 +220,8 @@ export function applyHammerheadTissue(model, reference) {
     o.userData.pathMaterial = o.material;
     if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
     if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
+    if (part === "Viscera") o.userData.organMaterial = visceraMaterial(reference);
   });
-  const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
+  const missing = Object.keys(CHANNEL).filter((p) => !found.has(p) && !OPTIONAL.has(p));
   if (missing.length) throw new Error(`specimen_hammerhead.glb に部位がありません: ${missing.join(", ")}`);
 }

@@ -9,6 +9,7 @@
   Teeth     歯（800 HU を超える石灰化した所）。椎骨と同じ赤
   Gill      舌の弓とエラの骨（a7 で作る）。ひれの軟骨と同じ明るい青
   Skin      体と、ひれの膜（透明になった組織）
+  Viscera   内臓（a8a_viscera.py、CT の体腔から取り出した。2026-10-15）
 CT（Kamminga et al. 2017、figshare、CC0）から作ったので、glb はリポジトリに入れてよい。
 """
 import bpy, bmesh, os
@@ -27,6 +28,9 @@ PARTS = {
     "Gill": (["HH_hyoid", "HH_gill"], 60000),
     "Skin": (["HH_body", "HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R"], 160000),
 }
+# A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
+if os.path.exists(f"{MESH}/HH_viscera.ply"):
+    PARTS["Viscera"] = (["HH_viscera"], 120000)
 sc = hh_paths.blender_scene("HH_EXPORT")
 coll = bpy.data.collections.get("HH_EXPORT")
 if coll is None:
