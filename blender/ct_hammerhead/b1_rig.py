@@ -57,6 +57,10 @@ for side, sg in (("R", 1), ("L", -1)):
         e = arm_data.edit_bones.new(f"{nm}_{side}")
         e.head = Vector((z / 1000, sg * u / 1000, -v / 1000)); e.tail = Vector(((z + du * 0.6) / 1000, sg * (u + du) / 1000, -(v + du * 0.25) / 1000))
         e.parent = eb[seg_of(z)]; fins[(nm, side)] = (z, u, v)
+# B5 口（2026-10-15）: 下あごの骨。顎の関節（a7_open.json、左右の関節を結ぶ軸は左右の向き）を付け根に、前へ向ける。頭の骨の子
+JR_ = json.load(open(os.path.join(_work, "a7_open.json")))
+JZ, JV = JR_["joint_L_zuv_mm"][0], JR_["joint_L_zuv_mm"][2]
+e = arm_data.edit_bones.new("jaw"); e.head = Vector((JZ / 1000, 0, -JV / 1000)); e.tail = Vector(((JZ - 40) / 1000, 0, -JV / 1000)); e.roll = 0.0; e.parent = eb["head"]
 bpy.ops.object.mode_set(mode="OBJECT")
 centers = [(cuts[i] + cuts[i + 1]) / 2 for i in range(len(names))]
 centers[0] = float(os.environ.get('HH_RIG_HEAD', 125.0))   # 頭: 翼の後ろの端（約 125 mm）までは頭の骨だけ（100 mm では翼の後ろの端が膜から少し出た）
@@ -82,14 +86,38 @@ def fin_weight(p_mm, src):
     return [(f"{nm}_{side}", w)] if w > 0 else []
 PECT_LAT = tuple(float(v) for v in os.environ.get("HH_RIG_PECTLAT", "45,80").split(","))
 PELV_LAT = tuple(float(v) for v in os.environ.get("HH_RIG_PELVLAT", "22,32").split(","))
+_JRG = np.load(os.path.join(_work, "b5_jaw_region.npz"))
+_L0 = np.unpackbits(_JRG["L0"])[:int(np.prod(_JRG["shape"]))].reshape(_JRG["shape"]).astype(bool); _SD = _JRG["SD"]
+JAWBAND = float(os.environ.get("HH_RIG_JAWBAND", 8))
+def in_jaw_region(P_mm):
+    """Blender の mm の点（開いた形）→ 下あごの膜か。a7c_open_mesh.py の rot を逆に回し、開く前の格子 L0 を引く（関節より 6 mm 前まで）"""
+    JL = _JRG["joint_L"]; A = float(_JRG["sign"]) * float(_JRG["angle"])
+    Z = np.stack([P_mm[:, 0], P_mm[:, 1], -P_mm[:, 2]], 1)           # (z, u, v)
+    ax = np.array([0.0, 1.0, 0.0]); t = np.radians(-A); X = Z - JL; c, s_ = np.cos(t), np.sin(t)
+    Q = JL + X * c + np.cross(ax, X) * s_ + np.outer(X @ ax, ax) * (1 - c)
+    o, g = _JRG["origin"], float(_JRG["step"])
+    iz = np.round((Q[:, 0] - o[0]) / g).astype(int); iv = np.round((Q[:, 2] - o[1]) / g).astype(int); iu = np.round((Q[:, 1] - o[2]) / g).astype(int)
+    ok = (iz >= 0) & (iz < _L0.shape[0]) & (iv >= 0) & (iv < _L0.shape[1]) & (iu >= 0) & (iu < _L0.shape[2])
+    # 重み: 境目からの距離で ±JAWBAND mm をなめらかに、関節の後ろ（関節 −2 → +8 mm）でも 0 へ
+    w = np.zeros(len(P_mm)); sd = _SD[iz[ok], iv[ok], iu[ok]].astype(float)
+    t = np.clip((sd + JAWBAND) / (2 * JAWBAND), 0, 1); w[ok] = t * t * (3 - 2 * t)
+    t2 = np.clip((Q[:, 0] - (JL[0] - 2)) / 10, 0, 1); w *= 1 - t2 * t2 * (3 - 2 * t2)
+    return w
 for ob in [o for o in coll.objects if o.type == "MESH"]:
     me = ob.data; M = ob.matrix_world
-    groups = {nm: ob.vertex_groups.new(name=nm) for nm in names + [f"{a}_{s}" for a in ("pect", "pelv") for s in ("L", "R")]}
+    groups = {nm: ob.vertex_groups.new(name=nm) for nm in names + ["jaw"] + [f"{a}_{s}" for a in ("pect", "pelv") for s in ("L", "R")]}
+    Pall = np.array([tuple(M @ v.co) for v in me.vertices]) * 1000
+    jawskin = in_jaw_region(Pall) if ob.name == "HH_Skin" else np.zeros(len(Pall))
     srcg = {g.index: g.name[4:] for g in ob.vertex_groups if g.name.startswith("src_")}
     for v in me.vertices:
         p = M @ v.co; pm = (p.x * 1000, p.y * 1000, p.z * 1000)
         src = next((srcg[g.group] for g in v.groups if g.group in srcg and g.weight > 0.5), None)
-        ws = spine_weights(pm[0]); fw = fin_weight(pm, src)
+        if src in ("HH_jaw_lower", "HH_teeth_lower"):
+            groups["jaw"].add([v.index], 1.0, "REPLACE"); continue
+        wj = float(jawskin[v.index])
+        if wj > 1e-4: groups["jaw"].add([v.index], wj, "REPLACE")
+        if wj > 1 - 1e-4: continue
+        ws = [(n_, w_ * (1 - wj)) for n_, w_ in spine_weights(pm[0])]; fw = fin_weight(pm, src)
         f = min(1.0, sum(w for _, w in fw))
         for nm, w in ws:
             if w * (1 - f) > 1e-4: groups[nm].add([v.index], w * (1 - f), "REPLACE")
@@ -97,6 +125,35 @@ for ob in [o for o in coll.objects if o.type == "MESH"]:
     for gi in sorted(srcg, reverse=True): ob.vertex_groups.remove(ob.vertex_groups[gi])   # 出どころのグループは書き出さない
     ob.parent = arm; mod = ob.modifiers.new("Armature", "ARMATURE"); mod.object = arm
 print("rig: bones", len(arm_data.bones), "spine segments", len(names))
+
+if os.environ.get("HH_RIG_JAWTEST"):
+    # B5 口の試し: 口の骨だけを回し（+ で開く、°）、膜の辺の伸びと、上あご・下あごの近さを測る。b5_jaw_test.json を書いて終わる
+    def wverts(ob):
+        ev = ob.evaluated_get(bpy.context.evaluated_depsgraph_get()); me = ev.to_mesh()
+        V = np.array([tuple(ob.matrix_world @ v.co) for v in me.vertices]); F = np.array([list(p.vertices) for p in me.polygons]); ev.to_mesh_clear(); return V, F
+    skin = coll.objects["HH_Skin"]; jawob = coll.objects["HH_Jaw"]
+    gi = jawob.vertex_groups["jaw"].index
+    low = np.array([any(g.group == gi and g.weight > 0.5 for g in v.groups) for v in jawob.data.vertices])
+    S0, SF = wverts(skin); E = np.unique(np.sort(np.concatenate([SF[:, [0, 1]], SF[:, [1, 2]], SF[:, [2, 0]]]), axis=1), axis=0)
+    l0 = np.linalg.norm(S0[E[:, 0]] - S0[E[:, 1]], axis=1)
+    from mathutils.kdtree import KDTree
+    out = {"jaw_verts_low": int(low.sum()), "jaw_verts_up": int((~low).sum()), "skin_jaw_verts": int(sum(1 for v in skin.data.vertices if any(g.group == skin.vertex_groups["jaw"].index for g in v.groups))), "poses": {}}
+    for deg in [float(x) for x in os.environ["HH_RIG_JAWTEST"].split(",")]:
+        bpy.context.view_layer.objects.active = arm; bpy.ops.object.mode_set(mode="POSE")
+        pb = arm.pose.bones["jaw"]; pb.rotation_mode = "QUATERNION"
+        axis_local = (pb.bone.matrix_local.to_3x3().inverted() @ Vector((0, 1, 0))).normalized()
+        pb.rotation_quaternion = Quaternion(axis_local, -math.radians(deg))   # 背の上から見て、+Y のまわりの − が開く向き
+        bpy.ops.object.mode_set(mode="OBJECT"); bpy.context.view_layer.update()
+        S1, _ = wverts(skin); st = np.linalg.norm(S1[E[:, 0]] - S1[E[:, 1]], axis=1) / np.maximum(l0, 1e-9)
+        J1, _ = wverts(jawob); kd = KDTree(int((~low).sum()))
+        for i, p in enumerate(J1[~low]): kd.insert(p, i)
+        kd.balance(); dmin = min(kd.find(p)[2] for p in J1[low][::3])
+        big = np.nonzero(st > 1.3)[0]
+        out["poses"][str(deg)] = dict(stretch_max=round(float(st.max()), 3), shrink_min=round(float(st.min()), 3), edges_over_1_3=int(len(big)),
+                                       edges_over_1_3_x_mm=[round(float(x)) for x in np.percentile(S0[E[big, 0], 0] * 1000, [0, 50, 100])] if len(big) else [],
+                                       upper_lower_jaw_gap_mm=round(dmin * 1000, 2), front_lower_z_mm=round(float(J1[low][np.argmin(J1[low][:, 0]), 2] * 1000), 1))
+        print("jaw", deg, out["poses"][str(deg)])
+    json.dump(out, open(os.path.join(_work, "b5_jaw_test.json"), "w"), indent=1); raise SystemExit(0)
 
 if os.environ.get("HH_RIG_TEST") == "1":
     # --- 試しのうねり: 尾ほど振れが大きい波（振れ幅は見やすく大きめ）。骨は背の軸（ワールドの z）のまわりに回す ---
