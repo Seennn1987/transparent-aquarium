@@ -7,14 +7,15 @@
 #  置き場所（骨格から、Blender の mm: x 吻端→尾、y 左右、z 背+）: 心膜腔は、肩帯の下の棒（烏口骨、(175, −42) から (230, −66) へ斜め）の前、
 #   鰓弓の床（底鰓軟骨、x 160 で z −34、x 200 で z −40）の下、腹の膜（x 170〜200 で z −63）の上。その三角の中に収まる大きさとして W = 26 mm
 #  部品: 心室（腹側）、心房（背側、左右の葉）、静脈洞（後ろ・背側の横の管）、動脈円錐（前へ）。なめらかな和の場（距離の場）→ 面
+#  既定は案「実物に近い大きさ」（心室の幅 26 mm、心室の中心 x 189・z −56 mm。2026-10-15 プロデューサー「心臓は実物に近い大きさ、拍動は毎分 37、エラは止める（出典どおり）にしてください。」）
 #  出力: mesh/HH_heart.ply、b5_heart.json（中心、大きさ、部品ごとの中心。ページの拍動の中心に使う）
 import hh_paths; hh_paths.cd_work()
 import numpy as np, json, os
 from skimage.measure import marching_cubes
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 W = float(os.environ.get('HH_HEART_W', 26.0))
-X0 = float(os.environ.get('HH_HEART_X', 168.0))       # 心室の中心の前後（mm）
-Z0 = float(os.environ.get('HH_HEART_Z', -54.0))       # 心室の中心の背腹（mm、Blender z）
+X0 = float(os.environ.get('HH_HEART_X', 189.0))       # 心室の中心の前後（mm）
+Z0 = float(os.environ.get('HH_HEART_Z', -56.0))       # 心室の中心の背腹（mm、Blender z）
 def ell(P, c, r):   # 楕円体のおおよその符号つき距離（mm）
     q = (P - np.array(c)) / np.array(r); return (np.linalg.norm(q, axis=-1) - 1) * min(r)
 def capsule(P, a, b, r):

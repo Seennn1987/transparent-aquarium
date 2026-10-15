@@ -103,6 +103,7 @@ HH_ORGANS=B HH_SPIRAL=bowl step py a8b_viscera_organs.py
 HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8 step py a8c_vertebrae.py
 export HH_VERT_CENTRA_PART=Centrum HH_VERT_ARCH_PART=Arch   # 弓も別の部品（2026-10-15 H1）
 # A6 glb に書き出す（Blender）
+step py b5b_heart.py   # B5 心臓（推定、案「実物に近い大きさ」、2026-10-15 決定）
 step py b5a_jaw_region.py   # B5 口: 下あごといっしょに動く膜の範囲（b1_rig.py が使う）
 export HH_RIG=1   # B1 骨組み（b1_rig.py）を付けて書き出す。標本ページは B3（2026-10-15）から骨組みでうねる
 step blender a6a_export_gltf.py
