@@ -46,12 +46,28 @@ export const HH_LIGHTBOX = [253 / 255, 247 / 255, 251 / 255];
 export const HH_BONE_SPECTRUM = [0.37, 1, 0.28];
 export const HH_CARTILAGE_SPECTRUM = [1, 0.01, 0.04];
 export const HH_HEAD_SPECTRUM = [1, 0.19, 0.20];
-export const HH_SKIN_SPECTRUM = [0.42, 0.74, 1];
+// 2026-10-15 胴の色の案（プロデューサー「A から持ち越した胴の色の違和感を直したいです」）: 胚の体の組織を、前に測った 1 点 (300, 24) だけでなく、
+//  胴の広い範囲で測り直した（eames2007_fig2.jpg の A、y 0〜90、x 100〜420 px、背景より少し暗く骨・軟骨の濃い色でない画素の中央値）:
+//   前に測った点 (300, 24)（後ろの胴の赤みのある所） 0.79 / 0.66 / 0.57
+//   胴の真ん中（x 180〜260） 0.81 / 0.76 / 0.69
+//   胴全体（x 100〜420）     0.80 / 0.81 / 0.75
+//  ?tissue= で、体の組織の色をそれぞれに合わせる（80 mm 通ったときにその値になる吸い方。A: いま、B: 胴の真ん中、C: 胴全体）
+const TISSUE_TARGETS = { A: [0.79, 0.66, 0.57], B: [0.81, 0.76, 0.69], C: [0.80, 0.81, 0.75] };
+const TISSUE = (typeof location !== "undefined" && new URLSearchParams(location.search).get("tissue")) || "A";
+function tissueStain(t) {   // 80 mm で t になる吸い方 → 色（いちばん吸う成分を 1）と利得（/m）
+  const A = t.map((v) => -Math.log(v)), top = Math.max(...A);
+  return { spectrum: A.map((v) => +(v / top).toFixed(3)), gain: +(top / 0.080).toFixed(2) };
+}
+// D: 標本ページで測った体の組織が C の目標（0.80 / 0.81 / 0.75）になるよう、皮歯・まだら・内臓が足す分（C で測った 0.75 / 0.73 / 0.70 と目標の差、
+//  吸い方で 0.065 / 0.104 / 0.069）を体の組織から引いた（80 mm で 0.158 / 0.107 / 0.219）。皮歯・まだらの強さは決めたまま
+const TISSUE_D = { spectrum: [0.721, 0.489, 1], gain: 2.74 };
+const TISSUE_STAIN = TISSUE === "D" ? TISSUE_D : TISSUE === "A" || !TISSUE_TARGETS[TISSUE] ? null : tissueStain(TISSUE_TARGETS[TISSUE]);
+export const HH_SKIN_SPECTRUM = TISSUE_STAIN?.spectrum ?? [0.42, 0.74, 1];
 export const HH_BONE_T0 = 0.02;      // the bone's path saturates as in the chameleon (t0, metres)
 export const HH_BONE_GAIN = 166;   // 2026-10-15 191 → 166（上の注）
 export const HH_CARTILAGE_GAIN = 408;
 export const HH_HEAD_GAIN = 1014;  // 2026-10-15 780 → 1014（上の注）
-export const HH_SKIN_GAIN = 7.0;
+export const HH_SKIN_GAIN = TISSUE_STAIN?.gain ?? 7.0;
 
 STAINS.hammerhead = {
   lightbox: HH_LIGHTBOX,
@@ -66,5 +82,6 @@ STAINS.hammerhead = {
   //  0.12 は「むらの濃い所で、体の組織の青の吸い方（80 mm で 0.56）が 1 割ほど増える」くらいからの出発（2026-10-15）。強さはページの ?mottle=（既定 0.5、2026-10-15 決定）
   // A8 鰓条（hammerhead-material.js の gillRayMaterial）: エラの骨の色（骨 1.67・軟骨 1.518 の重み）の 0.5 mm 分を 1 回横切るごとに
   //  （骨 166 × 1.67 × (0.37, 1, 0.28) + 軟骨 408 × 1.518 × (1, 0.01, 0.04)、/m → × 0.0005）
-  organs: { mottle: [0.42 * 0.12, 0.74 * 0.12, 1 * 0.12], gillray: [0.361, 0.142, 0.051] },
+  // まだらの色は体の組織の色（案で変わる）に合わせる。いま（A）では前と同じ 0.42 / 0.74 / 1 × 0.12
+  organs: { mottle: HH_SKIN_SPECTRUM.map((v) => v * 0.12), gillray: [0.361, 0.142, 0.051] },
 };
