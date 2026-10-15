@@ -14,22 +14,32 @@ export const hhOrganLook = { heart: { value: 1 }, mouth: { value: 1 }, gill: { v
 export function heartbeat(beats) { return (0.5 + 0.5 * Math.sin(2 * Math.PI * beats)) ** 4; }
 
 export function createHammerheadClock(rates = { ...HH_RATES }) {
+  // 位相（回数で数えた時刻）は dt × 回数で足していく。回数（泳ぐ速さの案など）を途中で変えても、動きがとばない（2026-10-15）
   let time = 0;
+  const phase = { tail: 0, mouth: 0, heart: 0, gill: 0 };
   const state = { time: 0, tailCycles: 0, mouthDeg: 0, beat: 0, breath: 0 };
-  function at(t) {
-    state.time = t;
-    state.tailCycles = t * rates.tailHz;
-    state.mouthDeg = rates.mouthDeg * hhOrganLook.mouth.value * Math.sin(2 * Math.PI * t * rates.mouthHz);
-    state.beat = rates.heartBpm > 0 ? rates.heartSqueeze * hhOrganLook.heart.value * heartbeat(t * rates.heartBpm / 60) : 0;
-    state.breath = rates.gillHz > 0 ? rates.gillAmp * hhOrganLook.gill.value * Math.sin(2 * Math.PI * t * rates.gillHz) : 0;
+  function pose() {
+    state.time = time;
+    state.tailCycles = phase.tail;
+    state.mouthDeg = rates.mouthDeg * hhOrganLook.mouth.value * Math.sin(2 * Math.PI * phase.mouth);
+    state.beat = rates.heartBpm > 0 ? rates.heartSqueeze * hhOrganLook.heart.value * heartbeat(phase.heart) : 0;
+    state.breath = rates.gillHz > 0 ? rates.gillAmp * hhOrganLook.gill.value * Math.sin(2 * Math.PI * phase.gill) : 0;
     return state;
   }
   return {
     rates, state,
     /** dt 秒だけ進める（一時停止は 0）。 */
-    update(dt) { time += dt; return at(time); },
-    /** 時刻を決めて、その時刻の姿にする（撮るときの ?phase=）。 */
-    at(t) { time = t; return at(t); },
+    update(dt) {
+      time += dt;
+      phase.tail += dt * rates.tailHz; phase.mouth += dt * rates.mouthHz; phase.heart += dt * rates.heartBpm / 60; phase.gill += dt * rates.gillHz;
+      return pose();
+    },
+    /** 時刻を決めて、その時刻の姿にする（撮るときの ?phase=。回数は今の値のまま、0 秒から進めたとみなす）。 */
+    at(t) {
+      time = t;
+      phase.tail = t * rates.tailHz; phase.mouth = t * rates.mouthHz; phase.heart = t * rates.heartBpm / 60; phase.gill = t * rates.gillHz;
+      return pose();
+    },
     get time() { return time; },
   };
 }

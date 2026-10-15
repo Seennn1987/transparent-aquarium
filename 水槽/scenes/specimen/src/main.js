@@ -8,6 +8,7 @@ import { createSpecimen } from "./specimen.js";
 import { createChameleonSpecimen } from "./specimen-chameleon.js";
 import { createHammerheadSpecimen } from "./specimen-hammerhead.js";
 import { pickerPanel } from "./picker-panel.js";
+import { swimLook, mouthLook } from "./hammerhead-swim.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
@@ -158,10 +159,21 @@ async function start() {
     : specimenKind === "hammerhead" ? await createHammerheadSpecimen(specimenOptions)
     : await createSpecimen(specimenOptions);
   // ?specimen=hammerhead&pick=dish: 器の直径（サメに対して）の案を、回したまま切り替える（C2・C3、2026-10-15）
-  if (specimenKind === "hammerhead" && query.get("pick") === "dish") {
+  const picks = (query.get("pick") ?? "").split(",");
+  if (specimenKind === "hammerhead" && picks.includes("dish")) {
     pickerPanel([
-      ["器の直径", [["1 倍（いま）", 1], ["1.5 倍", 1.5], ["2 倍", 2], ["2.5 倍", 2.5]], () => specimen.dishRatio, (v) => specimen.setDishRatio(v)],
+      ["器の直径", [["1 倍", 1], ["1.5 倍", 1.5], ["2 倍（決定）", 2], ["2.5 倍", 2.5]], () => specimen.dishRatio, (v) => specimen.setDishRatio(v)],
     ], "器はこのままで、サメを小さく描く（器の直径がサメに対して何倍か）。1 倍は回れないので真ん中でその場の泳ぎ。回る円の半径は、体のどこも壁から 0.12 より近づかない、いちばん大きい円");
+  }
+  // ?pick=speed: 泳ぐ速さの案（2026-10-15、プロデューサー「泳ぐスピードが速いのでもう少し遅いパターンを何パターンか提案して」）。
+  //  1 回の尾の振りで進む長さ（0.64 L、Webb & Keyes 1982）はそのままで、尾の振りの回数を速さに合わせて下げる（遅く泳ぐほど尾の振りは少ない、Webb & Keyes 1982・Lowe 1996）。
+  //  口は「尾と同じ回数」（B5 の決定）なので、尾に合わせる
+  if (specimenKind === "hammerhead" && picks.includes("speed")) {
+    const speeds = [0.8, 0.6, 0.4, 0.25];   // L/s
+    pickerPanel([
+      ["泳ぐ速さ", speeds.map((v) => [`${v} L/s（尾 ${(v / 0.64).toFixed(2)} Hz）`, v]), () => +(swimLook.frequency * 0.64).toFixed(2),
+        (v) => { swimLook.frequency = v / 0.64; mouthLook.hz = swimLook.frequency; }],
+    ], "0.8 L/s がいま（出典のボンネットヘッドの水槽での速さ、尾 1.25 Hz）。遅いほど 1 周が長い（2 倍の器で 0.8 L/s は 5.9 秒）。速さを変えた瞬間は位置がとぶ");
   }
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { circlePose, dishBaseScale, farthestFromAxis, fitCircle, HH_BODY, HH_HEIGHT } from "../src/hammerhead-path.js";
+import { circlePose, circleSpeed, dishBaseScale, farthestFromAxis, fitCircle, HH_BODY, HH_HEIGHT } from "../src/hammerhead-path.js";
 
 // シロシュモクザメの回遊（C2、2026-10-15）: 器の直径の案ごとに、1 周の間、体のどこも壁・液面・底から空き（0.12）より近づかない。
 //  器の液の大きさは dish.glb の Jar_Liquid（ページの liquidBounds と同じ）から読む。体の外形は hammerhead-path.js（中心線 ± 半幅、ページと同じ式）
@@ -24,7 +24,7 @@ for (const ratio of [1.5, 2, 2.5]) {
   const lap = 2 * Math.PI * r / (HH_BODY.stride * L * swim.frequency);
   let far = 0, maxTurn = 0;
   for (let t = 0; t <= lap; t += 1 / 60) {
-    const pose = circlePose(t, t * swim.frequency, { radius: r, scale, swim });
+    const pose = circlePose(circleSpeed(scale, swim) * t / r, t * swim.frequency, { radius: r, scale, swim });
     far = Math.max(far, farthestFromAxis(pose, scale));
     maxTurn = Math.max(maxTurn, pose.turn);
   }
@@ -39,5 +39,15 @@ for (const ratio of [1.5, 2, 2.5]) {
   const a = circlePose(3.3, 4.1, { radius: r, scale, swim }), b = circlePose(3.3, 4.1, { radius: r, scale, swim });
   assert.deepEqual([a.at, a.yaw], [b.at, b.yaw]);
   console.log(`  ${ratio} 倍: 回る半径 ${(r / L).toFixed(2)} L、1 周 ${lap.toFixed(1)} 秒、壁までの空き ${(radius - far).toFixed(3)}`);
+}
+// 泳ぐ速さの案（2 倍の器）: 尾の振りの回数を下げても、1 周の間の空きは変わらない（道すじの形は速さによらない）
+for (const v of [0.6, 0.4, 0.25]) {
+  const f = v / HH_BODY.stride, sw = { ...swim, frequency: f }, scale = scale1 / 2;
+  const r = fitCircle({ inner: radius, clearance: CLEARANCE, scale, swim: sw });
+  const lap = 2 * Math.PI * r / (HH_BODY.stride * HH_BODY.length * scale * f);
+  let far = 0;
+  for (let t = 0; t <= lap; t += 1 / 30) far = Math.max(far, farthestFromAxis(circlePose(circleSpeed(scale, sw) * t / r, t * f, { radius: r, scale, swim: sw }), scale));
+  assert.ok(far <= radius - CLEARANCE + 1e-9, `${v} L/s: 壁までの空き ${(radius - far).toFixed(4)}`);
+  console.log(`  2 倍・${v} L/s（尾 ${f.toFixed(2)} Hz）: 1 周 ${lap.toFixed(1)} 秒、壁までの空き ${(radius - far).toFixed(3)}`);
 }
 console.log("hammerhead-circle: ok");

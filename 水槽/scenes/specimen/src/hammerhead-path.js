@@ -48,17 +48,23 @@ const angleOf = (vx, vz) => Math.atan2(-vz, vx);
 
 /**
  * 器の中を回る道すじ: 体の真ん中（s = L/2）が、器の軸を中心とする半径 radius（器の単位）の円の上を、反時計回り（上から見て）に進む。
- * 真ん中の体の向きが道すじの向きにそろう。曲がりは道すじの円の半径から（turn = 出典の旋回の半径 / 道すじの半径、体の右へ）。
- * scale: 器の単位 / m。時刻 time（秒）→ 器の中の姿: 標本の点 p（m）は、器の座標で centre + R_yaw(scale (p − mid)) + 円の上の点。
+ * 2026-10-15 直し（プロデューサー「綺麗な円を描くように泳ぐようにして」）:
+ *  - 体の向きと置き場所は、うねりを抜いた体（振れ 0）の中心線で決める。うねりはその上に乗るだけで、体全体の向きは尾の振りで揺れない
+ *  - 体は道すじの円と同じ曲がりに曲げる（turnBend 1、turn = 出典の旋回の半径 / 道すじの半径）。前は旋回の曲げ 0.5 のままで、体が円よりまっすぐで頭と尾が外へはみ出した。
+ *    回る円の半径 0.74 L では、この曲がりは B4 で決めた「曲げ 0.5」と同じ強さ（0.5 / 0.374 L ≈ 1 / 0.75 L）
+ * scale: 器の単位 / m。標本の点 p（m）は、器の座標で R_yaw(scale (p − mid)) + 円の上の点。
  */
-export function circlePose(time, cycles, { radius, scale, swim }) {
+/** 回る速さ（器の単位 / 秒）: 1 回の尾の振りで stride L 進む。 */
+export function circleSpeed(scale, swim) { return HH_BODY.stride * HH_BODY.length * scale * (swim.frequency ?? 1.25); }
+
+/** theta: 円の上の角（rad）。ページは dt ごとに 速さ × dt / 半径 を足す（速さを変えてもとばない）。 */
+export function circlePose(theta, cycles, { radius, scale, swim }) {
   const L = HH_BODY.length;
-  const turn = Math.min(HH_BODY.turnRadius * L * scale / radius, 1);
-  const opts = { ...swim, turn };
+  const turn = HH_BODY.turnRadius * L * scale / radius;
+  const opts = { ...swim, turn, turnBend: 1 };
   const pts = centreline(cycles, opts);
-  const mid = pts[Math.round(pts.length / 2)];
-  const speed = HH_BODY.stride * L * scale * (swim.frequency ?? 1.25);   // 器の単位 / 秒
-  const theta = speed * time / radius;
+  const ref = centreline(cycles, { ...opts, amplitude: 0 });   // うねりを抜いた体: 向きと置き場所の基準
+  const mid = ref[Math.round(ref.length / 2)];
   const at = { x: radius * Math.cos(theta), z: radius * Math.sin(theta) };
   // 進む向き（反時計回り）と、標本の前（−体の軸の向き）
   const travel = angleOf(-Math.sin(theta), Math.cos(theta));
@@ -89,7 +95,7 @@ export function fitCircle({ inner, clearance, scale, swim, phases = 64, margin =
   const L = HH_BODY.length, minR = HH_BODY.turnRadius * L * scale;
   const ok = (r) => {
     for (let i = 0; i < phases; i++) {
-      const pose = circlePose(0, i / phases, { radius: r, scale, swim });
+      const pose = circlePose(0, i / phases, { radius: r, scale, swim });   // 円の上のどこでも同じ形なので、角 0 で尾の振りの位相だけ変える
       if (farthestFromAxis(pose, scale) > inner - clearance - margin) return false;   // 位相の間の分の余裕（16 位相では 1 周の間に空きが 0.119 になった）
     }
     return true;

@@ -4,7 +4,7 @@ import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
 import { createSwim, swimLook } from "./hammerhead-swim.js";
-import { circlePose, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
+import { circlePose, circleSpeed, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
 
 // シロシュモクザメ（hammerhead.html）を、ギャラリーの前の台の低い器（dish.glb）に入れる。`?specimen=hammerhead`（C、2026-10-15）。
 //  描き方はカメレオンと同じ: 透かしの通り道（chameleon-material.js の createLightbox、色は hammerhead-stain.js）を、器の屈折が引く画像に描く。
@@ -49,7 +49,7 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
   const swimOpts = () => ({ amplitude: swimLook.amplitude, wavelength: swimLook.wavelength, turnBend: swimLook.turnBend, frequency: swimLook.frequency });
   const yMid = (HH_HEIGHT.top + HH_HEIGHT.bottom) / 2;
   const centre = liquidBounds.getCenter(new THREE.Vector3());
-  const state = { ratio: 0, scale: scale1, circle: null };
+  const state = { ratio: 0, scale: scale1, circle: null, theta: 0, lastTime: 0 };
   const pivot = new THREE.Group();
   pivot.name = "SpecimenPivot";
   pivot.add(body);
@@ -63,12 +63,15 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
       body.position.copy(middle).multiplyScalar(-state.scale);
       pivot.position.copy(centre); pivot.rotation.set(0, 0, 0);
       swimLook.turn = 0;
-    } else model.rotation.y = 0;
+    } else { model.rotation.y = 0; swimLook.turnBend = 1; }   // 回るときは体を道すじの円と同じ曲がりに（hammerhead-path.js の circlePose）
     lightbox?.dispose?.(); lightbox = null;   // 組織の通り道の倍率（1 / 縮尺）が変わる
   }
   function place() {
     if (!state.circle) return;
-    const pose = circlePose(swim.clock.time, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() });
+    // 円の上の角は、時計の進み（一時停止で 0）× 速さ / 半径 を足す
+    const dt = swim.clock.time - state.lastTime; state.lastTime = swim.clock.time;
+    state.theta += circleSpeed(state.scale, swimOpts()) * dt / state.circle;
+    const pose = circlePose(state.theta, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() });
     swimLook.turn = pose.turn;   // 次のフレームの骨の曲げ（道すじの円の向き、体の右へ）
     body.position.set(-state.scale * pose.mid.x, -state.scale * yMid, -state.scale * pose.mid.z);
     pivot.position.set(centre.x + pose.at.x, centre.y, centre.z + pose.at.z);
@@ -97,10 +100,11 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
     get dishRatio() { return state.ratio; },
     get circleRadius() { return state.circle; },
     setDishRatio(k) { setDishRatio(k); place(); },
+    get theta() { return state.theta; },
     size,
     bounds: new THREE.Box3().setFromObject(pivot, true),
     update(dt) {
-      if (state.circle) { const pose = circlePose(swim.clock.time, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() }); swimLook.turn = pose.turn; }
+      if (state.circle) swimLook.turn = circlePose(state.theta, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() }).turn;
       swim?.update(dt * hoverAction.timeScale);
       place();
     },
