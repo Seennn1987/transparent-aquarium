@@ -99,8 +99,8 @@ async function start() {
   if (swim && query.get("pick") === "organs") organPicker();
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
-    ["胴の色", [["A いま", "A"], ["B 胴の真ん中", "B"], ["C 胴全体", "C"], ["D 胴全体（画面で合わせる）", "D"]], () => query.get("tissue") ?? "A",
-      (v) => { const q = new URLSearchParams(location.search); if (v === "A") q.delete("tissue"); else q.set("tissue", v); location.search = q.toString(); }],
+    ["胴の色", [["A 前の色", "A"], ["B 胴の真ん中", "B"], ["C 胴全体", "C"], ["D 胴全体（画面で合わせる、決定）", "D"]], () => query.get("tissue") ?? "D",
+      (v) => { const q = new URLSearchParams(location.search); if (v === "D") q.delete("tissue"); else q.set("tissue", v); location.search = q.toString(); }],
   ], "参考の胚の体の組織: 前に測った 1 点 0.79 / 0.66 / 0.57（A）、胴の真ん中 0.81 / 0.76 / 0.69（B）、胴全体 0.80 / 0.81 / 0.75（C）。D は皮歯・まだら・内臓の分を差し引いて、画面で C の値になるようにした");
   document.body.dataset.ready = "1";
   window.hammerheadPage = {

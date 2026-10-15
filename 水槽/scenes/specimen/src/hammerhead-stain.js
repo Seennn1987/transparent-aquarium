@@ -53,7 +53,8 @@ export const HH_HEAD_SPECTRUM = [1, 0.19, 0.20];
 //   胴全体（x 100〜420）     0.80 / 0.81 / 0.75
 //  ?tissue= で、体の組織の色をそれぞれに合わせる（80 mm 通ったときにその値になる吸い方。A: いま、B: 胴の真ん中、C: 胴全体）
 const TISSUE_TARGETS = { A: [0.79, 0.66, 0.57], B: [0.81, 0.76, 0.69], C: [0.80, 0.81, 0.75] };
-const TISSUE = (typeof location !== "undefined" && new URLSearchParams(location.search).get("tissue")) || "A";
+// 既定は D（2026-10-15 プロデューサー「胴の色は D（胴全体を画面で合わせる）にしてください。」）。?tissue=A で前の色
+const TISSUE = (typeof location !== "undefined" && new URLSearchParams(location.search).get("tissue")) || "D";
 function tissueStain(t) {   // 80 mm で t になる吸い方 → 色（いちばん吸う成分を 1）と利得（/m）
   const A = t.map((v) => -Math.log(v)), top = Math.max(...A);
   return { spectrum: A.map((v) => +(v / top).toFixed(3)), gain: +(top / 0.080).toFixed(2) };
