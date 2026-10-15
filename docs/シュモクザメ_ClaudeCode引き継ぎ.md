@@ -1,6 +1,6 @@
 # シロシュモクザメ透明標本 Claude Code への引き継ぎ
 
-- DATE: 2026-10-14
+- DATE: 2026-10-14（2026-10-15 追記: 第 3 節の 3.1・3.3・3.4・3.5 と A7 を終えた。表の A7 を更新）
 - 前の担当: Claude デスクトップアプリ（Mac 上の Linux 仮想環境で CT を処理し、Blender は MCP で操作していた）
 - この文書の役割: Claude Code が最初に読む文書。いまの状態、決まったこと、最初に片付けること、次の作業を書く
 - 経緯の正: `docs/シュモクザメ透明標本_計画書_v1.0.md`（以下「計画書」）。決定の言葉と測った数は、計画書の記録が正
@@ -41,8 +41,9 @@
 | A4 輪郭の静止画 | 済み | `docs/hammerhead_ct/a4_*.png` |
 | A5 体の膜 | 済み（頭のすぐ後ろ約 147 mm に左右の小さな出っ張りが残る） | `docs/hammerhead_ct/a5_*.png` |
 | A6 染まり | 1 回目済み。4 部位が目標の範囲に入った | `水槽/scenes/specimen/hammerhead.html`、`specimen_hammerhead.glb`、`docs/hammerhead_ct/a6_*.jpg` |
-| A7 顎・歯・エラの骨 | 進行中（別のチャットで 10-14 夜まで作業していた）。計画書に記録がまだない | `blender/ct_hammerhead/a7*.py`、`docs/hammerhead_ct/a7_*.png`、`a7_open.json`、`a7_gill_arches.json` |
-| A8 生々しさ、B、C | 未着手 | |
+| A7 顎・歯・エラの骨 | 済み（2026-10-15。計画書 第 9 節 A7 の最後「A7 の締めくくり」） | `blender/ct_hammerhead/a7*.py`、`docs/hammerhead_ct/a7_gill_arches.json`、`docs/hammerhead_ct/page/cmp_a7_final.png` |
+| A8 生々しさ | 着手（2026-10-15） | |
+| B、C | 未着手 | |
 
 A7 で分かっていることは次のとおり。スクリプトの注と出力の名前から読んだもので、計画書には記録されていない。
 

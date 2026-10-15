@@ -1,41 +1,48 @@
 {
- "tag": "B",
- "front_z": 150.0,
+ "tag": "B2",
+ "rays": {
+  "length_frac": 0.0,
+  "length_mm": 0.0,
+  "count_one_side": 0,
+  "spacing_mm": 2.5,
+  "radius_mm": 0.45
+ },
+ "front_z": 139.0,
  "fifth_ceratobranchial_back_z": 215.0,
  "dorsal_v": 2.0,
  "ventral_v_max": 53.4,
- "spacing_mm": 12.72,
+ "spacing_mm": 15.24,
  "heights_mm": [
-  31.6,
-  47.0,
+  27.2,
+  33.9,
   45.2,
   42.1,
   39.1
  ],
- "pharyngobranchial_mm": 26.0,
- "plate_mm": 5.5,
+ "pharyngobranchial_mm": 30.4,
+ "plate_mm": 6.5,
  "body_ventral_at_front_mm": [
-  39.6,
-  58.0,
+  35.2,
+  44.0,
   63.2,
   63.9,
-  66.1
+  65.4
  ],
- "faces": 233280,
+ "faces": 251624,
  "elements": [
   {
    "arch": 1,
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     157.9,
+     145.8,
      -3.0,
-     35.6
+     31.2
     ],
     [
-     150.0,
+     139.0,
      -15.0,
-     33.6
+     29.2
     ]
    ],
    "radius_mm": 1.0,
@@ -46,58 +53,58 @@
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     150.0,
+     139.0,
      -15.0,
-     33.6
+     29.2
     ],
     [
-     153.8,
-     -21.5,
-     21.0
+     142.3,
+     -27.5,
+     18.3
     ],
     [
-     157.0,
-     -24.5,
-     13.1
+     145.0,
+     -30.5,
+     11.5
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 5.5
+   "plate_mm": 6.5
   },
   {
    "arch": 1,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     157.0,
-     -24.5,
-     13.1
+     145.0,
+     -30.5,
+     11.5
     ],
     [
-     162.7,
-     -22.2,
-     5.8
+     149.9,
+     -25.2,
+     5.3
     ],
     [
-     167.4,
+     154.0,
      -16.0,
-     2.6
+     2.5
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 4.4
+   "plate_mm": 5.2
   },
   {
    "arch": 1,
    "part": "pharyngobranchial",
    "points_zuv_mm": [
     [
-     167.4,
+     154.0,
      -16.0,
      2.0
     ],
     [
-     193.4,
+     184.4,
      -6.0,
      3.0
     ]
@@ -110,14 +117,14 @@
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     174.5,
+     162.7,
      -3.0,
-     51.0
+     37.9
     ],
     [
-     162.7,
+     154.2,
      -15.0,
-     49.0
+     35.9
     ]
    ],
    "radius_mm": 1.0,
@@ -128,58 +135,58 @@
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     162.7,
+     154.2,
      -15.0,
-     49.0
+     35.9
     ],
     [
-     168.4,
+     158.3,
      -21.5,
-     30.2
+     22.3
     ],
     [
-     173.1,
+     161.7,
      -24.5,
-     18.5
+     13.9
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 5.5
+   "plate_mm": 6.5
   },
   {
    "arch": 2,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     173.1,
+     161.7,
      -24.5,
-     18.5
+     13.9
     ],
     [
-     181.5,
+     167.8,
      -22.2,
-     7.6
+     6.1
     ],
     [
-     188.6,
+     172.9,
      -16.0,
-     2.9
+     2.7
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 4.4
+   "plate_mm": 5.2
   },
   {
    "arch": 2,
    "part": "pharyngobranchial",
    "points_zuv_mm": [
     [
-     188.6,
+     172.9,
      -16.0,
      2.0
     ],
     [
-     212.0,
+     200.2,
      -6.0,
      3.0
     ]
@@ -192,12 +199,12 @@
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     186.7,
+     180.8,
      -3.0,
      49.2
     ],
     [
-     175.4,
+     169.5,
      -15.0,
      47.2
     ]
@@ -210,58 +217,58 @@
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     175.4,
+     169.5,
      -15.0,
      47.2
     ],
     [
-     180.9,
+     174.9,
      -21.5,
      29.1
     ],
     [
-     185.4,
+     179.4,
      -24.5,
      17.8
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 5.5
+   "plate_mm": 6.5
   },
   {
    "arch": 3,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     185.4,
+     179.4,
      -24.5,
      17.8
     ],
     [
-     193.5,
+     187.6,
      -22.2,
      7.4
     ],
     [
-     200.3,
+     194.4,
      -16.0,
      2.9
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 4.4
+   "plate_mm": 5.2
   },
   {
    "arch": 3,
    "part": "pharyngobranchial",
    "points_zuv_mm": [
     [
-     200.3,
+     194.4,
      -16.0,
      2.0
     ],
     [
-     221.1,
+     218.7,
      -6.0,
      3.0
     ]
@@ -274,12 +281,12 @@
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     198.7,
+     195.2,
      -3.0,
      46.1
     ],
     [
-     188.2,
+     184.7,
      -15.0,
      44.1
     ]
@@ -292,58 +299,58 @@
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     188.2,
+     184.7,
      -15.0,
      44.1
     ],
     [
-     193.2,
+     189.8,
      -21.5,
      27.3
     ],
     [
-     197.4,
+     194.0,
      -24.5,
      16.8
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 5.5
+   "plate_mm": 6.5
   },
   {
    "arch": 4,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     197.4,
+     194.0,
      -24.5,
      16.8
     ],
     [
-     205.0,
+     201.6,
      -22.2,
      7.1
     ],
     [
-     211.3,
+     207.9,
      -16.0,
      2.8
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 4.4
+   "plate_mm": 5.2
   },
   {
    "arch": 4,
    "part": "pharyngobranchial",
    "points_zuv_mm": [
     [
-     211.3,
+     207.9,
      -16.0,
      2.0
     ],
     [
-     229.5,
+     229.2,
      -6.0,
      3.0
     ]
@@ -356,12 +363,12 @@
    "part": "hypobranchial",
    "points_zuv_mm": [
     [
-     210.6,
+     209.7,
      -3.0,
      43.1
     ],
     [
-     200.9,
+     199.9,
      -15.0,
      41.1
     ]
@@ -374,58 +381,58 @@
    "part": "ceratobranchial",
    "points_zuv_mm": [
     [
-     200.9,
+     199.9,
      -15.0,
      41.1
     ],
     [
-     205.6,
+     204.6,
      -21.5,
      25.4
     ],
     [
-     209.5,
+     208.5,
      -24.5,
      15.7
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 5.5
+   "plate_mm": 6.5
   },
   {
    "arch": 5,
    "part": "epibranchial",
    "points_zuv_mm": [
     [
-     209.5,
+     208.5,
      -24.5,
      15.7
     ],
     [
-     216.5,
+     215.6,
      -22.2,
      6.7
     ],
     [
-     222.4,
+     221.4,
      -16.0,
      2.8
     ]
    ],
    "radius_mm": 1.0,
-   "plate_mm": 4.4
+   "plate_mm": 5.2
   },
   {
    "arch": 5,
    "part": "pharyngobranchial",
    "points_zuv_mm": [
     [
-     222.4,
+     221.4,
      -16.0,
      2.0
     ],
     [
-     238.0,
+     239.7,
      -6.0,
      3.0
     ]
@@ -438,12 +445,12 @@
    "part": "basibranchial",
    "points_zuv_mm": [
     [
-     157.9,
+     145.8,
      0.0,
-     35.6
+     31.2
     ],
     [
-     223.6,
+     224.9,
      0.0,
      43.1
     ]
