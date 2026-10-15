@@ -64,5 +64,7 @@ STAINS.hammerhead = {
   film: { spectrum: HH_BONE_SPECTRUM, gain: 0.25 },
   // A8 まだら（hammerhead-material.js の mottleMaterial）: 体の組織と同じ吸い方の色。1 回横切るごとの吸い方（?mottle=1 のとき）。
   //  0.12 は「むらの濃い所で、体の組織の青の吸い方（80 mm で 0.56）が 1 割ほど増える」くらいからの出発（2026-10-15）。強さはページの ?mottle=（既定 0.5、2026-10-15 決定）
-  organs: { mottle: [0.42 * 0.12, 0.74 * 0.12, 1 * 0.12] },
+  // A8 鰓条（hammerhead-material.js の gillRayMaterial）: エラの骨の色（骨 1.67・軟骨 1.518 の重み）の 0.5 mm 分を 1 回横切るごとに
+  //  （骨 166 × 1.67 × (0.37, 1, 0.28) + 軟骨 408 × 1.518 × (1, 0.01, 0.04)、/m → × 0.0005）
+  organs: { mottle: [0.42 * 0.12, 0.74 * 0.12, 1 * 0.12], gillray: [0.361, 0.142, 0.051] },
 };

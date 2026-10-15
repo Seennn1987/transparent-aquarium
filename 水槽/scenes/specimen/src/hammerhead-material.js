@@ -125,9 +125,10 @@ function denticleMaterial() {
 //  むらは体の座標の 3 次元のなめらかな乱数（2 段、決まった種）。色は hammerhead-stain.js の organs.mottle。強さは ?mottle=（既定 0.5、2026-10-15 決定）、
 //  むらの大きさは ?mottlecell= mm（既定 40）
 // 輪郭（表面を斜めに見る所）で色がたまらないよう、1 / |cos| の上限を ?mottlecos=（既定 0.6 = 最大 1.7 倍）で抑える（0.2 では輪郭が茶色く縁取られた）
-export const mottleLook = { cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };
+export const mottleLook = { amount: { value: Number(DENT_Q.get("mottle") ?? 0.5) }, cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };   // 強さ ?mottle=（既定 0.5、2026-10-15 決定）
 const mottleFragment = `
 uniform float cell;
+uniform float amount;
 uniform vec3 organAbs;
 uniform float filmMinCos;
 varying vec3 vRest;
@@ -144,12 +145,40 @@ void main() {
   float n = .65 * vnoise(q) + .35 * vnoise(q * 2.7 + 5.1);
   float m = smoothstep(.45, .75, n);
   float cs = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
-  gl_FragColor = vec4(organAbs * m / max(cs, filmMinCos), 0.);
+  gl_FragColor = vec4(amount * organAbs * m / max(cs, filmMinCos), 0.);
 }`;
 function mottleMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { cell: mottleLook.cell, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    uniforms: { cell: mottleLook.cell, amount: mottleLook.amount, organAbs: (chameleonOrgans.mottle ??= { value: new THREE.Vector3() }), filmMinCos: mottleLook.minCos, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
     vertexShader: denticleVertex, fragmentShader: mottleFragment, ...ADD,
+  });
+}
+
+// A8 鰓条（2026-10-15、プロデューサー「鰓条は今は入れず、A8 で質感として扱ってください」）: エラの骨の表面に、体に貼り付いた細い縞を足す。
+//  エラの骨は咽頭のまわりを輪のように回るので、輪の中心（背腹 25 mm 腹側、正中）のまわりの角度で縞を作ると、骨の輪に直角な線（鰓条の向き）になる。
+//  出典の図（BIODIDAC の Squalus）では鰓条は角鰓・上鰓の後ろのふちに並ぶ。間隔は ?rayspace= mm（既定 1.8、出典なし）。
+//  色はエラの骨と同じ（hammerhead-stain.js の organs.gillray）。強さ ?rays=（既定 0）
+export const gillRayLook = { amount: { value: Number(DENT_Q.get("rays") ?? 0) }, space: { value: Number(DENT_Q.get("rayspace") ?? 1.8) / 1000 } };
+const gillRayFragment = `
+uniform float amount;
+uniform float space;
+uniform vec3 organAbs;
+uniform float filmMinCos;
+varying vec3 vRest;
+varying vec3 vViewPosition;
+varying vec3 vViewNormal;
+void main() {
+  vec2 q = vec2(vRest.z, vRest.y + .025);
+  float s = atan(q.x, q.y) * length(q) / space;          // 輪に沿った長さ ÷ 間隔
+  float line = 1. - smoothstep(.12, .22, abs(fract(s) - .5));
+  float cs = abs(dot(normalize(vViewNormal), normalize(-vViewPosition)));
+  gl_FragColor = vec4(amount * organAbs * line / max(cs, filmMinCos), 0.);
+}`;
+function gillRayMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { amount: gillRayLook.amount, space: gillRayLook.space, organAbs: (chameleonOrgans.gillray ??= { value: new THREE.Vector3() }),
+      filmMinCos: { value: 0.4 }, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    vertexShader: denticleVertex, fragmentShader: gillRayFragment, ...ADD,
   });
 }
 
@@ -166,6 +195,7 @@ export function applyHammerheadTissue(model, reference) {
     o.material = new THREE.ShaderMaterial({ uniforms: { channel: { value: channel }, reference, asym: asymLook.amount, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
     o.userData.pathMaterial = o.material;
     if (part === "Skin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
+    if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
   });
   const missing = Object.keys(CHANNEL).filter((p) => !found.has(p));
   if (missing.length) throw new Error(`specimen_hammerhead.glb に部位がありません: ${missing.join(", ")}`);
