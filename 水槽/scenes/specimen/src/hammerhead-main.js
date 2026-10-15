@@ -51,6 +51,8 @@ async function start() {
   else if (view === "front") dir = new THREE.Vector3(-1, 0.15, 0.25).normalize();
   else dir = new THREE.Vector3(-0.35, 0.55, 0.85).normalize();
   // 横長の体を画面の幅に収める（縦長の画面では、横の画角が縦より狭い）
+  // 描く枠の大きさが 0 のうち（見えない欄やタブで読み込んだとき）は待つ。0 のまま視点を決めると、距離が NaN になって何も描かれなかった（2026-10-15）
+  await canvasShown(canvas);
   const aspect0 = canvas.clientWidth / canvas.clientHeight;
   // focus=head: 頭（吻端から 0.3 m）を画面いっぱいに（顎・歯・エラの骨を見る）
   const focusHead = query.get("focus") === "head";
@@ -72,6 +74,7 @@ async function start() {
   }
   resize();
   addEventListener("resize", resize);
+  new ResizeObserver(resize).observe(canvas);   // 窓の大きさが変わらずに枠だけが変わるとき（隠れていた欄が開いたときなど）
   const v = new THREE.Vector3();
   function frame() {
     swim?.update(performance.now() / 1000);
@@ -92,5 +95,12 @@ async function start() {
       return { width: t.width, height: t.height, data: out };
     },
   };
+}
+function canvasShown(el) {
+  if (el.clientWidth > 0 && el.clientHeight > 0) return Promise.resolve();
+  return new Promise((done) => {
+    const ro = new ResizeObserver(() => { if (el.clientWidth > 0 && el.clientHeight > 0) { ro.disconnect(); done(); } });
+    ro.observe(el);
+  });
 }
 start().catch((error) => { status.textContent = String(error.message ?? error); document.body.dataset.error = "1"; console.error(error); });
