@@ -7,6 +7,7 @@ import { createJar } from "./jar.js";
 import { createSpecimen } from "./specimen.js";
 import { createChameleonSpecimen } from "./specimen-chameleon.js";
 import { createHammerheadSpecimen } from "./specimen-hammerhead.js";
+import { pickerPanel } from "./picker-panel.js";
 import { specimenLook } from "./specimen-material.js";
 import { createSpecimenPost, LENS } from "./postprocess.js";
 import {
@@ -156,6 +157,12 @@ async function start() {
     ? await createChameleonSpecimen({ ...specimenOptions, stain: query.get("stain") === "01" ? "01" : "06" })
     : specimenKind === "hammerhead" ? await createHammerheadSpecimen(specimenOptions)
     : await createSpecimen(specimenOptions);
+  // ?specimen=hammerhead&pick=dish: 器の直径（サメに対して）の案を、回したまま切り替える（C2・C3、2026-10-15）
+  if (specimenKind === "hammerhead" && query.get("pick") === "dish") {
+    pickerPanel([
+      ["器の直径", [["1 倍（いま）", 1], ["1.5 倍", 1.5], ["2 倍", 2], ["2.5 倍", 2.5]], () => specimen.dishRatio, (v) => specimen.setDishRatio(v)],
+    ], "器はこのままで、サメを小さく描く（器の直径がサメに対して何倍か）。1 倍は回れないので真ん中でその場の泳ぎ。回る円の半径は、体のどこも壁から 0.12 より近づかない、いちばん大きい円");
+  }
   const specimenScene = new THREE.Scene();
   specimenScene.background = new THREE.Color(1, 1, 1);
   specimenScene.add(specimen.object);

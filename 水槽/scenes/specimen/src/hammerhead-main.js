@@ -5,6 +5,7 @@ import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
 import { createSwim, swimLook, mouthLook, heartLook, gillLook } from "./hammerhead-swim.js";
+import { pickerPanel } from "./picker-panel.js";
 
 // The smooth hammerhead as a cleared-and-stained specimen on a lightbox, without its dish (A6).
 // The mesh: blender/ct_hammerhead (CT of ZMA.PISC.108725, Kamminga et al. 2017, CC0).
@@ -113,24 +114,6 @@ function turnBendPicker() {
     ["体の曲げ", [["1", 1], ["0.5", 0.5], ["0.25", 0.25]], () => swimLook.turnBend, (v) => { swimLook.turnBend = v; }],
     ["向き", [["右へ旋回", 1], ["左へ旋回", -1], ["まっすぐ", 0]], () => swimLook.turn, (v) => { swimLook.turn = v; }],
   ], "1 = 体が通り道の円（半径は体長の 37%）に沿う（推定）。旋回では内側の胸びれを引く");
-}
-function pickerPanel(rows, noteText) {
-  const box = document.createElement("div");
-  box.style.cssText = "position:fixed;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;font:14px/1.3 system-ui,sans-serif;color:#333;background:rgba(255,255,255,.85);padding:10px 12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15)";
-  for (const [title, items, get, set] of rows) {
-    const r = document.createElement("div"); r.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap";
-    const t = document.createElement("span"); t.textContent = title; t.style.minWidth = "5.5em"; r.append(t);
-    const buttons = items.map(([label, value]) => {
-      const b = document.createElement("button"); b.type = "button"; b.textContent = label;
-      b.style.cssText = "font:inherit;padding:4px 10px;border:1px solid #999;border-radius:6px;cursor:pointer";
-      b.onclick = () => { set(value); paint(); };
-      r.append(b); return [b, value];
-    });
-    const paint = () => { for (const [b, v] of buttons) { const on = get() === v; b.style.background = on ? "#333" : "#fff"; b.style.color = on ? "#fff" : "#333"; } };
-    paint(); box.append(r);
-  }
-  const note = document.createElement("div"); note.style.cssText = "font-size:12px;color:#666;max-width:28em"; note.textContent = noteText;
-  box.append(note); document.body.append(box);
 }
 // ?pick=organs: 心臓（推定）の案と拍動の回数、エラの動きの案を、動かしたまま切り替える（B5）。心臓の案は ?glb=specimen_hammerhead_heart
 function organPicker() {

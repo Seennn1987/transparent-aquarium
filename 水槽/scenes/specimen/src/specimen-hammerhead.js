@@ -3,7 +3,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createLightbox, chameleonLook } from "./chameleon-material.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
-import { createSwim } from "./hammerhead-swim.js";
+import { createSwim, swimLook } from "./hammerhead-swim.js";
+import { circlePose, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
 
 // シロシュモクザメ（hammerhead.html）を、ギャラリーの前の台の低い器（dish.glb）に入れる。`?specimen=hammerhead`（C、2026-10-15）。
 //  描き方はカメレオンと同じ: 透かしの通り道（chameleon-material.js の createLightbox、色は hammerhead-stain.js）を、器の屈折が引く画像に描く。
@@ -14,6 +15,8 @@ const HAMMERHEAD_URL = new URL("../assets/specimen_hammerhead.glb", import.meta.
 export const HH_DISH = {
   clearance: 0.12,        // 器の単位。カメレオンの瓶と同じ空き（計画書 第 4 節 C2 の目安）
   tailSwing: 0.09,        // 尾の先の片側の振れ（全長に対して、hammerhead-swim.js の既定）
+  // 器の直径の、サメに対する倍率（C1 の大きさを 1）。決まるまでの仮の既定 2。?dish= で変える
+  ratio: Number(new URLSearchParams(location.search).get("dish") ?? 2),
 };
 
 /**
@@ -37,21 +40,44 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
   const c = HH_DISH.clearance;
   const radius = (liquidBounds.max.x - liquidBounds.min.x) / 2;
   const depth = liquidBounds.max.y - liquidBounds.min.y;
-  // 吻端〜尾は器の真ん中を通る直径に沿う。尾の振れの分だけ、体の端は真ん中から遠くなる
-  const reach = Math.hypot(size.x / 2, HH_DISH.tailSwing * size.x);
-  const scale = Math.min((radius - c) / reach, (depth - 2 * c) / size.y);
-  model.rotation.y = Math.atan2(facing.x, facing.z);
-  body.scale.setScalar(scale);
-  const middle = box.getCenter(new THREE.Vector3()).applyAxisAngle(new THREE.Vector3(0, 1, 0), model.rotation.y);
-  body.position.copy(middle).multiplyScalar(-scale);
-
+  // いまの器の大きさ（C1）: 吻端〜尾が器の真ん中を通る直径に沿い、尾の振れの分も壁から c 離れる縮尺。これを「器の直径 1 倍」とする
+  const scale1 = dishBaseScale({ radius, depth, clearance: c, tailSwing: HH_DISH.tailSwing });   // hammerhead-path.js（自動テストと同じ式）
+  // C2・C3（2026-10-15、プロデューサー「サメのサイズに対して水槽が小さいです。せめて直径を２倍以上にしないと周回できないのではないでしょうか？」）:
+  //  器はこのまま（前の台に載る大きさ）で、サメを 1 / dishRatio に縮めて描く（＝器の直径がサメに対して dishRatio 倍）。
+  //  回れるとき（hammerhead-path.js の fitCircle）は、体の真ん中が器の軸のまわりの円を反時計回りに進む。回れないときは真ん中でその場の泳ぎ
+  const swimOpts = () => ({ amplitude: swimLook.amplitude, wavelength: swimLook.wavelength, turnBend: swimLook.turnBend, frequency: swimLook.frequency });
+  const yMid = (HH_HEIGHT.top + HH_HEIGHT.bottom) / 2;
+  const centre = liquidBounds.getCenter(new THREE.Vector3());
+  const state = { ratio: 0, scale: scale1, circle: null };
   const pivot = new THREE.Group();
   pivot.name = "SpecimenPivot";
   pivot.add(body);
-  pivot.position.copy(liquidBounds.getCenter(new THREE.Vector3()));
-  pivot.updateMatrixWorld(true);
+  function setDishRatio(k) {
+    state.ratio = k; state.scale = scale1 / k;
+    state.circle = fitCircle({ inner: radius, clearance: c, scale: state.scale, swim: swimOpts() });
+    body.scale.setScalar(state.scale);
+    if (!state.circle) {   // その場: 左の体側を見る人へ
+      model.rotation.y = Math.atan2(facing.x, facing.z);
+      const middle = box.getCenter(new THREE.Vector3()).applyAxisAngle(new THREE.Vector3(0, 1, 0), model.rotation.y);
+      body.position.copy(middle).multiplyScalar(-state.scale);
+      pivot.position.copy(centre); pivot.rotation.set(0, 0, 0);
+      swimLook.turn = 0;
+    } else model.rotation.y = 0;
+    lightbox?.dispose?.(); lightbox = null;   // 組織の通り道の倍率（1 / 縮尺）が変わる
+  }
+  function place() {
+    if (!state.circle) return;
+    const pose = circlePose(swim.clock.time, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() });
+    swimLook.turn = pose.turn;   // 次のフレームの骨の曲げ（道すじの円の向き、体の右へ）
+    body.position.set(-state.scale * pose.mid.x, -state.scale * yMid, -state.scale * pose.mid.z);
+    pivot.position.set(centre.x + pose.at.x, centre.y, centre.z + pose.at.z);
+    pivot.rotation.set(0, pose.yaw, 0);
+  }
   const swim = createSwim(model);
   let lightbox = null;
+  setDishRatio(HH_DISH.ratio);
+  place();
+  pivot.updateMatrixWorld(true);
   const view = new THREE.Vector3();
   // 調整の欄（tune-panel.js）の「泳ぎの速さ」はイカ・カメレオンの hoverAction.timeScale を動かす。シュモクザメは時計の進み方の倍率にする
   const hoverAction = { timeScale: 1 };
@@ -66,13 +92,20 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
     motion: { setRate() {} },
     /** 机の映り込みの写しはイカの組織を焼き付ける。シュモクザメは焼き付けない */
     bakeable: false,
-    scale,
+    get scale() { return state.scale; },
+    get dishRatio() { return state.ratio; },
+    get circleRadius() { return state.circle; },
+    setDishRatio(k) { setDishRatio(k); place(); },
     size,
     bounds: new THREE.Box3().setFromObject(pivot, true),
-    update(dt) { swim?.update(dt * hoverAction.timeScale); },
+    update(dt) {
+      if (state.circle) { const pose = circlePose(swim.clock.time, swim.clock.state.tailCycles, { radius: state.circle, scale: state.scale, swim: swimOpts() }); swimLook.turn = pose.turn; }
+      swim?.update(dt * hoverAction.timeScale);
+      place();
+    },
     /** 体を通った光（白の上、線形）を `target` に描く */
     renderImage(renderer, target, camera, scene) {
-      lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: 1 / scale, stain: "hammerhead" });
+      lightbox ??= createLightbox(renderer, { linear: true, alphaScale: 1, pathScale: 1 / state.scale, stain: "hammerhead" });
       if (lightbox.size.width !== target.width || lightbox.size.height !== target.height)
         lightbox.setSize(target.width, target.height);
       pivot.getWorldPosition(view).applyMatrix4(camera.matrixWorldInverse);

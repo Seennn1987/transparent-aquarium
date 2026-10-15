@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { organClock } from "./hammerhead-material.js";
 import { createHammerheadClock, hhOrganLook } from "./hammerhead-organs.js";
+import { bodyAngle, snoutShift, HH_BODY } from "./hammerhead-path.js";
 
 // B3 うねり（2026-10-15、プロデューサー「標本ページを骨組みで動かし、B2 のボンネットヘッドの値（尾の振り 1.25 Hz・片側 0.09 L・波長 0.91 L）でうねらせてください」）
 //  骨組みは blender/ct_hammerhead/b1_rig.py（頭・背骨 38・尾の鎖と、胸びれ・腹びれ）。B1 の試しのうねり（HH_RIG_TEST=1）と同じ式で骨を回す:
@@ -38,9 +39,8 @@ export const heartLook = { show: Q.get("heart") ?? "large", bpm: Number(Q.get("h
 // 強さ（0 でその動きだけ止まる）: ?heartamt=、?mouthamt=、?gillamt=（hammerhead-organs.js の hhOrganLook）
 for (const [k, q] of [["heart", "heartamt"], ["mouth", "mouthamt"], ["gill", "gillamt"]]) if (Q.has(q)) hhOrganLook[k].value = Number(Q.get(q));
 export const gillLook = { hz: Number(Q.get("gillhz") ?? 0), amp: 0.06 };
-const NECK = 0.125, TURN_R = 0.374;   // 首（頭の骨だけの終わり、m）、旋回の半径（L）
 const TUCK = { protract: 8.5, roll: 5.0, depress: 10.4 };   // 内側の胸びれ（°）
-const L = 1.024;   // 全長（m）。b1_rig.py の尾の骨の終わり
+const L = HH_BODY.length;   // 全長（m）。b1_rig.py の尾の骨の終わり
 
 export function createSwim(model) {
   let skeleton = null;
@@ -72,12 +72,7 @@ export function createSwim(model) {
   const clock = createHammerheadClock();
   const basePos = model.position.clone();
   const tmp = new THREE.Quaternion();
-  const slope = (s, t) => {
-    const At = swimLook.amplitude * L, k = 2 * Math.PI / (swimLook.wavelength * L);
-    const A = At * (0.15 + 0.85 * (s / L) ** 2), dA = At * 0.85 * 2 * s / (L * L);
-    const ph = k * s - 2 * Math.PI * t;
-    return Math.atan(dA * Math.sin(ph) + A * k * Math.cos(ph));
-  };
+
   return {
     bones: chain.length,
     /** cycles: 尾の振りの回数で数えた時刻（f × 秒）。 */
@@ -85,7 +80,7 @@ export function createSwim(model) {
       let prev = 0;
       const turn = swimLook.turn;
       chain.forEach((b, i) => {
-        const a = slope(rest[i].mid, cycles) + turn * swimLook.turnBend * Math.max(rest[i].mid - NECK, 0) / (TURN_R * L);
+        const a = bodyAngle(rest[i].mid, cycles, { amplitude: swimLook.amplitude, wavelength: swimLook.wavelength, turn, turnBend: swimLook.turnBend });   // hammerhead-path.js と同じ式
         b.quaternion.copy(rest[i].q0).multiply(tmp.setFromAxisAngle(rest[i].axis, a - prev));
         prev = a;
       });
@@ -100,7 +95,7 @@ export function createSwim(model) {
           .multiply(tmp.setFromAxisAngle(f.along, -sg * r(TUCK.depress) * k));
       }
       // 吻端の横のずれ。+Y まわりに回すと体の向き（+x）は −z へ傾くので、ずれ y は −z に置く
-      const y0 = swimLook.amplitude * L * 0.15 * Math.sin(-2 * Math.PI * cycles);
+      const y0 = snoutShift(cycles, swimLook);
       model.position.set(basePos.x, basePos.y, basePos.z - y0);
     },
     /** 口: 開きの増し（°、+ で開く）。glTF の +Z（体の左）まわりの + が開く向き（Blender の +Y まわりの − と同じ） */
