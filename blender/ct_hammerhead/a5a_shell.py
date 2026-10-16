@@ -173,7 +173,7 @@ if _os.environ.get('HH_TRUNK_PROFILE')=='ref':
     _g=(np.clip((_zk-110)/80,0,1) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.clip((_zk-120)/15,0,1))*(1-np.clip((_f-0.68)/0.03,0,1))
     kd=1+_g*(np.clip(kd,0.8,2.0)-1); kb=1+_g*(np.clip(kb,0.8,2.0)-1)
     LOBE=float(_os.environ.get('HH_TRUNK_LOBE',1.35))
-    kb=kb*(1+(LOBE-1)*np.interp(_zk,[720,760,820],[0,1,0]))
+    kb=kb*(1+(LOBE-1)*np.interp(_zk,[705,770,840] if _os.environ.get('HH_SIDE_SMOOTH') else [720,760,820],[0,1,0]))   # 案 2: 尾柄の下の段（波 6）を作らないよう、立ち上がりをゆっくり
     _KD=ndi.gaussian_filter1d(1+MIX*(kd-1),4); _KB=ndi.gaussian_filter1d(1+MIX*(kb-1),4)
     if STAGE=='2':
         _w=np.interp(_zk,zmm,ct_w)
@@ -182,6 +182,35 @@ if _os.environ.get('HH_TRUNK_PROFILE')=='ref':
                        tl_mm=TLf,mix=MIX,source='ref profile (FMIB 51331 width, Duane Raver depth)'),open('a5_trunk_width.json','w'))
 def kdv(z): return float(np.interp(z,_zk,_KD)), float(np.interp(z,_zk,_KB))
 def kfac(z): return float(np.interp(z,_zk,_K))
+# 2026-10-16 案 2（プロデューサー「真横から見た時に背中側もお腹側も体がまだまだボコボコと波打っていますよ…本ものはもっと流線的です」→「案２」）:
+#  HH_SIDE_SMOOTH=背,腹（mm、例 40,90）で、横から見た背の線（断面のいちばん上）と腹の線（いちばん下）を、体軸方向にその長さでならした線にそろえる。
+#  断面ごとに、背骨の高さより上を背の線まで、下を腹の線まで伸び縮みさせる（向きでなめらかに混ぜる）。120〜150 mm と 690〜720 mm で効き目を 0 へ
+SIDE=_os.environ.get('HH_SIDE_SMOOTH')
+_SIDEF={}
+def _trunk_poly(z,kx,kd_,kb_):
+    r=np.array([np.interp(z,zmm,Rs[:,j]) for j in range(NT)]); vc=vc_of(z)
+    pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)*((kd_+kb_)/2+(kb_-kd_)/2*np.sin(TH) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.where(np.sin(TH)<0,kd_,kb_))+vc
+    if _os.environ.get('HH_SHELL_FIT')=='smooth' and 120<=z<700:
+        from scipy.spatial import ConvexHull
+        _h=ConvexHull(np.c_[pu,pv]).vertices; pu,pv=pu[_h],pv[_h]
+    return pu,pv,vc
+def _side_fit(z,pu,pv,vc):
+    f=_SIDEF.get(int(round(z/VX)))
+    if f is None: return pv
+    sd,sb=f; d=pv-vc; sn=d/np.maximum(np.hypot(pu,d),1e-6)
+    return vc+d*((sd+sb)/2+(sb-sd)/2*sn)
+if SIDE and STAGE=='2':
+    _sb_,_sv_=[float(x) for x in SIDE.split(',')]
+    _ks=np.arange(int(120/VX),int(720/VX)); _tp=[];_bt=[];_vc=[]
+    for k in _ks:
+        z=k*VX; _kd,_kb=kdv(z); pu,pv,vc=_trunk_poly(z,kfac(z),_kd,_kb); _tp.append(pv.min()); _bt.append(pv.max()); _vc.append(vc)
+    _tp=np.array(_tp); _bt=np.array(_bt); _vc=np.array(_vc)
+    _Tt=ndi.gaussian_filter1d(_tp,_sb_/VX,mode='nearest'); _Tb=ndi.gaussian_filter1d(_bt,_sv_/VX,mode='nearest')
+    _zk2=_ks*VX; _w=np.clip((_zk2-120)/30,0,1)*np.clip((720-_zk2)/30,0,1)
+    _sd=1+_w*((_vc-_Tt)/np.maximum(_vc-_tp,1)-1); _sbb=1+_w*((_Tb-_vc)/np.maximum(_bt-_vc,1)-1)
+    _SIDEF={int(k):(float(a),float(b)) for k,a,b in zip(_ks,_sd,_sbb)}
+    json.dump(dict(z_mm=_zk2[::4].round(2).tolist(),top_mm=_tp[::4].round(2).tolist(),top_target_mm=_Tt[::4].round(2).tolist(),bot_mm=_bt[::4].round(2).tolist(),bot_target_mm=_Tb[::4].round(2).tolist(),sigma_mm=[_sb_,_sv_]),open('a5_side_fit.json','w'))
+    print('side fit: max move top %.1f bottom %.1f mm'%(np.abs(_w*(_Tt-_tp)).max(),np.abs(_w*(_Tb-_bt)).max()))
 if STAGE=='2':
     S=np.lib.format.open_memmap('a5_S.npy',mode='w+',dtype=np.bool_,shape=(NZ,NV,NU))
     S0=np.lib.format.open_memmap('a5_S0.npy',mode='w+',dtype=np.bool_,shape=(NZ,NV,NU))
@@ -211,6 +240,7 @@ if STAGE=='2':
             if z>=120:
                 from scipy.spatial import ConvexHull
                 _h=ConvexHull(np.c_[pu,pv]).vertices; pu,pv=pu[_h],pv[_h]
+            pv=_side_fit(z,pu,pv,vc)
             rr,cc=skpoly((pv-V0)/VX,(pu-U0)/VX,shape=(NV,NU)); tr[rr,cc]=True
             sd=lambda a: ndi.distance_transform_edt(~a)-ndi.distance_transform_edt(a)
             t=(z-NB0)/(NB1-NB0); t=t*t*(3-2*t)
@@ -220,10 +250,8 @@ if STAGE=='2':
         if r.max()<1: continue
         _kd,_kb=kdv(z)
         for arr,kx,kd_,kb_ in ((S0,1.0,1.0,1.0),(S,kk,_kd,_kb)):
-            pu=r*np.cos(TH)*kx; pv=r*np.sin(TH)*((kd_+kb_)/2+(kb_-kd_)/2*np.sin(TH) if _os.environ.get('HH_SHELL_FIT')=='smooth' else np.where(np.sin(TH)<0,kd_,kb_))+vc
-            if _os.environ.get('HH_SHELL_FIT')=='smooth' and 120<=z<700:   # 胴の断面は外へ膨らんだ形（ひれは別に足す）。くびれを残さず外形で包む
-                from scipy.spatial import ConvexHull
-                _h=ConvexHull(np.c_[pu,pv]).vertices; pu,pv=pu[_h],pv[_h]
+            pu,pv,_=_trunk_poly(z,kx,kd_,kb_)   # 胴の断面は外へ膨らんだ形（ひれは別に足す）。くびれを残さず外形で包む（HH_SHELL_FIT=smooth）
+            if arr is S: pv=_side_fit(z,pu,pv,vc)
             rr,cc=skpoly((pv-V0)/VX,(pu-U0)/VX,shape=(NV,NU)); arr[k,rr,cc]=True
     S.flush(); S0.flush(); print('stage2 ok')
 if STAGE=='3':
@@ -264,6 +292,9 @@ if STAGE=='4':
                 dv=-np.interp(zz,_T['z_mm'],_T['dtop_mm']) if name!='anal' else np.interp(zz,_T['z_mm'],_T['dbot_mm'])
                 sh=int(round(dv/VX)); M2[j,PAD+sh:PAD+sh+M.shape[1]]=M[j]
             M=M2; lo=lo-np.array([0,PAD,0])
+        # 案 2: 背びれ・臀びれの膜は正中から ±HH_FIN_HALF mm（例 3）の板にする。付け根の厚い肉が、横から見ると背びれの前後の盛り上がり（波 2・3）になっていた
+        if _os.environ.get('HH_FIN_HALF'):
+            _uu=U0+(lo[2]+np.arange(M.shape[2]))*VX; M=M&(np.abs(_uu)<=float(_os.environ['HH_FIN_HALF']))[None,None,:]
         hi=lo+np.array(M.shape)
         lo2=np.maximum(lo,0); hi2=np.minimum(hi,[NZ,NV,NU])
         sub=np.asarray(S[lo2[0]:hi2[0],lo2[1]:hi2[1],lo2[2]:hi2[2]])
