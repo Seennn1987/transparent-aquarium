@@ -76,6 +76,11 @@ step py a4e_mesh.py fins
 step fig a4h_headwidth_options.py
 step fig a4i_bodywidth_options.py
 # A5 体の膜とひれの膜
+# 胴の形は案 2（2026-10-16 プロデューサー「胴の形は案 2 に決めて、既定にしてください」）: 幅は FMIB 51331・高さは Duane Raver の図に合わせ（ref）、
+#  断面をなめらかな曲線で当て（smooth）、横から見た背と腹の線を 40・90 mm でならし、背びれ・臀びれの膜を ±3 mm の板に、面を作ったあとにならす。
+#  前の形は HH_TRUNK_PROFILE=ct HH_SHELL_FIT=median HH_SIDE_SMOOTH= HH_FIN_HALF= HH_MESH_TAUBIN=0 HH_MESH_SIGMA=1
+export HH_TRUNK_PROFILE=${HH_TRUNK_PROFILE-ref} HH_SHELL_FIT=${HH_SHELL_FIT-smooth} HH_SIDE_SMOOTH=${HH_SIDE_SMOOTH-40,90} HH_FIN_HALF=${HH_FIN_HALF-3}
+export HH_MESH_TAUBIN=${HH_MESH_TAUBIN-50} HH_MESH_SIGMA=${HH_MESH_SIGMA-1.5}
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3

@@ -120,12 +120,12 @@ async function start() {
     const arch = `${query.get("archbone") ?? 0.3},${query.get("arch") ?? 0.08}`;
     pickerPanel([
       // 2026-10-16 参考の図（FMIB の幅・Raver の高さ）に合わせた案を足した。前の「幅を写真に」の 3 案は、幅が高さを超えて文献と逆の形なので外した（glb は試しのページに残る）
-      ["案", [["いま", "specimen_hammerhead"], ["胴: 中間", "specimen_hammerhead_r05"], ["胴: 参考の図に合わせた", "specimen_hammerhead_r1"], ["胴: なめらかにした", "specimen_hammerhead_s1"], ["胴: 案 2（背と腹の線もならした）", "specimen_hammerhead_s2"],
-        ["尾の骨を足す", "specimen_hammerhead_t1"]], () => GLB_NAME,
+      // 2026-10-16 胴の形は案 2 に決定（プロデューサー「胴の形は案 2 に決めて、既定にしてください」）。前の形の glb は試しのページに specimen_hammerhead_prev として残す
+      ["案", [["胴: 案 2（決定）", "specimen_hammerhead"], ["胴: 前の形", "specimen_hammerhead_prev"], ["尾の骨を足す（前の胴の形で作った案）", "specimen_hammerhead_t1"]], () => GLB_NAME,
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
       ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
-    ], "胴: 幅は FMIB の図、高さは Raver の図（どちらもパブリックドメイン）に合わせ、首を細く縦長に、背を第 1 背びれへ高く、後ろ半分と尾柄を細く、尾びれの下の葉を大きく。中間はいまとの半分ずつ。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
+    ], "胴: 案 2 は、幅を FMIB の図・高さを Raver の図（どちらもパブリックドメイン）に合わせ、断面をなめらかな曲線にし、横から見た背と腹の線をならした形。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
   }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
