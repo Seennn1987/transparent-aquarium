@@ -1,7 +1,7 @@
 import browser
 """標本ページを、glb の座標の点に寄って撮る。  python zoom.py <URL> <出力.png> <x,y,z> <向き dx,dy,dz> <上 ux,uy,uz> <距離（ページ既定の何倍）>
 向きは中心からカメラへの向き（views.py と同じ。背 −X、腹 +X、頭 −Y、左 +Z）。"""
-import asyncio, sys
+import asyncio, sys, os
 from playwright.async_api import async_playwright
 url, out = sys.argv[1], sys.argv[2]
 c, d, up = [[float(v) for v in a.split(',')] for a in sys.argv[3:6]]; k = float(sys.argv[6])
@@ -13,5 +13,6 @@ async def main():
         b = await browser.launch(p); pg = await b.new_page(viewport={'width': 800, 'height': 956})
         await pg.goto(url); await pg.wait_for_function('document.body.dataset.ready || document.body.dataset.error', timeout=300000)
         await pg.add_style_tag(content='#status,.home-link{visibility:hidden!important}')
+        if os.environ.get('PAGE_JS'): await pg.evaluate(os.environ['PAGE_JS'])   # 試しの設定（例: 臓器の吸光度）
         await pg.evaluate(JS, [c, d, up, k]); await pg.wait_for_timeout(3000); await pg.screenshot(path=out); await b.close()
 asyncio.run(main())

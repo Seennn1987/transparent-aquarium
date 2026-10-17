@@ -370,6 +370,8 @@ FH = -kS * np.log(np.maximum(accH, 1e-30)); del accH
 #   皮膚と筋肉で埋まり、輪郭は骨の枠に沿う。頭の膜は、横から写した頭骨・眼球の像（穴を埋め、半径 HEAD_CLOSE_MM で閉じる）の
 #   外へ出さない（像の外形 + HEAD_WALL_MM で、横向きに押し出した形と重ねる）。上・前から写した像も同じ
 HEAD_CLOSE_MM = 2.0
+CASQUE_OPEN = bool(int(os.environ.get('CASQUE_OPEN', '0')))       # 1 でかぶとの輪の穴を横の像で埋めない（記録 25 の案）
+CASQUE_HOLE_MM2 = float(os.environ.get('CASQUE_HOLE_MM2', '4.0'))
 lat = np.array(EY['eye_r']['centre_model']) - np.array(EY['eye_l']['centre_model']); lat /= np.linalg.norm(lat)
 e1 = tP - lat * (tP @ lat); e1 /= np.linalg.norm(e1); e2 = np.cross(lat, e1)
 hp = np.concatenate([PX['head'], HY_FRONT, EYE_PTS])                  # 舌骨（骨と軟骨）も頭の像に入れる（喉の下の舌の芯・基舌骨）
@@ -382,7 +384,16 @@ for (u1, u2, nm_) in ((e1, e2, 'side'), (e1, lat, 'top'), (lat, e2, 'front')):
     im2 = np.zeros(sh2, bool); g2 = ((H2 - lo2) / px2).round().astype(int); im2[tuple(g2.T)] = True
     im2 = nd.distance_transform_edt(~im2) * px2 <= HEAD_CLOSE_MM + 0.15          # 閉じる（ふくらませて戻す）
     im2 = nd.distance_transform_edt(im2) * px2 > HEAD_CLOSE_MM
-    im2 = nd.binary_fill_holes(im2)
+    filled = nd.binary_fill_holes(im2)
+    if CASQUE_OPEN and nm_ == 'side':
+        # かぶとの輪の穴（眼の点を含まない、CASQUE_HOLE_MM2 より大きい穴）は埋めない（記録 25 の案。写真 06 の輪の内側は白く抜ける）
+        holes, nh = nd.label(filled & ~im2)
+        ge = ((np.c_[EYE_PTS @ u1, EYE_PTS @ u2] / MM - lo2) / px2).round().astype(int)
+        eye_lab = set(holes[tuple(ge.T)].ravel()) - {0}
+        for lb in range(1, nh + 1):
+            if lb not in eye_lab and (holes == lb).sum() * px2 * px2 > CASQUE_HOLE_MM2:
+                filled[holes == lb] = False
+    im2 = filled
     sd2 = (nd.distance_transform_edt(~im2) - nd.distance_transform_edt(im2)) * px2   # 外が正（mm）
     q2 = (np.c_[xq @ u1, xq @ u2] / MM - lo2) / px2
     dq = nd.map_coordinates(sd2, [q2[:, 0], q2[:, 1]], order=1, mode='nearest') - HEAD_WALL_MM

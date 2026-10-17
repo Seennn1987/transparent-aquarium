@@ -1,5 +1,5 @@
 import browser
-import asyncio, sys
+import asyncio, sys, os
 from playwright.async_api import async_playwright
 url, out, wait = sys.argv[1], sys.argv[2], float(sys.argv[3])
 async def main():
@@ -9,6 +9,7 @@ async def main():
         msgs=[]; pg.on('console', lambda m: msgs.append(m.text)); pg.on('pageerror', lambda e: msgs.append('ERR '+str(e)))
         await pg.goto(url)
         await pg.wait_for_function('window.specimenDebug || document.body.dataset.ready || document.body.dataset.error', timeout=240000)
+        if os.environ.get('PAGE_JS'): await pg.evaluate(os.environ['PAGE_JS'])   # 試しの設定（例: 臓器の吸光度）
         await pg.wait_for_timeout(wait*1000)
         try:
             await pg.get_by_text('閉じる').click(timeout=5000)
