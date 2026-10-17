@@ -401,13 +401,25 @@ def trim_skin(max_ratio=SKIN_STRETCH_MAX):
     return len(bad)
 
 
+def jar_pose():
+    """瓶の姿勢（POSE_JAR）。手足の向きの案を試すとき（計画書 C の記録 22）は、CH_LIMBS_JSON に {骨の名前: [θ, φ]} の JSON の
+    パスを入れる。書いた骨だけ置き換える。"""
+    if not os.environ.get("CH_LIMBS_JSON"):
+        return POSE_JAR
+    import json
+    pose = dict(POSE_JAR); pose["limbs"] = dict(POSE_JAR["limbs"])
+    pose["limbs"].update({n: tuple(v) for n, v in json.load(open(os.environ["CH_LIMBS_JSON"])).items()})
+    print("[Chameleon CT] 手足の向きを置き換えました:", os.environ["CH_LIMBS_JSON"])
+    return pose
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     g = runpy.run_path(GEN, run_name="chameleon_ct")
     coll, rigob, skel, rig = g["build"]()
     d, _, k = g["load"]()
     if not os.environ.get("CH_REST"):
-        build_pose(rigob, d, k, POSE_JAR)
+        build_pose(rigob, d, k, jar_pose())
         print("[Chameleon CT] 瓶の姿勢を付けました")
         bpy.context.view_layer.update()
         # 膜は体積のうちに切り離して作ったので、伸びた面を外さない（ct_body_pipeline/softmesh2.py。trim_skin は以前の膜用）

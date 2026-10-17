@@ -53,7 +53,7 @@ def prepare():
     gen = runpy.run_path(g["GEN"], run_name="chameleon_ct")
     coll, rigob, skel, rig = gen["build"]()
     d, _, k = gen["load"]()
-    g["build_pose"](rigob, d, k, g["POSE_JAR"])
+    g["build_pose"](rigob, d, k, g["jar_pose"]())
     bpy.context.view_layer.update()
     # 膜は体積のうちに切り離して作った（ct_body_pipeline/softmesh2.py）ので、伸びた面を外さない
     stretch_report(bpy.data.objects["CH_Skin"])

@@ -17,6 +17,8 @@ from scipy.ndimage import gaussian_filter1d
 
 src, dst, tg, soft = sys.argv[1:5]
 case = sys.argv[5] if len(sys.argv) > 5 else 'width_B'
+# 付け根で拡大を 0 にする長さ [mm]（記録 22: 付け根まで外へ開いて椎骨とのすき間が 0.49 → 1.05 mm になった）。0 なら記録 21 のまま
+ROOT_TAPER_MM = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0
 d = dict(np.load(src)); names = [str(n) for n in d['rig__names']]
 A = d['rig__axis'].astype(np.float64); D = d['rig__dorsal'].astype(np.float64)
 T = np.gradient(A, axis=0); T /= np.linalg.norm(T, axis=1, keepdims=True)
@@ -63,7 +65,17 @@ def widen(x):
     return x + ((w - 1) * lat)[:, None] * L[i]
 
 
-for k in ribk: d[k] = widen(d[k].astype(np.float64)).astype(d[k].dtype)
+def root_weight(x):
+    """付け根（体軸に最も近い 3% の点の重心）からの距離で 0 → 1。ROOT_TAPER_MM が 0 なら 1。"""
+    if ROOT_TAPER_MM <= 0: return np.ones(len(x))
+    _, _, i = t_lat(x); rel = x - A[i]; dist = np.linalg.norm(rel - (rel * T[i]).sum(1, keepdims=True) * T[i], axis=1)
+    h = x[dist <= np.percentile(dist, 3)].mean(0)
+    u = np.clip(np.linalg.norm(x - h, axis=1) / ROOT_TAPER_MM, 0, 1); return u * u * (3 - 2 * u)
+
+
+for k in ribk:
+    x = d[k].astype(np.float64); w = root_weight(x)
+    d[k] = (x + (widen(x) - x) * w[:, None]).astype(d[k].dtype)
 for k in ('cart__a', 'cart__b'):
     a = d[k].astype(np.float64); a[cm] = widen(a[cm]); d[k] = a.astype(d[k].dtype)
 np.savez_compressed(dst, **d)
