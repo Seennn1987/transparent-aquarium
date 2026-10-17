@@ -5,7 +5,7 @@ import { chameleonLook } from "./chameleon-material.js";
 import { createHammerheadLightbox } from "./hammerhead-lightbox.js";
 import { installHammerheadTune } from "./hammerhead-tune.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
-import { applyHammerheadTissue } from "./hammerhead-material.js";
+import { applyHammerheadTissue, HH_DENT_DEFAULT } from "./hammerhead-material.js";
 import { createSwim, swimLook, mouthLook, heartLook, gillLook } from "./hammerhead-swim.js";
 import { pickerPanel } from "./picker-panel.js";
 
@@ -24,7 +24,7 @@ async function start() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   chameleonLook.boneT0.value = HH_BONE_T0;
   // A8 皮歯の強さ（膜の層の通り道。hammerhead-material.js の denticleMaterial）。既定 1（2026-10-15 プロデューサー決定）。?dent=0 で皮歯なし
-  chameleonLook.film.value = Number(query.get("dent") ?? 1);
+  chameleonLook.film.value = Number(query.get("dent") ?? HH_DENT_DEFAULT);
   // A8 内臓の通り道（まだら・鰓条）。強さはそれぞれの式の中（hammerhead-material.js の mottleLook・gillRayLook）にあるので、ここは 1
   chameleonLook.organs.value = 1;
   const ss = Number(query.get("ss")) || 2;

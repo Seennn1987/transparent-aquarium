@@ -63,8 +63,13 @@ export const HH_PALETTES = {
 //  サメの軟骨は芯が石灰化していない基質（アルシアンで青）で、表面を石灰化した小板が覆うので、頭・ひれは青 1 を足す。椎体と歯は青なし。
 //  薄い部位は CT の画素（0.5〜0.735 mm）に骨と液がまざって薄く写るので、頭・ひれの赤紫は少なめに出ている見込み
 HH_PALETTES.ct = { spine: SPINE, teeth: [1, 0, 0], head: [0.83, 1, 0], gill: [0.83, 1, 0], fin: [0.8, 1, 0], pelvic: [0.68, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] };
+// tuned（既定）: 2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」）。前の調整の欄（色を自由に選ぶ版）の値を、
+//  4 つの量の足し合わせに直した（最小二乗、負にしない）。ひれ・頭骨・エラ・腹びれ・石灰化していない軟骨・歯は元の色とぴったり同じ。
+//  背骨は色見本の厚みで透過 0.309 / 0.550 / 0.761 → 0.307 / 0.591 / 0.695、肉は 0.917 / 0.955 / 0.785 → 0.919 / 0.930 / 0.791（4 つの量では元の色を作れない分）。
+//  頭骨の濃さ 5.05 は青の量に入れた。顎は頭骨と同じ層なので、顎の濃さは部品の倍率（hammerhead-material.js の hhPartLook.Jaw 0.227 = 304 ÷（265 × 5.05））
+HH_PALETTES.tuned = { spine: [0.404, 1.261, 0, 0], teeth: [0.46, 0, 0, 0], head: [0, 5.05, 0, 0], gill: [0, 1, 0, 0], fin: [0, 1, 0, 0], pelvic: [0, 1, 0, 0], uncal: [0, 1, 0, 0], skin: [0, 0.068, 0, 0.941] };
 HH_PALETTES.photo = HH_PALETTES.juvenile;
-const PALETTE = Q.get("palette") ?? "photo";
+const PALETTE = Q.get("palette") ?? "tuned";
 const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0
 const effOf = (c) => (c.sat ? T0 * (1 - Math.exp(-c.ref / T0)) : c.ref);
 /** 染料の量 [赤紫, 青, 無色, 黄ばみ] → 吸い方の比（spectrum）と 1 m あたりの利得（gain）。 */

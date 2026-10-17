@@ -1,6 +1,6 @@
 import { chameleonLook } from "./chameleon-material.js";
 import { HH_CHANNELS, hhColorLook, hhStainMix, stainToChannel } from "./hammerhead-lightbox.js";
-import { hhPartLook, hhOrganColor, mottleLook, gillRayLook, visceraLook, HH_ORGAN_MIX, organMixToColor } from "./hammerhead-material.js";
+import { hhPartLook, hhPartHaze, hhOrganColor, mottleLook, gillRayLook, visceraLook, HH_ORGAN_MIX, organMixToColor } from "./hammerhead-material.js";
 import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 
 // シロシュモクザメの調整の欄（2026-10-15、プロデューサー「骨、内臓、軟骨、肉など、パーツ種別ごとに色や濃さを調整できるようにしたいです。調整パネルを作成して下さい」）。
@@ -10,7 +10,7 @@ import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 // 2026-10-17 直し（プロデューサー「着色剤の種類はある程度決まっているわけで、色編集パレットは完全自由な色使いではなくて、それをベースに色を選べるようにして」）:
 //  色は自由に選ばず、染料の量（赤紫 = アリザリンレッド S、青 = アルシアンブルー、無色 = 染まらない組織の濁り、黄ばみ = 2026-10-17 足した組織の淡い黄。hammerhead-lightbox.js の HH_STAIN_T）を
 //  動かして決める。色見本（四角）はその種別のふつうの厚みを通った光の色で、見るだけ。内臓も同じ 3 つの量（色見本の厚み 40 mm）
-const STORE = "hh-tune-v3";
+const STORE = "hh-tune-v4";
 const organMix = Object.fromEntries(Object.keys(hhOrganColor).map((k) => [k, HH_ORGAN_MIX?.[k] ? [...HH_ORGAN_MIX[k]] : null]));
 const setMix = (c, m) => { hhStainMix[c.key] = [...m]; const r = stainToChannel(c, m), L = hhColorLook[c.key]; L.spectrum.value.set(...r.spectrum); L.gain.value = r.gain; L.density.value = 1; };
 const setOrganMix = (k, m) => { organMix[k] = [...m]; hhOrganColor[k]?.value.set(...organMixToColor(m, visceraLook.amount.value)); };
@@ -36,19 +36,27 @@ const setOrganColor = (k, hex) => { const a = visceraLook.amount.value * 7.5 * O
 const GROUPS = [
   ["骨・軟骨", [
     { channel: "spine", note: "椎骨（CT の殻と椎体）。石灰化している" },
-    { part: "Centrum", label: "　椎体（背骨の中の濃さ）", max: 5 },
     { channel: "head", note: "頭骨と顎。成魚では軟骨の表面が石灰化した小板で覆われる" },
     { channel: "teeth", note: "石灰化している" }, { channel: "gill" },
-    { channel: "fin", note: "胸びれ・背びれ・尾・肩帯・腰帯の軟骨（CT に写る）" },
+    { channel: "fin", note: "胸びれ・背びれ・臀びれ・尾・肩帯・腰帯の軟骨（CT に写る）。ひれごとの濃さは下の「部品ごと」" },
     { channel: "pelvic" },
     { channel: "uncal", note: "弓・肋骨・尾びれの鰭条（形は図と文献から）" },
-    { part: "Arch", label: "　弓（濃さ）", max: 5 }, { part: "Rib", label: "　肋骨（濃さ）", max: 5 }, { part: "CaudalRay", label: "　尾びれの鰭条（濃さ）", max: 5 },
   ]],
   ["肉・膜", [
-    { channel: "skin", note: "体の組織（胴・ひれの膜）。透明にして染まらない" },
-    { part: "PelvicSkin", label: "腹びれの膜（肉の色の濃さ）", max: 30 },   // 膜は数 mm と薄く、肉の色（80 mm の胴に合わせた）では 3 倍でもほとんど見えない
+    { channel: "skin", note: "体の組織（胴・ひれの膜）。透明にして染まらない。にごり度もこの色で吸う" },
   ]],
   ["内臓（透明にした組織、ふつうは染まらない）", [{ organ: "Liver", label: "肝臓" }, { organ: "Gut", label: "消化管" }, { organ: "Spiral", label: "らせん弁" }, { organ: "Heart", label: "心臓" }]],
+  // 2026-10-17 プロデューサー「今、ヒレごとの色の濃さを調整できません。特に背鰭がずっと透明です。」「各パーツごとににごり度を調整できるようにして」:
+  //  部品ごとに 濃さ（その層の色の吸い方の倍率）と にごり度（体の組織と同じ吸い方を、通り道 × にごり度だけ足す）
+  ["部品ごとの濃さ・にごり度", [
+    ...[["Bone", "背骨の殻（CT）"], ["Centrum", "椎体"], ["Arch", "弓"], ["Rib", "肋骨"], ["CaudalRay", "尾びれの鰭条"],
+      ["HeadCartilage", "頭骨"], ["Jaw", "顎"], ["Teeth", "歯"], ["Gill", "エラの骨"],
+      ["Cartilage", "肩帯・腰帯・尾の軟骨"], ["PectCartilage", "胸びれの軟骨"], ["Dorsal1Cartilage", "第 1 背びれの軟骨"], ["Dorsal2Cartilage", "第 2 背びれの軟骨"],
+      ["AnalCartilage", "臀びれの軟骨"], ["PelvicCartilage", "腹びれの軟骨"]].map(([k, label]) => ({ partrow: k, label, max: 5 })),
+    ...[["Skin", "体の膜"], ["PectSkin", "胸びれの膜"], ["Dorsal1Skin", "第 1 背びれの膜"], ["Dorsal2Skin", "第 2 背びれの膜"], ["AnalSkin", "臀びれの膜"], ["PelvicSkin", "腹びれの膜"]]
+      .map(([k, label]) => ({ partrow: k, label, max: 30 })),   // 膜は数 mm と薄く、肉の色（80 mm の胴に合わせた）では 3 倍でもほとんど見えない
+    ...[["Liver", "肝臓"], ["Gut", "消化管"], ["Spiral", "らせん弁"], ["Heart", "心臓"]].map(([k, label]) => ({ partrow: k, label, max: 5 })),
+  ]],
   ["表面の模様", [
     { look: chameleonLook.film, key: "dent", label: "皮歯", max: 3 }, { look: mottleLook.amount, key: "mottle", label: "まだら", max: 2 },
     { look: gillRayLook.amount, key: "rays", label: "鰓条", max: 5 }, { look: visceraLook.amount, key: "visc", label: "内臓ぜんぶ", max: 5 },
@@ -59,6 +67,7 @@ function snapshot() {
   return {
     channels: Object.fromEntries(HH_CHANNELS.map((c) => { const L = hhColorLook[c.key]; return [c.key, { spectrum: L.spectrum.value.toArray().map((v) => +v.toFixed(4)), gain: +L.gain.value.toFixed(3), density: +L.density.value.toFixed(3) }]; })),
     parts: Object.fromEntries(Object.entries(hhPartLook).map(([k, v]) => [k, +v.value.toFixed(3)])),
+    haze: Object.fromEntries(Object.entries(hhPartHaze).map(([k, v]) => [k, +v.value.toFixed(3)])),
     organs: Object.fromEntries(Object.entries(hhOrganColor).map(([k, v]) => [k, v.value.toArray().map((x) => +x.toFixed(4))])),
     looks: Object.fromEntries(GROUPS.flatMap(([, rows]) => rows.filter((r) => r.look).map((r) => [r.key, +r.look.value.toFixed(3)]))),
     mix: Object.fromEntries(Object.entries(hhStainMix).map(([k, m]) => [k, m && m.map((v) => +v.toFixed(3))])),
@@ -68,6 +77,7 @@ function snapshot() {
 function restore(s) {
   for (const [k, v] of Object.entries(s.channels ?? {})) if (hhColorLook[k]) { hhColorLook[k].spectrum.value.set(...v.spectrum); hhColorLook[k].gain.value = v.gain; hhColorLook[k].density.value = v.density; }
   for (const [k, v] of Object.entries(s.parts ?? {})) if (hhPartLook[k]) hhPartLook[k].value = v;
+  for (const [k, v] of Object.entries(s.haze ?? {})) if (hhPartHaze[k]) hhPartHaze[k].value = v;
   for (const [k, v] of Object.entries(s.organs ?? {})) if (hhOrganColor[k]) hhOrganColor[k].value.set(...v);
   for (const [, rows] of GROUPS) for (const r of rows) if (r.look && s.looks?.[r.key] != null) r.look.value = s.looks[r.key];
   for (const [k, m] of Object.entries(s.mix ?? {})) { const c = HH_CHANNELS.find((x) => x.key === k); if (c && m) setMix(c, m); else if (c) hhStainMix[k] = null; }
@@ -117,6 +127,7 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
     #hh-tune .stains { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 14px; margin: 1px 0 2px; }
     #hh-tune .stain { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; font-size: 11px; align-items: center; }
     #hh-tune .stain input[type=range] { width: 100%; grid-column: 1 / -1; }
+    #hh-tune .stains.two { grid-template-columns: repeat(2, 1fr); }
     #hh-tune .stain .val { grid-row: 1; grid-column: 2; font-size: 11px; }
     #hh-tune .stain.r span:first-child { color: #b03060; } #hh-tune .stain.b span:first-child { color: #1f8fbf; } #hh-tune .stain.n span:first-child { color: #888; } #hh-tune .stain.y span:first-child { color: #b08a00; }`;
   document.head.append(css);
@@ -171,11 +182,12 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
     for (const r of rows) {
       const row = document.createElement("div"); row.className = "row"; row.dataset.group = title;
       const name = document.createElement("span"); name.className = "name"; name.title = "ダブルクリックで、この行を既定に戻す";
-      const cur = () => snapshot(), key = r.channel ? ["mix", r.channel] : r.part ? ["parts", r.part] : r.organ ? ["organMix", r.organ] : ["looks", r.key];
-      const isChanged = () => { const a = cur()[key[0]]?.[key[1]], b = DEFAULTS[key[0]]?.[key[1]]; return JSON.stringify(a) !== JSON.stringify(b); };
+      const cur = () => snapshot(), key = r.channel ? ["mix", r.channel] : r.part ? ["parts", r.part] : r.partrow ? ["parts", r.partrow] : r.organ ? ["organMix", r.organ] : ["looks", r.key];
+      const isChanged = () => { const c = cur(), a = c[key[0]]?.[key[1]], b = DEFAULTS[key[0]]?.[key[1]]; return JSON.stringify(a) !== JSON.stringify(b) || Boolean(r.partrow && c.haze[r.partrow] !== DEFAULTS.haze[r.partrow]); };
       refreshers.push(() => name.classList.toggle("changed", isChanged()));
       name.ondblclick = () => {
-        const one = { channels: {}, parts: {}, organs: {}, looks: {}, mix: {}, organMix: {} };
+        const one = { channels: {}, parts: {}, haze: {}, organs: {}, looks: {}, mix: {}, organMix: {} };
+        if (r.partrow) one.haze[r.partrow] = DEFAULTS.haze[r.partrow];
         if (r.channel) one.channels[r.channel] = DEFAULTS.channels[r.channel];
         if (r.organ) one.organs[r.organ] = DEFAULTS.organs[r.organ];
         one[key[0]][key[1]] = DEFAULTS[key[0]][key[1]];
@@ -201,6 +213,17 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
         st.dataset.group = title; st.classList.add("row"); panel.append(st);
         if (r.note) { const n = document.createElement("div"); n.className = "row"; n.dataset.group = title; const t = document.createElement("span"); t.className = "note"; t.textContent = r.note; n.append(t); panel.append(n); }
         continue;
+      } else if (r.partrow) {
+        if (!hhPartLook[r.partrow]) continue;
+        name.textContent = r.label; row.classList.add("stainrow"); row.append(name, document.createElement("span"));
+        const st = document.createElement("div"); st.className = "stains two"; st.dataset.group = title; st.classList.add("row");
+        for (const [lab, max, get, set, tip] of [["濃さ", r.max, () => hhPartLook[r.partrow].value, (v) => { hhPartLook[r.partrow].value = v; }, "その層の色の吸い方の倍率（1 が既定の色見本どおり）"],
+          ["にごり", 50, () => hhPartHaze[r.partrow].value, (v) => { hhPartHaze[r.partrow].value = v; }, "体の組織と同じ吸い方を、通り道 × この値だけ足す（1 で体の組織と同じ濁り。薄い部品は大きくしないと見えない）"]]) {
+          const cell = document.createElement("label"); cell.className = "stain"; cell.title = tip;
+          const t = document.createElement("span"); t.textContent = lab;
+          const [rr, vv] = slider(0, max, 0.01, get, set); cell.append(t, rr, vv); st.append(cell);
+        }
+        panel.append(row, st); continue;
       } else if (r.part) {
         if (!hhPartLook[r.part]) continue;
         name.textContent = r.label;

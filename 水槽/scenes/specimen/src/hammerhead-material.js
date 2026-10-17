@@ -21,17 +21,23 @@ const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE
   // 案 H: ?centrumbone= ?archbone= で骨の色（アリザリン）を混ぜる（胚の 15 cm では軟骨の多くも表面がアリザリンで染まる、計画書 第 8.3 節）
   Centrum: [Number(new URLSearchParams(location.search).get("centrumbone") ?? 0.1), Number(new URLSearchParams(location.search).get("centrum") ?? 0.02), 0, 0],   // 既定 骨 0.1・軟骨 0.02（2026-10-15 プロデューサー決定「H1」）
   Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0), Number(new URLSearchParams(location.search).get("arch") ?? 0.5), 0, 0] };   // 既定 骨 0・軟骨 0.5（ひれの軟骨の半分の青。2026-10-17 プロデューサー「弓の色はひれの軟骨の半分の青で既定にしてください」。前は H1 の骨 0.3・軟骨 0.08）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
-const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（推定、b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
+const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
 for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描く
 // 2026-10-16 案: 肋骨と尾びれの鰭条（推定、a8c_vertebrae.py）。ひれの軟骨と同じ層に、?rib= ?ray= 倍（既定 1、ひれの放射軟骨と同じ青）
 CHANNEL.Rib = [0, Number(new URLSearchParams(location.search).get("rib") ?? 1), 0, 0];
 CHANNEL.CaudalRay = [0, Number(new URLSearchParams(location.search).get("ray") ?? 1), 0, 0];
-const OPTIONAL = new Set(["Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", "Rib", "CaudalRay", ...HEARTS]);   // 2026-10-15 前の glb には無い
+const FIN_CART = ["PectCartilage", "Dorsal1Cartilage", "Dorsal2Cartilage", "AnalCartilage"], FIN_SKIN = ["PectSkin", "Dorsal1Skin", "Dorsal2Skin", "AnalSkin"];
+const OPTIONAL = new Set([...FIN_CART, ...FIN_SKIN, "Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", "Rib", "CaudalRay", ...HEARTS]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 // 2026-10-15 色の層を 8 つにした（hammerhead-lightbox.js）。部品ごとの、層 A（背骨・ひれの軟骨・肉・頭骨）と層 B（顎・エラの骨・腹びれの軟骨・歯）への重み。
 //  顎・エラの骨の色の混ぜ方（?jawbone=・?gillbone=・?gillcart=）は、層の色（HH_CHANNELS）の方に入る。腹びれの軟骨と膜は別の部品にした（a6a_export_gltf.py）
 CHANNEL.PelvicCartilage = 1; CHANNEL.PelvicSkin = 2;
+// 2026-10-17 プロデューサー「今、ヒレごとの色の濃さを調整できません。特に背鰭がずっと透明です。」: ひれごとの軟骨と膜の部品（a6a_export_gltf.py の HH_FIN_PARTS）。
+//  色はひれの軟骨・肉の層のまま、濃さとにごり度を部品ごとに変える
+for (const k of FIN_CART) CHANNEL[k] = 1;
+for (const k of FIN_SKIN) CHANNEL[k] = 2;
+export const HH_SKIN_PARTS = ["Skin", "PelvicSkin", ...FIN_SKIN];
 const LAYERS = {
   Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: [CHANNEL.Arch[0], 0, 0, 0], b: [CHANNEL.Arch[1], 0, 0, 0] },
   Rib: { b: [CHANNEL.Rib[1], 0, 0, 0] }, CaudalRay: { b: [CHANNEL.CaudalRay[1], 0, 0, 0] }, Cartilage: { a: [0, 1, 0, 0] },
@@ -39,9 +45,16 @@ const LAYERS = {
   // 2026-10-17: 顎は頭骨と同じ層（同じ組織）。弓・肋骨・尾びれの鰭条は「石灰化していない軟骨」の層（層 B の 1 つ目）。
   //  弓の骨の色の混ぜ（?archbone=）は層 A の背骨へ、軟骨の分（?arch=、既定 0.5）は石灰化していない軟骨の層へ
   Jaw: { a: [0, 0, 0, 1] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
+  ...Object.fromEntries(FIN_CART.map((k) => [k, { a: [0, 1, 0, 0] }])), ...Object.fromEntries(FIN_SKIN.map((k) => [k, { a: [0, 0, 1, 0] }])),
 };
 /** 部品ごとの濃さの倍率（調整の欄。既定 1）。 */
-export const hhPartLook = Object.fromEntries([...Object.keys(LAYERS), "Liver", "Gut", "Spiral", "Heart", "HeartLarge", "HeartSmall", "Viscera"].map((k) => [k, { value: 1 }]));
+//  既定（2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」））: 顎 0.227（hammerhead-lightbox.js の tuned）、弓 1.32、肋骨 1.36、尾びれの鰭条 0、腹びれの膜 8.39、らせん弁 1.98、心臓 2.02。
+//  ひれの膜（胸びれ・背びれ 2 つ・臀びれ）は、腹びれの膜と同じ厚さ（約 3 mm）なので同じ 8.39 から（前は胸びれの膜は体の膜と同じ 1、背びれの板は体の膜の中で 1）
+const PART_DEFAULT = { Jaw: 0.227, Arch: 1.32, Rib: 1.36, CaudalRay: 0, PelvicSkin: 8.39, Spiral: 1.98, Heart: 2.02, ...Object.fromEntries(FIN_SKIN.map((k) => [k, 8.39])) };
+export const hhPartLook = Object.fromEntries([...Object.keys(LAYERS), "Liver", "Gut", "Spiral", "Heart", "HeartLarge", "HeartSmall", "Viscera"].map((k) => [k, { value: PART_DEFAULT[k] ?? 1 }]));
+/** 部品ごとのにごり度（調整の欄。既定 0）。2026-10-17 プロデューサー「各パーツごとににごり度を調整できるようにして」:
+ *  その部品の通り道を、体の組織（肉の層、hammerhead-lightbox.js の skin）と同じ吸い方で、にごり度 × 通り道だけ足す。1 で体の組織と同じ濁り */
+export const hhPartHaze = Object.fromEntries(Object.keys(hhPartLook).map((k) => [k, { value: 0 }]));
 
 const ASYM_GLSL = `
 // A8 左右差（2026-10-15）: 鏡映で作った左右を、左側（glTF の z > 0。z = −u）だけ決まった量なめらかに曲げる。すべての部品で同じ式なので、
@@ -102,10 +115,11 @@ const fragment = `
 uniform vec4 channel;
 uniform float reference;
 uniform float partGain;
+uniform float haze;
 varying vec3 vViewPosition;
 void main() {
   float d = -vViewPosition.z - reference;
-  gl_FragColor = partGain * channel * (gl_FrontFacing ? -d : d);
+  gl_FragColor = (partGain * channel + vec4(0., 0., haze, 0.)) * (gl_FrontFacing ? -d : d);   // haze: 層 A の 3 つ目（肉）へ。層 B では 0
 }`;
 const ADD = {
   transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
@@ -178,7 +192,8 @@ function denticleMaterial() {
 //  むらは体の座標の 3 次元のなめらかな乱数（2 段、決まった種）。色は hammerhead-stain.js の organs.mottle。強さは ?mottle=（既定 0.5、2026-10-15 決定）、
 //  むらの大きさは ?mottlecell= mm（既定 40）
 // 輪郭（表面を斜めに見る所）で色がたまらないよう、1 / |cos| の上限を ?mottlecos=（既定 0.6 = 最大 1.7 倍）で抑える（0.2 では輪郭が茶色く縁取られた）
-export const mottleLook = { amount: { value: Number(DENT_Q.get("mottle") ?? 0.5) }, cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };   // 強さ ?mottle=（既定 0.5、2026-10-15 決定）
+export const HH_DENT_DEFAULT = 0.46;   // 皮歯の強さの既定（2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」）。前は 1）。hammerhead-main.js・specimen-hammerhead.js
+export const mottleLook = { amount: { value: Number(DENT_Q.get("mottle") ?? 0.04) }, cell: { value: Number(DENT_Q.get("mottlecell") ?? 40) / 1000 }, minCos: { value: Number(DENT_Q.get("mottlecos") ?? 0.6) } };   // 強さ ?mottle=（既定 0.5、2026-10-15 決定）
 const mottleFragment = `
 uniform float cell;
 uniform float amount;
@@ -211,7 +226,7 @@ function mottleMaterial() {
 //  エラの骨は咽頭のまわりを輪のように回るので、輪の中心（背腹 25 mm 腹側、正中）のまわりの角度で縞を作ると、骨の輪に直角な線（鰓条の向き）になる。
 //  出典の図（BIODIDAC の Squalus）では鰓条は角鰓・上鰓の後ろのふちに並ぶ。間隔は ?rayspace= mm（既定 1.8、出典なし）。
 //  色はエラの骨と同じ（hammerhead-stain.js の organs.gillray）。強さ ?rays=（既定 2、2026-10-15 決定）
-export const gillRayLook = { amount: { value: Number(DENT_Q.get("rays") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定）
+export const gillRayLook = { amount: { value: Number(DENT_Q.get("rays") ?? 1.06) },   // 既定 1.06（2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」）。前は 2、2026-10-15 決定）
   space: { value: Number(DENT_Q.get("rayspace") ?? 1.8) / 1000 } };
 const gillRayFragment = `
 uniform float amount;
@@ -243,22 +258,24 @@ const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1,
 // 案 2 の部品ごとの色（仮、出典なし）: 肝臓は黄みのクリーム、消化管は淡い青、らせん弁の仕切りは濃い青（強さ 3 倍）
 // 2026-10-17 色の既定（写真の透明標本、hammerhead-lightbox.js の PALETTE）: 消化管とらせん弁は、写真の腹の青い塊（粘液がアルシアンで青く染まる）に合わせて
 //  色見本の厚み 40 mm・強さ 2 で 透過 0.55 / 0.88 / 0.95 の青緑（らせん弁はその 1.5 倍）。肝臓と心臓は前のまま。前の色は ?palette=embryo
-const ORGAN_PALETTE = new URLSearchParams(location.search).get("palette") ?? "photo";
+const ORGAN_PALETTE = new URLSearchParams(location.search).get("palette") ?? "tuned";
 const ORGAN_PHOTO = ORGAN_PALETTE === "photo";
 // 2026-10-17 内臓は軟骨ではないので染まらない（透明にした組織、ほぼ無色）。calcified・double・juvenile では、無色の濁りの量（色見本 40 mm）で
 //  肝臓 1.5・消化管 1・らせん弁 1.5・心臓 1.2（量は目で見た仮の値）。値は [赤紫, 青, 無色, 黄ばみ] の量（hammerhead-lightbox.js の HH_STAIN_A）。
 //  黄ばみ: 2026-10-17 プロデューサー「内臓は黄ばませて」。内臓は脱色が届きにくく脂も多いので、肉の黄ばみ（?yellow=）に足して ?visy=（既定 1）。脂の多い肝臓は 2 倍
 const OY = HH_YELLOW + Number(new URLSearchParams(location.search).get("visy") ?? 1);
-export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo", "ct"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5, 2 * OY], Gut: [0, 0, 1, OY], Spiral: [0, 0, 1.5, OY], Heart: [0, 0, 1.2, OY], HeartLarge: [0, 0, 1.2, OY], HeartSmall: [0, 0, 1.2, OY] } : null;
+//  tuned（既定、2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」））: 前の欄で選んだ色を 4 つの量に直した（ぴったり同じ色。強さ 2.07）
+const ORGAN_TUNED = { Liver: [0.199, 0.967, 0, 3.77], Gut: [0.142, 0.452, 0, 1.808], Spiral: [0.218, 0.242, 0, 8.512], Heart: [0.316, 0.129, 0, 1.39], HeartLarge: [0.316, 0.129, 0, 1.39], HeartSmall: [0.316, 0.129, 0, 1.39] };
+export const HH_ORGAN_MIX = ORGAN_PALETTE === "tuned" ? ORGAN_TUNED : ["calcified", "double", "juvenile", "photo", "ct"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5, 2 * OY], Gut: [0, 0, 1, OY], Spiral: [0, 0, 1.5, OY], Heart: [0, 0, 1.2, OY], HeartLarge: [0, 0, 1.2, OY], HeartSmall: [0, 0, 1.2, OY] } : null;
 /** 染料の量 → 内臓の色の値（visceraMaterial の color。強さ visceraLook.amount × 7.5 × 色見本 40 mm で割る） */
 export function organMixToColor(m, amount) { const k = amount * 7.5 * 0.04; return stainAbsorb(m).map((v) => v / k); }
 //  肝臓は写真に黄色い臓器が見えないので、ほとんど色の無い淡い膜に（透過 0.90 / 0.91 / 0.93、色見本の厚み 40 mm・強さ 2）
 const ORGAN_COLORS_BASE = { Liver: ORGAN_PHOTO ? [0.176, 0.157, 0.121] : [0.25, 0.45, 1], Gut: ORGAN_PHOTO ? [1, 0.213, 0.085] : [1, 0.5, 0.42], Spiral: ORGAN_PHOTO ? [1.5, 0.32, 0.13] : [3, 1.5, 1.2],
   // 心臓: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
   Heart: [0.42, 0.74, 1], HeartLarge: [0.42, 0.74, 1], HeartSmall: [0.42, 0.74, 1] };
-const ORGAN_VISC_AMOUNT = Number(new URLSearchParams(location.search).get("visc") ?? 2);
+const ORGAN_VISC_AMOUNT = Number(new URLSearchParams(location.search).get("visc") ?? 2.07);
 const ORGAN_COLORS = HH_ORGAN_MIX ? Object.fromEntries(Object.keys(ORGAN_COLORS_BASE).map((k) => [k, organMixToColor(HH_ORGAN_MIX[k], ORGAN_VISC_AMOUNT)])) : ORGAN_COLORS_BASE;
-export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定、案 2c）
+export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2.07) },   // 既定 2.07（2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」）。前は 2、2026-10-15 決定）
  
   color: { value: new THREE.Vector3(...(VISC_COLORS[DENT_Q.get("visccol") ?? "cream"] ?? VISC_COLORS.cream)) } };
 // B5 心臓の拍動: 心臓の中心（読み込んだ心臓の面の箱の中心）へ beat 倍だけ縮める。左右差・呼吸の変形と骨組みの変形の間
@@ -297,11 +314,11 @@ export function applyHammerheadTissue(model, reference) {
     o.frustumCulled = false;
     const layer = LAYERS[part] ?? {};
     const partGain = hhPartLook[part] ?? { value: 1 };
-    const pathMat = (w) => new THREE.ShaderMaterial({ uniforms: { channel: { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
-    o.material = pathMat(layer.a);
+    const pathMat = (w, haze = { value: 0 }) => new THREE.ShaderMaterial({ uniforms: { channel: { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, haze, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    o.material = pathMat(layer.a, hhPartHaze[part]);
     o.userData.pathMaterial = o.material;
     o.userData.path2Material = layer.b ? pathMat(layer.b) : null;
-    if (part === "Skin" || part === "PelvicSkin") { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
+    if (HH_SKIN_PARTS.includes(part)) { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
     if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
     if (["Viscera", "Liver", "Gut", "Spiral"].includes(part)) o.userData.organMaterial = visceraMaterial(reference, part);
     if (HEARTS.includes(part)) {
