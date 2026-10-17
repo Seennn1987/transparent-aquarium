@@ -1,0 +1,15 @@
+import asyncio, sys
+from playwright.async_api import async_playwright
+url,pre=sys.argv[1],sys.argv[2]
+async def main():
+    async with async_playwright() as p:
+        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium',args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-proxy-server'])
+        pg=await b.new_page(viewport={'width':800,'height':956}); msgs=[]; pg.on('pageerror',lambda e: msgs.append(str(e)))
+        await pg.goto(url); await pg.wait_for_function('document.body.dataset.ready || document.body.dataset.error',timeout=300000)
+        await pg.wait_for_timeout(5000); await pg.screenshot(path=pre+'_f.png')
+        for name,steps in (('90',29),('180',29)):
+            await pg.mouse.move(100,500); await pg.mouse.down()
+            for i in range(1,steps): await pg.mouse.move(100+i*10,500)
+            await pg.mouse.up(); await pg.wait_for_timeout(5000); await pg.screenshot(path=pre+f'_{name}.png')
+        print(msgs); await b.close()
+asyncio.run(main())
