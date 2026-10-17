@@ -51,7 +51,10 @@ G_LEFT = [(1480, 630), (1450, 670), (1420, 720), (1390, 765), (1330, 790), (1265
 G_RIGHT = [(1720, 625), (1780, 660), (1810, 700), (1840, 740), (1880, 765), (1940, 785), (1985, 805)]
 G_CX, G_SADDLE_Y, G_SPAN = 1625, 590, 720
 BEAK = dict(length=0.065)
-PEAK = 0.198   # 頭の頂を後ろへずらす量（W）。2026-10-17 プロデューサー決定「横の線は C」。頂は前の端から 0.69、眼の開口 0.33
+LOBE_FADE_HARMONICS = 2      # 頭の丸みの輪郭に残す波の次数
+LOBE_FADE = (0.55, 0.9)      # 膜の縁の波を、縁からの割合 ρ がこの範囲で出していく
+PEAK = 0.185   # 頭の頂を後ろへずらす量（W）。2026-10-17 プロデューサー決定「横の線は C」= 眼の開口を写真の 0.33 に合わせる量。
+               # 決定時は 0.198。A3 で頭の丸みから縁の波を消したので、眼 0.33 を保つ量を測り直した
 
 
 def font(size, bold=False):
@@ -80,11 +83,32 @@ class Body:
         phi = np.arctan2(px, pz + peak)
         o = np.argsort(phi)
         self.phi, self.D = phi[o], np.hypot(px, pz + peak)[o]
+        # 頭の丸みには膜の縁の 8 つの波を持ち込まない: 2 次までの波でならした輪郭（2026-10-17、A3 で直した）
+        f = np.fft.rfft(self.r)
+        f[LOBE_FADE_HARMONICS + 1:] = 0
+        rs = np.fft.irfft(f, len(self.r))
+        sx, sz = np.sin(self.th) * rs, np.cos(self.th) * rs
+        ps = np.arctan2(sx, sz + peak)
+        o = np.argsort(ps)
+        self.phi_s, self.D_s = ps[o], np.hypot(sx, sz + peak)[o]
 
     def Dc(self, t):
         """ずらした中心から、角度 t の向きの輪郭までの距離"""
         t = np.mod(t + np.pi, 2 * np.pi) - np.pi
         return np.interp(t, self.phi, self.D, period=2 * np.pi)
+
+    def Ds(self, t):
+        t = np.mod(t + np.pi, 2 * np.pi) - np.pi
+        return np.interp(t, self.phi_s, self.D_s, period=2 * np.pi)
+
+    def rho(self, x, zz):
+        """高さを決める割合。縁（ρ = 1）では膜の縁の輪郭、内側ほど波の無い輪郭に近づける"""
+        t = np.arctan2(x, zz)
+        dist = np.hypot(x, zz)
+        rl = dist / self.Dc(t)
+        w = np.clip((rl - LOBE_FADE[0]) / (LOBE_FADE[1] - LOBE_FADE[0]), 0, 1)
+        w = w * w * (3 - 2 * w)
+        return dist / (self.Ds(t) + w * (self.Dc(t) - self.Ds(t))), rl
 
     def R(self, t):
         t = np.mod(t, 2 * np.pi)
@@ -92,9 +116,8 @@ class Body:
 
     def h(self, x, z):
         zz = z + self.peak
-        t = np.arctan2(x, zz)       # θ = 0 が前（+z）。左右対称なので向きの符号は問わない
-        rho = np.hypot(x, zz) / self.Dc(t)
-        return np.where(rho <= 1, np.interp(rho, self.u[self.u >= 0], self.v[self.u >= 0]), 0.0)
+        rho, rl = self.rho(x, zz)   # θ = 0 が前（+z）。左右対称なので向きの符号は問わない
+        return np.where(rl <= 1, np.interp(np.minimum(rho, 1), self.u[self.u >= 0], self.v[self.u >= 0]), 0.0)
 
     def z_at(self, frac):
         """前の端からの割合 → z"""
@@ -110,7 +133,7 @@ class Body:
                 Rt = float(self.Dc(np.array([t]))[0])
                 for rho in rr:
                     x, z = np.sin(t) * rho * Rt, np.cos(t) * rho * Rt - self.peak
-                    y = float(np.interp(rho, self.u[self.u >= 0], self.v[self.u >= 0])) if top else 0.0
+                    y = float(self.h(np.array([x]), np.array([z]))[0]) if top and rho < 1 else (float(self.v[-1]) if top else 0.0)
                     verts.append((x, y, z))
             for i in range(n_t):
                 j = (i + 1) % n_t
@@ -314,9 +337,14 @@ def render(meshes, view, size=600, extent=0.62, alpha_body=True, fit=False):
         D = depth(v)
         tri = f
         n = np.cross(v[tri[:, 1]] - v[tri[:, 0]], v[tri[:, 2]] - v[tri[:, 0]])
-        n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
-        shade = 0.35 + 0.65 * np.abs(n @ (eye * 0.8 + np.array([0.3, 0.5, 0.2])) / np.linalg.norm(eye * 0.8 + np.array([0.3, 0.5, 0.2])))
-        for t, sh in zip(tri, shade):
+        vn = np.zeros_like(v)
+        for k in range(3):
+            np.add.at(vn, tri[:, k], n)
+        vn /= np.linalg.norm(vn, axis=1, keepdims=True) + 1e-12
+        L = eye * 0.8 + np.array([0.3, 0.5, 0.2])
+        vshade = 0.35 + 0.65 * np.abs(vn @ (L / np.linalg.norm(L)))   # 頂点の陰（面の継ぎ目の縞を出さない）
+        for t in tri:
+            sh = vshade[t]
             xs, ys, ds = X[t], Y[t], D[t]
             x0, x1 = int(max(0, np.floor(xs.min()))), int(min(size - 1, np.ceil(xs.max())))
             y0, y1 = int(max(0, np.floor(ys.min()))), int(min(size - 1, np.ceil(ys.max())))
@@ -335,12 +363,13 @@ def render(meshes, view, size=600, extent=0.62, alpha_body=True, fit=False):
             dd = l0 * ds[0] + l1 * ds[1] + l2 * ds[2]
             sub = zb[y0:y1 + 1, x0:x1 + 1]
             win = inside & (dd > sub)
+            shp = (l0 * sh[0] + l1 * sh[1] + l2 * sh[2])[..., None]
             if alpha < 1:
                 im = img[y0:y1 + 1, x0:x1 + 1]
-                im[inside] = im[inside] * (1 - alpha) + np.array(col) * sh * alpha
+                im[inside] = im[inside] * (1 - alpha) + (np.array(col) * shp * alpha)[inside]
                 continue
             sub[win] = dd[win]
-            img[y0:y1 + 1, x0:x1 + 1][win] = np.array(col) * sh
+            img[y0:y1 + 1, x0:x1 + 1][win] = (np.array(col) * shp)[win]
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
 
