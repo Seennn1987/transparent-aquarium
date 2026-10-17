@@ -17,7 +17,6 @@
 | `15-meyer1906-taf14.jpg` | Taf. XIV。組織、生殖器 | PD | 同上 n742 |
 | `16-meyer1906-taf15.jpg` | Taf. XV。図 21 精莢嚢、図 23 口球、図 24 吸盤、図 26〜28 腕の断面 | PD | 同上 n748 |
 | `17-meyer1906-taf16.jpg` | Taf. XVI | PD | 同上 n752 |
-
 | `30-verhoeff2024-fig12.png` | Verhoeff 2024 図 12（p.29 を 300 dpi で画像にした）。D・E 完模式標本の殻（後ろから）、F・G 成熟した雄の殻（上から・後ろから）は Sasaki 1929 pl. 7 figs 8–9 の描き直し。A 雄の口側、B・C 消化管、H 雄の生殖器 | CC BY 4.0 | Verhoeff, T. J. 2024「Flapjack octopods of Australia (Cephalopoda), Part I Southern Australia」Aust. J. Taxon. 68: 1–44, doi:10.54102/ajt.wij3l |
 
 ## 同じ属の別の種（形の比較だけ。比率には使わない）
