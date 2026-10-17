@@ -237,7 +237,11 @@ function gillRayMaterial() {
 //  強さ ?visc=（既定 2、2026-10-15 決定）。1 で 40 mm 通ると、いちばん吸う色で約 0.3 吸う
 const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1, 0.5, 0.42] };
 // 案 2 の部品ごとの色（仮、出典なし）: 肝臓は黄みのクリーム、消化管は淡い青、らせん弁の仕切りは濃い青（強さ 3 倍）
-const ORGAN_COLORS = { Liver: [0.25, 0.45, 1], Gut: [1, 0.5, 0.42], Spiral: [3, 1.5, 1.2],
+// 2026-10-17 色の既定（写真の透明標本、hammerhead-lightbox.js の PALETTE）: 消化管とらせん弁は、写真の腹の青い塊（粘液がアルシアンで青く染まる）に合わせて
+//  色見本の厚み 40 mm・強さ 2 で 透過 0.55 / 0.88 / 0.95 の青緑（らせん弁はその 1.5 倍）。肝臓と心臓は前のまま。前の色は ?palette=embryo
+const ORGAN_PHOTO = new URLSearchParams(location.search).get("palette") !== "embryo";
+//  肝臓は写真に黄色い臓器が見えないので、ほとんど色の無い淡い膜に（透過 0.90 / 0.91 / 0.93、色見本の厚み 40 mm・強さ 2）
+const ORGAN_COLORS = { Liver: ORGAN_PHOTO ? [0.176, 0.157, 0.121] : [0.25, 0.45, 1], Gut: ORGAN_PHOTO ? [1, 0.213, 0.085] : [1, 0.5, 0.42], Spiral: ORGAN_PHOTO ? [1.5, 0.32, 0.13] : [3, 1.5, 1.2],
   // 心臓（推定）: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
   Heart: [0.42, 0.74, 1], HeartLarge: [0.42, 0.74, 1], HeartSmall: [0.42, 0.74, 1] };
 export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定、案 2c）

@@ -28,6 +28,31 @@ export const HH_CHANNELS = [
   { key: "pelvic", label: "腹びれの軟骨", layer: 1, index: 2, ref: 0.002, ...K.cartilage },
   { key: "teeth", label: "歯", layer: 1, index: 3, sat: true, ref: 0.009, ...K.bone },
 ];
+// 2026-10-17 色の既定（プロデューサー「一旦これを参考に色付けしてみて。それを規定にして。組織種別ごとに色分けすることを意識して」、
+//  いただいた透明標本の写真 2 枚、プロデューサーの撮影）: 組織の種別ごとに 1 つの色にそろえる。種別ごとの、色見本の厚み（ref）を通ったときの透過（背景の液で割った値）:
+//   骨（石灰化。背骨・歯）: 赤紫の画素の中央値 写真 1 の 0.776 / 0.351 / 0.430、写真 2 の 0.620 / 0.311 / 0.409 → 0.70 / 0.33 / 0.42
+//   軟骨（頭骨・顎・エラの骨・ひれ・腹びれ）: 青緑の画素の中央値 写真 1 の 0.500 / 1.032 / 1.067、写真 2 の 0.370 / 0.847 / 0.982 → 0.44 / 0.94 / 0.99
+//   肉: 体の中の色の無い所は液より明るいか同じ（写真 1 の 1.17 / 1.17 / 1.11、写真 2 の 1.01 / 1.07 / 1.13）。ほとんど吸わない色の無い膜として 0.93 / 0.94 / 0.95
+//  頭骨は前は胚の濃い青緑、顎は淡い青、エラの骨は青緑と分けていたのを、軟骨の 1 色にそろえた（厚いところほど濃く見えるのは、通り道の長さで出る）。
+//  前の色は ?palette=embryo
+const PALETTE = Q.get("palette") ?? "photo";
+//   背骨（椎骨の列）は骨の中でも濃いので、赤紫の画素の中央値（0.70 / 0.33 / 0.42）と濃い 10% の平均（写真 1 の 0.385 / 0.147 / 0.219、写真 2 の 0.320 / 0.142 / 0.220 → 0.35 / 0.145 / 0.22）の間（幾何平均 0.52 / 0.23 / 0.31）。濃い 10% にすると画面の背骨は黒ずんだ赤（透過 0.46 / 0.28 / 0.38）になり、
+//    中央値にすると写真の背骨より淡い桃色になった
+const PHOTO_T = { bone: [0.70, 0.33, 0.42], spine: [0.52, 0.23, 0.31], cartilage: [0.44, 0.94, 0.99], skin: [0.93, 0.94, 0.95] };
+const CLASS = { spine: "spine", teeth: "bone", fin: "cartilage", head: "cartilage", jaw: "cartilage", gill: "cartilage", pelvic: "cartilage", skin: "skin" };
+export const HH_BONE_PHOTO_SPECTRUM = (() => { const A = PHOTO_T.bone.map((t) => -Math.log(t)), top = Math.max(...A); return A.map((v) => v / top); })();
+if (PALETTE === "photo") {
+  const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0
+  for (const c of HH_CHANNELS) {
+    const A = PHOTO_T[CLASS[c.key]].map((t) => -Math.log(t)), top = Math.max(...A), eff = c.sat ? T0 * (1 - Math.exp(-c.ref / T0)) : c.ref;
+    c.spectrum = A.map((v) => v / top); c.gain = top / eff;
+  }
+  // 肉のまだらも、色の無い肉の吸い方の比で（前は胚の肉のクリーム色から作っていた）
+  const As = PHOTO_T.skin.map((t) => -Math.log(t)), ts = Math.max(...As);
+  if (K.organs) K.organs.mottle = As.map((v) => (v / ts) * 0.12);
+}
+export const HH_PALETTE = PALETTE;
+
 /** 調整の欄が動かす値（uniform の形）。spectrum は vec3、gain は 1 m あたり、density は濃さの倍率。 */
 export const hhColorLook = Object.fromEntries(HH_CHANNELS.map((c) => [c.key, {
   spectrum: { value: new THREE.Vector3(...c.spectrum) }, gain: { value: c.gain }, density: { value: 1 },
@@ -70,7 +95,7 @@ export function createHammerheadLightbox(renderer, { linear = false, alphaScale 
   const material = new THREE.ShaderMaterial({
     uniforms: {
       tPath: { value: target.texture }, tPath2: { value: target2.texture }, tFilm: { value: filmTarget.texture }, tOrgan: { value: organTarget.texture },
-      organGain: { value: 1 }, filmGain: { value: K.film.gain }, filmSpectrum: { value: new THREE.Vector3(...K.film.spectrum) },
+      organGain: { value: 1 }, filmGain: { value: K.film.gain }, filmSpectrum: { value: new THREE.Vector3(...(PALETTE === "photo" ? HH_BONE_PHOTO_SPECTRUM : K.film.spectrum)) },   // 皮歯も骨の色
       lightbox: { value: new THREE.Vector3(...K.lightbox) }, boneT0: chameleonLook.boneT0,
       gainA: { value: new THREE.Vector4() }, gainB: { value: new THREE.Vector4() },
       ...Object.fromEntries(A.map((c, i) => [`specA${i}`, spec(c)])), ...Object.fromEntries(B.map((c, i) => [`specB${i}`, spec(c)])),
