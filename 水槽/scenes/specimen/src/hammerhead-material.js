@@ -19,7 +19,7 @@ const CHANNEL = { Bone: 0, Teeth: 0, Cartilage: 1, Jaw: JAW_BONE > 0 ? [JAW_BONE
   // 2026-10-15 背骨の案 E: 椎体の外側の軟骨（a8c_vertebrae.py の椎体）を軟骨の色で淡く。中の石灰化した砂時計形（CT の殻）は Bone のまま
   // 案 H: ?centrumbone= ?archbone= で骨の色（アリザリン）を混ぜる（胚の 15 cm では軟骨の多くも表面がアリザリンで染まる、計画書 第 8.3 節）
   Centrum: [Number(new URLSearchParams(location.search).get("centrumbone") ?? 0.1), Number(new URLSearchParams(location.search).get("centrum") ?? 0.02), 0, 0],   // 既定 骨 0.1・軟骨 0.02（2026-10-15 プロデューサー決定「H1」）
-  Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0.3), Number(new URLSearchParams(location.search).get("arch") ?? 0.08), 0, 0] };   // 既定 骨 0.3・軟骨 0.08（同「H1」）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
+  Arch: [Number(new URLSearchParams(location.search).get("archbone") ?? 0), Number(new URLSearchParams(location.search).get("arch") ?? 0.5), 0, 0] };   // 既定 骨 0・軟骨 0.5（ひれの軟骨の半分の青。2026-10-17 プロデューサー「弓の色はひれの軟骨の半分の青で既定にしてください」。前は H1 の骨 0.3・軟骨 0.08）   // 背骨の弓（別の部品にしたとき。2026-10-15 案 G）
 const HEARTS = ["Heart", "HeartLarge", "HeartSmall"];   // B5 心臓（推定、b5b_heart.py）。Large・Small は見比べの案（試しの glb だけ）
 for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描く
 // 2026-10-16 案: 肋骨と尾びれの鰭条（推定、a8c_vertebrae.py）。ひれの軟骨と同じ層に、?rib= ?ray= 倍（既定 1、ひれの放射軟骨と同じ青）

@@ -105,6 +105,8 @@ step py a7h2_gill_options.py B2 139 215 2 53.4
 HH_VISC_SIGMA=10,3,3 HH_VISC_GAPDIL=0 HH_VISC_OPEN=0 step py a8a_viscera.py
 HH_ORGANS=B HH_SPIRAL=bowl step py a8b_viscera_organs.py
 # A8 背骨（案 E、2026-10-15 プロデューサー決定）: 椎体と弓を部品から作り、椎体は別の部品 Centrum（CT の殻は Bone のまま）
+# 尾の骨（2026-10-17 プロデューサー「尾の骨を足す案にして、弓の色はひれの軟骨の半分の青で既定にしてください」）: 血道弓を高く、肋骨と尾びれの鰭条を足す
+export HH_VERT_HAEMAL=${HH_VERT_HAEMAL-1} HH_VERT_RIBS=${HH_VERT_RIBS-1} HH_VERT_RADIALS=${HH_VERT_RADIALS-1}
 HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8 step py a8c_vertebrae.py
 export HH_VERT_CENTRA_PART=Centrum HH_VERT_ARCH_PART=Arch   # 弓も別の部品（2026-10-15 H1）
 # A6 glb に書き出す（Blender）

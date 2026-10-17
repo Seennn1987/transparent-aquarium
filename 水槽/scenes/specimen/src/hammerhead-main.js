@@ -117,14 +117,14 @@ async function start() {
   //  後ろ半分の長さの案、尾の骨（血道弓・尾びれの鰭条・肋骨）の案を両方作って、ブラウザで並べて見せて」）。案の glb は試しのページだけに置く
   if (query.get("pick") === "body") {
     const reload = (set) => { const q = new URLSearchParams(location.search); set(q); location.search = q.toString(); };
-    const arch = `${query.get("archbone") ?? 0.3},${query.get("arch") ?? 0.08}`;
+    const arch = `${query.get("archbone") ?? 0},${query.get("arch") ?? 0.5}`;
     pickerPanel([
       // 2026-10-16 参考の図（FMIB の幅・Raver の高さ）に合わせた案を足した。前の「幅を写真に」の 3 案は、幅が高さを超えて文献と逆の形なので外した（glb は試しのページに残る）
       // 2026-10-16 胴の形は案 2 に決定（プロデューサー「胴の形は案 2 に決めて、既定にしてください」）。前の形の glb は試しのページに specimen_hammerhead_prev として残す
-      ["案", [["胴: 案 2（決定）", "specimen_hammerhead"], ["胴: 前の形", "specimen_hammerhead_prev"], ["尾の骨を足す（胴は案 2）", "specimen_hammerhead_t2"]], () => GLB_NAME,
+      ["案", [["胴は案 2・尾の骨あり（決定）", "specimen_hammerhead"], ["尾の骨なし", "specimen_hammerhead_notail"], ["胴: 前の形", "specimen_hammerhead_prev"]], () => GLB_NAME,
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
-      ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
-        (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
+      ["弓の色", [["ひれの軟骨の半分の青（決定）", "0,0.5"], ["ひれの軟骨と同じ青", "0,1"], ["前（骨 0.3・軟骨 0.08）", "0.3,0.08"]], () => arch,
+        (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0,0.5") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
     ], "胴: 案 2 は、幅を FMIB の図・高さを Raver の図（どちらもパブリックドメイン）に合わせ、断面をなめらかな曲線にし、横から見た背と腹の線をならした形。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条を足す");
   }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
