@@ -1,0 +1,23 @@
+{
+ "A": {
+  "peak_shift": 0.0,
+  "eye_opening": 0.3865,
+  "peak_from_front": 0.4862155388471177,
+  "eye_gap_mm": -0.4,
+  "shell_gap_mm": 7.8
+ },
+ "B": {
+  "peak_shift": 0.13,
+  "eye_opening": 0.3713,
+  "peak_from_front": 0.619047619047619,
+  "eye_gap_mm": -0.2,
+  "shell_gap_mm": 7.1
+ },
+ "C": {
+  "peak_shift": 0.198,
+  "eye_opening": 0.3297,
+  "peak_from_front": 0.6892230576441102,
+  "eye_gap_mm": -0.9,
+  "shell_gap_mm": 5.2
+ }
+}

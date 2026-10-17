@@ -61,22 +61,36 @@ def font(size, bold=False):
 # 外形の入れ物
 # ------------------------------------------------------------------
 class Body:
-    def __init__(self):
+    """peak = 頭の頂（断面の高さの中心）を、上から見た輪郭の中心から後ろへずらす量（W）。0 が A1 案 a"""
+
+    def __init__(self, peak=0.0):
         L = json.load(open(os.path.join(OUT, "a1_outline_lines.json"), encoding="utf-8"))
+        self.peak = peak
         self.th = np.radians(np.array(L["dorsal"]["theta_deg"]))
         self.r = np.array(L["dorsal"]["r"]) * 0.5            # W = 1 なので半幅 = 0.5
         self.u = np.array(L["front"]["u"])
         self.v = np.array(L["front"]["v"])
         self.z_front = self.R(0.0)
         self.z_back = -self.R(np.pi)
+        # 輪郭の点を、ずらした中心 (0, −peak) から見た角度と距離に直す
+        px, pz = np.sin(self.th) * self.r, np.cos(self.th) * self.r
+        phi = np.arctan2(px, pz + peak)
+        o = np.argsort(phi)
+        self.phi, self.D = phi[o], np.hypot(px, pz + peak)[o]
+
+    def Dc(self, t):
+        """ずらした中心から、角度 t の向きの輪郭までの距離"""
+        t = np.mod(t + np.pi, 2 * np.pi) - np.pi
+        return np.interp(t, self.phi, self.D, period=2 * np.pi)
 
     def R(self, t):
         t = np.mod(t, 2 * np.pi)
         return np.interp(t, np.append(self.th, 2 * np.pi), np.append(self.r, self.r[0]))
 
     def h(self, x, z):
-        t = np.arctan2(x, z)        # θ = 0 が前（+z）。左右対称なので向きの符号は問わない
-        rho = np.hypot(x, z) / self.R(t)
+        zz = z + self.peak
+        t = np.arctan2(x, zz)       # θ = 0 が前（+z）。左右対称なので向きの符号は問わない
+        rho = np.hypot(x, zz) / self.Dc(t)
         return np.where(rho <= 1, np.interp(rho, self.u[self.u >= 0], self.v[self.u >= 0]), 0.0)
 
     def z_at(self, frac):
@@ -90,9 +104,9 @@ class Body:
         for top in (True, False):
             base = len(verts)
             for t in tt:
-                Rt = self.R(t)
+                Rt = float(self.Dc(np.array([t]))[0])
                 for rho in rr:
-                    x, z = np.sin(t) * rho * Rt, np.cos(t) * rho * Rt
+                    x, z = np.sin(t) * rho * Rt, np.cos(t) * rho * Rt - self.peak
                     y = float(np.interp(rho, self.u[self.u >= 0], self.v[self.u >= 0])) if top else 0.0
                     verts.append((x, y, z))
             for i in range(n_t):
@@ -327,11 +341,8 @@ def render(meshes, view, size=600, extent=0.62, alpha_body=True, fit=False):
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
 
-def main():
-    os.makedirs(WORK, exist_ok=True)
-    body = Body()
-    bv, bf = body.mesh()
-    zc = (body.z_front + body.z_back) / 2
+def build_parts(body):
+    """眼（開口を表面に置き、中心を法線に沿って内へ）・殻・顎板を作る"""
     eye_z = body.z_at(EYE["from_front"])
     eyes = []
     r = EYE["diameter"] / 2
@@ -347,9 +358,17 @@ def main():
         c = np.array([x, y, eye_z]) - nrm * r
         eye_open.append(dict(opening=[round(x, 4), round(y, 4), round(eye_z, 4)], normal=[round(float(t), 3) for t in nrm]))
         eyes.append(ellipsoid(c, (r, r, r)))
-    print("眼の開口（表面）の高さ", [o["opening"][1] for o in eye_open], "写真の測定 0.31〜0.345")
     sv, sf, sinfo = shell_mesh(body)
     beaks = beak_mesh(body)
+    return eyes, eye_open, (sv, sf, sinfo), beaks
+
+
+def main():
+    os.makedirs(WORK, exist_ok=True)
+    body = Body()
+    bv, bf = body.mesh()
+    eyes, eye_open, (sv, sf, sinfo), beaks = build_parts(body)
+    print("眼の開口（表面）の高さ", [o["opening"][1] for o in eye_open], "写真の測定 0.31〜0.345")
 
     report = dict(date="2026-10-17", W_mm=W_MM, axes="+Y 背、+Z 前、+X 体の左。単位 W = 1",
                   body=dict(z_front=body.z_front, z_back=body.z_back, height_max=float(body.v.max())),
