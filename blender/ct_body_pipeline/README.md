@@ -171,3 +171,10 @@
 - 肺: 体腔の背側の、空気で黒い空洞（`cavity_half.npy`）を肺として扱い、内臓に入れない。カメレオンの肺は体腔の背側で、腹側縁と尾側縁から盲嚢が出る（Klaver 1977。*C. calyptratus* は 7 本）。トカゲの肺は肝臓の背側で体腔の背壁に接する（Cassel 2014）
 - 内臓の一塊: 約 757 mm³。胴の前半〜中ほどの腹側に集まる。胴の後ろ半分の腹側は CT の軟部が薄く（`docs/chameleon_ct_body/viscera_xsec.png`）、塊にならなかった
 - 個々の臓器（肝臓・胃・腸）には分けない（計画書の方針）。カメレオンの臓器の位置を書いた文献（Melero et al. 2023）は本文を読めていない
+
+## Mac での回し方（Claude Code、2026-10-17）
+
+- 作業フォルダは `blender/private/work/`（git に入らない）。`blender/private/cowork_work_2026-10-17/` の中身と、`blender/private/` の `chameleon_body_ct.npz`・`ct_ms50726_vol4.npz`・`ct_ms50726_vol4max.npz`・`ribtracks2.npz`・`chameleon_body_ct_v1_ribs.npz` を写し、圧縮して運んだものを `.npy` に戻した（`soft2_mask`・`intruder` はキー `m`、`B_final_labels` はキー `B` で `B.npy`、`W2.0`・`Mc`・`M`・`vertLf`・`cavity_half`・`organs_lung`・`soft_solid_half` はキー `a`）
+- 膜から臓器まで: `cd blender/private/work && bash ../../ct_body_pipeline/run_skin_organs.sh`（約 8 分）。2026-10-17 に今の骨から回し、前の版（Cowork）と比べた: 膜と臓器の面は、面どうしの距離が同じ面を 2 回測ったときの誤差と同じ（膜で平均 0.107 mm、差の点 0%）。違うのは頂点の並びだけ。glb の検査の数は 4 桁目まで同じ（膜の体積 4.1038 → 4.1037）。標本ページを 5 方向で撮った画像の差は最大 6/255
+- 書き出し: `chameleon_body_soft.npz` を `blender/private/` に置いてから、リポジトリ直下で `/Applications/Blender.app/Contents/MacOS/Blender -b -P blender/export_chameleon_gltf.py -- <出力.glb>`（約 1 分）。今の素材からの書き出しは、今の glb とバイト単位で同じだった
+- 標本ページを撮る: `page_check/`（Mac の Chrome と共有の 8080 の配信）。4 方向（横・背中・腹・正面）は `page_check/views.py <URL> <接頭辞>`
