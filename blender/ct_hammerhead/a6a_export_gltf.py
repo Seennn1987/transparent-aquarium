@@ -167,7 +167,7 @@ for part, (names, target) in PARTS.items():
         bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
         bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.0032)
         bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, -0.0016, 0))
-        if fd["side"] > 0: bmesh.ops.reverse_faces(bm, faces=bm.faces[:])   # 腹へ向けた板は面の向きが裏返るので、外向きにそろえる
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])   # 外向きにそろえる（腹へ向けた板は、多角形の回る向きが背の板と逆になる）
         me = bpy.data.meshes.new(f"tmp_plate_{_fin}"); bm.to_mesh(me); bm.free()
         ob_ = bpy.data.objects.new(f"tmp_plate_{_fin}", me); coll.objects.link(ob_); objs.append(ob_)
     if not objs: continue
