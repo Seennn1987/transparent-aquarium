@@ -1,9 +1,10 @@
+import browser
 import asyncio, sys
 from playwright.async_api import async_playwright
 url,pre=sys.argv[1],sys.argv[2]
 async def main():
     async with async_playwright() as p:
-        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium',args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-proxy-server'])
+        b=await browser.launch(p)
         pg=await b.new_page(viewport={'width':800,'height':956}); msgs=[]; pg.on('pageerror',lambda e: msgs.append(str(e)))
         await pg.goto(url); await pg.wait_for_function('document.body.dataset.ready || document.body.dataset.error',timeout=300000)
         await pg.evaluate("(()=>{const L=window.chameleonPage.look; for(const k of ['skin','film','organs','viscera']) if(L[k]) L[k].value=0;})()")

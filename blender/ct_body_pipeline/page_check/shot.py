@@ -1,9 +1,10 @@
+import browser
 import asyncio, sys
 from playwright.async_api import async_playwright
 url, out, wait = sys.argv[1], sys.argv[2], float(sys.argv[3])
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-proxy-server'])
+        b = await browser.launch(p)
         pg = await b.new_page(viewport={'width':800,'height':956})
         msgs=[]; pg.on('console', lambda m: msgs.append(m.text)); pg.on('pageerror', lambda e: msgs.append('ERR '+str(e)))
         await pg.goto(url)

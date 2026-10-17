@@ -1,8 +1,9 @@
+import browser
 import asyncio, sys, json
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
-        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium',args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-proxy-server'])
+        b=await browser.launch(p)
         pg=await b.new_page(viewport={'width':800,'height':956})
         await pg.goto(sys.argv[1]); await pg.wait_for_function('document.body.dataset.ready',timeout=300000)
         r=await pg.evaluate('''()=>{const c=window.chameleonPage; const out={}; const W=c.renderer.domElement.width, H=c.renderer.domElement.height;
