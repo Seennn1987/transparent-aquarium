@@ -1,10 +1,10 @@
 # 展示の姿勢（POSE_JAR）での骨ごとの変形行列（静止 → 展示、モデル座標）と、静止の骨の位置を書き出す
 import runpy, os, sys, numpy as np, bpy
 HERE=os.path.dirname(os.path.abspath(__file__))
-r=runpy.run_path(os.path.join(HERE,'rig_chameleon_ct.py'),run_name='y')
+r=runpy.run_path(os.path.join(HERE,'..','rig_chameleon_ct.py'),run_name='y')   # blender/rig_chameleon_ct.py（2026-10-17: 以前は同じフォルダの写しを読んでいた）
 g=runpy.run_path(r['GEN'],run_name='x')
 coll,rigob,skel,rig=g['build'](); d,_,k=g['load']()
-r['build_pose'](rigob,d,k,r['POSE_JAR']); bpy.context.view_layer.update()
+r['build_pose'](rigob,d,k,r['jar_pose']()); bpy.context.view_layer.update()
 W=rigob.matrix_world; Wi=W.inverted()
 names=[]; M=[]; H=[]; T=[]
 for b in rigob.data.bones:
