@@ -86,6 +86,11 @@
 
 - 引き継ぎ: `docs/カメレオン_ClaudeCode引き継ぎ.md`（Cowork が書く）。経緯の記録は `docs/カメレオン透明標本_計画書_v1.0.md`
 - Claude Code での最初の作業: `docs/標本づくりの元データと手法_振り返り_v1.0.md` の第 9 節の点検（いまの部品を「何を元に作ったか」で見直し、外形を参考と重ねた図を見せる）。直すかどうかはプロデューサーが決める
-- ページ: `水槽/scenes/specimen/chameleon.html`、`src/chameleon-*.js`
-- CT 処理: `blender/ct_body_pipeline/`（README。最初から通しで作り直す確認はまだ）。元データ・中間ファイル・メッシュは `blender/private/`（git に入れない）
-- 権利: CT（MorphoSource 000050726・Digimorph）から作ったものは `blender/private/` と `assets/private/`。商用不可・再配布しない。参考写真は `docs/references/chameleon/`（出典は `SOURCES.md`。透かし入りの写真は git に入れない）
+- ページ: `水槽/scenes/specimen/chameleon.html`（瓶なし、ライトボックス）、`src/chameleon-*.js`、瓶は `src/specimen-chameleon.js`（`index.html?specimen=chameleon`）。`?stain=01`（写真 01 の色。付けなければ写真 06 の色）、`?view=photo06`（写真 06 と同じ向き）、`?still=1`（止める）、`?t=<秒>`（`CH_Hover` のその時刻から）、`?ss=<n>`（通り道の細かさ、既定 2）。glb を書き出し直したら、ブラウザのキャッシュを消して読み直す
+- CT 処理: `blender/ct_body_pipeline/`（README）。最初から通しでは作り直せない（輪になった依存がある。引き継ぎ文書 第 7 節）。今のやり方は、今の `blender/private/chameleon_body_ct.npz` を出発点に、変える段だけを回すこと。元データ・中間ファイル・メッシュは `blender/private/`（git に入れない）
+  - スクリプトはカレントフォルダの相対パスで読み書きするので、作業フォルダ `blender/private/work/` に入って実行する（例: `cd blender/private/work && ../../../.venv/bin/python ../../ct_body_pipeline/skinbody.py`）。中間ファイルの元は `blender/private/cowork_work_2026-10-17/`
+  - 膜から臓器まで: 作業フォルダで `run_skin_organs.sh`。結果の `chameleon_body_soft.npz` を `blender/private/` に置く
+  - glb の書き出し: `/Applications/Blender.app/Contents/MacOS/Blender -b -P blender/export_chameleon_gltf.py -- 水槽/scenes/specimen/assets/private/specimen_chameleon.glb`。骨を変えたら先に `blender/private/chameleon_body_ct_dec.npz` を消す（残っていると古い骨で書き出す）
+  - 標本ページを撮る・測る道具: `blender/ct_body_pipeline/page_check/`
+- 元データ: 全身 CT の zip（MorphoSource 000050726）と頭骨の STL（Digimorph TNHC 62768）は `~/transparent-aquarium/画像サンプル収集/エボシカメレオン/`（リポジトリの外）
+- 権利: CT（MorphoSource 000050726・Digimorph）から作ったものは `blender/private/` と `assets/private/`。商用不可・再配布しない。参考写真は `docs/references/chameleon/`（出典は `SOURCES.md`）。写真 01 など透かし入りの写真は git に入れない。写真 05・06 は CC BY-SA 4.0（Brianwray26、Wikimedia Commons）なので、使った図には出典を書く
