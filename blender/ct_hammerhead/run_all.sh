@@ -112,6 +112,9 @@ step fig a4i_bodywidth_options.py
 #  前の形は HH_TRUNK_PROFILE=ct HH_SHELL_FIT=median HH_SIDE_SMOOTH= HH_FIN_HALF= HH_MESH_TAUBIN=0 HH_MESH_SIGMA=1
 export HH_TRUNK_PROFILE=${HH_TRUNK_PROFILE-ref} HH_SHELL_FIT=${HH_SHELL_FIT-smooth} HH_SIDE_SMOOTH=${HH_SIDE_SMOOTH-40,90} HH_FIN_HALF=${HH_FIN_HALF-3}
 export HH_MESH_TAUBIN=${HH_MESH_TAUBIN-50} HH_MESH_SIGMA=${HH_MESH_SIGMA-1.5}
+# ひれ（2026-10-17 プロデューサー「背びれ 2 つと臀びれを参考の外形にし、胸びれ・腹びれを下へ 15° 回す案で既定にしてください」）: 外形は hh_fins.py。
+#  前の形は HH_FIN_REF= HH_FIN_PLATE= HH_PECT_DOWN=0 HH_PELV_DOWN=0
+export HH_FIN_REF=${HH_FIN_REF-1} HH_FIN_PLATE=${HH_FIN_PLATE-1} HH_PECT_DOWN=${HH_PECT_DOWN-15} HH_PELV_DOWN=${HH_PELV_DOWN-15}
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3
