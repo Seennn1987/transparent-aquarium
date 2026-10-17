@@ -83,6 +83,7 @@
 | 54 | entotrace.py → skull_frame.py → hyoid_rebuild.py（strip_strays.py の後） | `ct_ms50726_vol4max.npz` → `ento_line.npy`、`pose_jar.npz` → `skull_frame_ct.npy`、`chameleon_body_ct.npz` → 同じ | 舌骨の作り直し（2026-10-15、計画書 C の記録 12・13）。骨 = 頭骨のメッシュの中の左右の第 1 角鰓骨だけ。47 で舌骨に入れた胸の 5 本は外す（肋骨の腹側の部分と考える、仮）。軟骨: 舌内突起（CT の薄い殻の管、23.6 mm、半径 0.4 mm）、基舌骨（半径 0.35 mm、仮）、角舌骨（2.0 mm、半径 0.2 mm、向きも仮）。`pose_jar.npz` の hyoid は head と同じ行列（HYOID_EXTRA をやめた） |
 | 55 | skinbody.py（7） | 同上 | 舌骨（骨・軟骨）を頭の膜と頭の像の切り取りに入れる。胸へ伸びる舌骨の点は無くなった |
 | 56 | hyoidcart_mesh.py（eyes_mesh.py の後、pack_soft.py の前）、fit_hyoidcart06.py | `chameleon_body_ct.npz` → `organs_rigged.npz` に hyoid_cartilage | 舌骨の軟骨を臓器にして、色の型ごとの強さを持たせる。写真 06 の喉の水色に合わせて 11.71 / 3.77 / 0.71（仮） |
+| 57 | epiphysis_relabel.py（hyoid_rebuild.py の後） | `chameleon_body_ct.npz` → 同じ、`epiphysis_relabel.json` | 肩・股・肘・膝で、関節の向こうの骨のラベルに入っていた骨端を、成長板で載っている骨へ移す（触れている面の広さで決める）。その後 skinbody.py → organs_cav.py → organs.py → organs_mesh.py → eyes_mesh.py → hyoidcart_mesh.py → pack_soft.py |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |
