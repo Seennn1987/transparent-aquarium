@@ -31,6 +31,19 @@ PARTS = {
     "Skin": (["HH_body", "HH_pectmem_L", "HH_pectmem_R"], 152300),   # 同（160000 / 1540502）
     "PelvicSkin": (["HH_pelvmem_L", "HH_pelvmem_R"], 7700),
 }
+# 2026-10-17 プロデューサー「今、ヒレごとの色の濃さを調整できません。特に背鰭がずっと透明です。」: HH_FIN_PARTS=1 で、ひれごとに軟骨と膜を別の部品にする
+#  （ページの調整の欄で、ひれごとに濃さとにごり度を変えるため）。軟骨: 胸びれ・第 1 背びれ・第 2 背びれ・臀びれ（残りの肩帯・腰帯・尾は Cartilage のまま）。
+#  膜: 胸びれ（PectSkin）と、参考の外形の板（HH_FIN_PLATE=all で背びれ 2 つと臀びれを板にする）。減らす割合は分ける前と同じ（軟骨 0.44、膜 0.099）
+FIN_PARTS = os.environ.get("HH_FIN_PARTS") == "1"
+PLATE_FINS = {"dfin1": "Dorsal1Skin", "dfin2": "Dorsal2Skin", "anal": "AnalSkin"} if os.environ.get("HH_FIN_PLATE") == "all" else ({"dfin1": "Skin"} if os.environ.get("HH_FIN_PLATE") == "1" else {})
+if FIN_PARTS:
+    PARTS["Cartilage"] = (["HH_skel_rest", "HH_girdle"], 0.44)
+    PARTS["PectCartilage"] = (["HH_pect_L", "HH_pect_R"], 0.44)
+    PARTS["Dorsal1Cartilage"] = (["HH_dfin1"], 0.44); PARTS["Dorsal2Cartilage"] = (["HH_dfin2"], 1.0); PARTS["AnalCartilage"] = (["HH_anal"], 1.0)
+    PARTS["Skin"] = (["HH_body"], 0.099)
+    PARTS["PectSkin"] = (["HH_pectmem_L", "HH_pectmem_R"], 0.099)
+for _fin, _part in PLATE_FINS.items():
+    if _part not in PARTS: PARTS[_part] = ([], 1.0)
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)
@@ -138,23 +151,26 @@ for part, (names, target) in PARTS.items():
         # B1 骨組み（2026-10-15）: ひれの膜とひれの軟骨は、まとめる前に出どころの頂点グループを付ける（b1_rig.py が、体の膜ではなくひれだけをひれの骨に付けるため）
         if os.environ.get("HH_RIG") == "1" and n in ("HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R", "HH_pect_L", "HH_pect_R", "HH_pelv_L", "HH_pelv_R", "HH_jaw_lower", "HH_teeth_lower"):   # B5: 下あご・下の歯は口の骨へ
             o.vertex_groups.new(name=f"src_{n}").add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
-    # 2026-10-17 案: HH_FIN_PLATE=1 で、第 1 背びれの膜を参考の外形（hh_fins.py）の板の面にして体の膜に足す。
-    #  背の線（a5_side_fit.json、背骨の中心より上の断面の端）から 4 mm 体の中から立て、厚さ 3.2 mm（ひれの先の膜の厚さとして、体積で作るときの最小と同じ）
-    if part == "Skin" and os.environ.get("HH_FIN_PLATE") == "1":
+    # 2026-10-17 案: HH_FIN_PLATE=1 で、第 1 背びれの膜を参考の外形（hh_fins.py）の板の面にして体の膜に足す（HH_FIN_PLATE=all では背びれ 2 つと臀びれを、それぞれの部品に）。
+    #  背の線・腹の線（a5_side_fit.json）から 4 mm 体の中から立て、厚さ 3.2 mm（ひれの先の膜の厚さとして、体積で作るときの最小と同じ）
+    for _fin, _part in PLATE_FINS.items():
+        if part != _part: continue
         import hh_fins
-        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = hh_fins.FINS["dfin1"]; TLm = hh_fins.TL_MM
+        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = hh_fins.FINS[_fin]; TLm = hh_fins.TL_MM
         Lb = (fd["i"] - fd["o"]) * TLm; Hm = fd["H"] * TLm
         bm = bmesh.new(); vs = []
         for s_, h_ in fd["poly"]:
-            xm = fd["o"] * TLm + s_ * Lb; vtop = _np.interp(xm, _sf["z_mm"], _sf["top_target_mm"])
+            xm = fd["o"] * TLm + s_ * Lb; vline = _np.interp(xm, _sf["z_mm"], _sf["top_target_mm"] if fd["side"] < 0 else _sf["bot_target_mm"])
             hh = h_ * Hm if h_ > 0 else -4.0
-            vs.append(bm.verts.new((xm / 1000, 0.0, -(vtop - hh) / 1000)))
+            vs.append(bm.verts.new((xm / 1000, 0.0, -(vline + fd["side"] * hh) / 1000)))
         f = bm.faces.new(vs); bmesh.ops.triangulate(bm, faces=[f], quad_method="BEAUTY", ngon_method="BEAUTY")
         bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
         bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.0032)
         bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, -0.0016, 0))
-        me = bpy.data.meshes.new("tmp_finplate"); bm.to_mesh(me); bm.free()
-        ob_ = bpy.data.objects.new("tmp_finplate", me); coll.objects.link(ob_); objs.append(ob_)
+        if fd["side"] > 0: bmesh.ops.reverse_faces(bm, faces=bm.faces[:])   # 腹へ向けた板は面の向きが裏返るので、外向きにそろえる
+        me = bpy.data.meshes.new(f"tmp_plate_{_fin}"); bm.to_mesh(me); bm.free()
+        ob_ = bpy.data.objects.new(f"tmp_plate_{_fin}", me); coll.objects.link(ob_); objs.append(ob_)
+    if not objs: continue
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs: o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
@@ -162,6 +178,7 @@ for part, (names, target) in PARTS.items():
     ob = bpy.context.view_layer.objects.active; ob.name = f"HH_{part}"; ob.data.name = f"HH_{part}"
     bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6); bm.to_mesh(ob.data); bm.free()
     n0 = len(ob.data.polygons)
+    if target <= 1: target = int(n0 * target)   # 1 以下は割合（HH_FIN_PARTS の部品）
     if n0 > target:
         m = ob.modifiers.new("dec", "DECIMATE"); m.ratio = target / n0
         bpy.ops.object.modifier_apply(modifier=m.name)

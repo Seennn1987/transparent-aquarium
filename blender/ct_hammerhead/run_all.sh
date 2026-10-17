@@ -119,6 +119,10 @@ export HH_FIN_REF=${HH_FIN_REF-1} HH_FIN_PLATE=${HH_FIN_PLATE-1} HH_PECT_DOWN=${
 # 2026-10-17 決定（プロデューサー「全てのヒレの色のつき方が変です…」→ 直しの範囲の図に「進めて」）: 第 2 背びれ・臀びれの軟骨を参考の膜の付け根へ（先が膜の高さの 0.53）、
 #  尾びれの下の葉の軟骨を膜と同じだけ腹側へ、腹びれの膜を付け根を中心に 1.4 倍。前の形は HH_FIN_CART_REACH= HH_LOBE_CART= HH_PELV_SCALE=1
 export HH_FIN_CART_REACH=${HH_FIN_CART_REACH-0.53} HH_LOBE_CART=${HH_LOBE_CART-1} HH_PELV_SCALE=${HH_PELV_SCALE-1.4}
+# 2026-10-17 プロデューサー「今、ヒレごとの色の濃さを調整できません。特に背鰭がずっと透明です。」: ひれごとに軟骨と膜を別の部品に（ページで濃さ・にごり度を変える）。
+#  背びれ 2 つと臀びれの膜は、体の膜の体積に足さず板の面にする（HH_FIN_PLATE=all）。前の形は HH_FIN_PARTS= HH_FIN_PLATE=1
+export HH_FIN_PARTS=${HH_FIN_PARTS-1}
+[[ $HH_FIN_PARTS == 1 && $HH_FIN_PLATE == 1 ]] && export HH_FIN_PLATE=all
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3

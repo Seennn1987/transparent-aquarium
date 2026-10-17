@@ -25,7 +25,7 @@ def glb_parts(path, parts):
         a = J['accessors'][J['meshes'][nd['mesh']]['primitives'][0]['attributes']['POSITION']]; bv = J['bufferViews'][a['bufferView']]
         o = bv.get('byteOffset', 0) + a.get('byteOffset', 0); out.append(np.frombuffer(BIN[o:o + a['count'] * 12], dtype='<f4').reshape(-1, 3))
     return np.concatenate(out)
-G = glb_parts(hh_paths.GLB, ('Skin', 'PelvicSkin'))            # glTF: x 吻端→尾、y 背、z 左
+G = glb_parts(hh_paths.GLB, ('Skin', 'PelvicSkin', 'PectSkin', 'Dorsal1Skin', 'Dorsal2Skin', 'AnalSkin'))   # 2026-10-17 ひれの膜を部品に分けた（HH_FIN_PARTS）            # glTF: x 吻端→尾、y 背、z 左
 P = np.stack([G[:, 0], -G[:, 2], G[:, 1]], 1)
 x, lat, up = P[:, 0], np.abs(P[:, 1]), P[:, 2]          # Blender: x 吻端→尾、y 左右、z 背
 STEP = 0.01

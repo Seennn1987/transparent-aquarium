@@ -282,7 +282,7 @@ if STAGE=='3':
 if STAGE=='4':
     S=np.load('a5_S.npy',mmap_mode='r+')
     for name in ('dfin1','dfin2','anal'):
-        if name=='dfin1' and _os.environ.get('HH_FIN_PLATE')=='1': continue   # 第 1 背びれは板の面に置き換える（a6a_export_gltf.py）
+        if name=='dfin1' and _os.environ.get('HH_FIN_PLATE') in ('1','all'): continue   # 第 1 背びれは板の面に置き換える（a6a_export_gltf.py）
         d=np.load(f'a5_fin_{name}.npz'); M=d['mask']; lo=d['origin']
         # 背と腹を足した案（HH_TRUNK_PROFILE=ref）: 背びれの膜は背の上がった分だけ上へ、臀びれの膜は腹の下がった分だけ下へ動かす（体軸の断面ごと）
         if _os.path.exists('a5_trunk_width.json') and 'dtop_mm' in json.load(open('a5_trunk_width.json')):
@@ -312,7 +312,7 @@ if STAGE=='4':
     if _os.environ.get('HH_FIN_REF')=='1' and _os.path.exists('a5_side_fit.json'):
         from matplotlib.path import Path as _Path
         _SF=json.load(open('a5_side_fit.json')); TLm=1024.0
-        import hh_fins; FINS={k:v for k,v in hh_fins.FINS.items() if not (k=='dfin1' and _os.environ.get('HH_FIN_PLATE')=='1')}   # 外形は hh_fins.py。第 1 背びれは体積の格子（正中から上へ 150 mm まで）から出るので、HH_FIN_PLATE=1 では a6a_export_gltf.py で板の面にする
+        import hh_fins; FINS={k:v for k,v in hh_fins.FINS.items() if not ((k=='dfin1' and _os.environ.get('HH_FIN_PLATE')=='1') or _os.environ.get('HH_FIN_PLATE')=='all')}   # all: 3 つとも a6a で板の面（別の部品）にする   # 外形は hh_fins.py。第 1 背びれは体積の格子（正中から上へ 150 mm まで）から出るので、HH_FIN_PLATE=1 では a6a_export_gltf.py で板の面にする
         uu=U0+np.arange(NU)*VX; added=0
         for name,fd in FINS.items():
             pth=_Path(fd['poly']+[(0,0)]); Lb=(fd['i']-fd['o'])*TLm; Hm=fd['H']*TLm; smax=max(p_[0] for p_ in fd['poly'])
