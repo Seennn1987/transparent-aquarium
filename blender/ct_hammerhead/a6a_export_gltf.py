@@ -47,7 +47,7 @@ if os.path.exists(f"{MESH}/HH_vert_arches.ply"):
         PARTS["Arch"] = (["HH_vert_arches"], 20000)
     else:
         PARTS["Cartilage"] = (PARTS["Cartilage"][0] + ["HH_vert_arches"], 130000)
-# 2026-10-16 案: 肋骨と尾びれの鰭条（a8c_vertebrae.py の HH_VERT_RIBS・HH_VERT_RADIALS。CT に無く文献から作るので、名前に「推定」）
+# 2026-10-16 案: 肋骨と尾びれの鰭条（a8c_vertebrae.py の HH_VERT_RIBS・HH_VERT_RADIALS。CT に無く、文献と骨格標本の写真から作る）
 for _p, _f, _n in (("Rib", "HH_vert_ribs", 8000), ("CaudalRay", "HH_vert_radials", 12000)):
     if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000),   # 案 2（a8b_viscera_organs.py）
@@ -103,7 +103,6 @@ for part, (names, target) in PARTS.items():
     bpy.context.view_layer.objects.active = objs[0]
     if len(objs) > 1: bpy.ops.object.join()
     ob = bpy.context.view_layer.objects.active; ob.name = f"HH_{part}"; ob.data.name = f"HH_{part}"
-    if part.startswith("Heart") or part in ("Rib", "CaudalRay"): ob.name = f"HH_{part}_推定"   # CT に無く、図から作った部品（CLAUDE.md）
     bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6); bm.to_mesh(ob.data); bm.free()
     n0 = len(ob.data.polygons)
     if n0 > target:

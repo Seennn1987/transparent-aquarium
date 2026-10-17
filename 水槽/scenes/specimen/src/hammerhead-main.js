@@ -125,7 +125,7 @@ async function start() {
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
       ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
-    ], "胴: 案 2 は、幅を FMIB の図・高さを Raver の図（どちらもパブリックドメイン）に合わせ、断面をなめらかな曲線にし、横から見た背と腹の線をならした形。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条（推定）を足す");
+    ], "胴: 案 2 は、幅を FMIB の図・高さを Raver の図（どちらもパブリックドメイン）に合わせ、断面をなめらかな曲線にし、横から見た背と腹の線をならした形。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条を足す");
   }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
@@ -156,13 +156,13 @@ function turnBendPicker() {
     ["向き", [["右へ旋回", 1], ["左へ旋回", -1], ["まっすぐ", 0]], () => swimLook.turn, (v) => { swimLook.turn = v; }],
   ], "1 = 体が通り道の円（半径は体長の 37%）に沿う（推定）。旋回では内側の胸びれを引く");
 }
-// ?pick=organs: 心臓（推定）の案と拍動の回数、エラの動きの案を、動かしたまま切り替える（B5）。心臓の案は ?glb=specimen_hammerhead_heart
+// ?pick=organs: 心臓（BIODIDAC の図から作った部品）の案と拍動の回数、エラの動きの案を、動かしたまま切り替える（B5）。心臓の案は ?glb=specimen_hammerhead_heart
 function organPicker() {
   pickerPanel([
     ["心臓", [["実物に近い大きさ", "large"], ["小さく骨に当てない", "small"], ["なし", "none"]], () => heartLook.show, (v) => { heartLook.show = v; }],
     ["拍動", [["毎分 37", 37], ["毎分 52", 52], ["止める", 0]], () => heartLook.bpm, (v) => { heartLook.bpm = v; }],
     ["エラ", [["止める（出典どおり）", 0], ["口と同じ 1.25 Hz", 1.25], ["毎分 36", 0.6]], () => gillLook.hz, (v) => { gillLook.hz = v; }],
-  ], "心臓は形を BIODIDAC の Squalus の図から、置き場所を骨格から決めた推定の部品。拍動は近い種の安静時（ドチザメ類 37、レモンザメ 52 回/分）。泳いでいる間エラは開いたまま、が出典で、動かすのは創作");
+  ], "心臓は形を BIODIDAC の Squalus の図から、置き場所を骨格から決めた部品。拍動は近い種の安静時（ドチザメ類 37、レモンザメ 52 回/分）。泳いでいる間エラは開いたまま、が出典で、動かすのは創作");
 }
 // ?pick=mouth: 口の休みの開き・開け閉めの振れと回数の案を、動かしたまま切り替える（B5）
 function mouthPicker() {

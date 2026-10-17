@@ -118,7 +118,7 @@ for i in range(len(mid)):
         if side < 0: F = F[:, ::-1]
         add('a', P, F)
 
-# 2026-10-16 案: 肋骨と尾びれの鰭条（どちらも CT に写らず、文献と骨格標本の写真から作る。部品名に「推定」を付ける: a6a_export_gltf.py の Rib・CaudalRay）
+# 2026-10-16 案: 肋骨と尾びれの鰭条（どちらも CT に写らず、文献と骨格標本の写真から作る。a6a_export_gltf.py の部品 Rib・CaudalRay）
 #  板の棒（断面は横 0.9 mm × 前後 0.6 × 椎骨の長さ、先へ細る）を、椎体の表面から外へ置く
 def rod(key, p0, p1, wa, wb, side_v, fore_v):
     """p0 → p1 の細る棒。wa・wb: 根元・先の半幅（side_v 方向、mm）。前後の半幅は fore_v の長さ"""
