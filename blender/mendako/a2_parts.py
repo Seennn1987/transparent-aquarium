@@ -51,6 +51,7 @@ G_LEFT = [(1480, 630), (1450, 670), (1420, 720), (1390, 765), (1330, 790), (1265
 G_RIGHT = [(1720, 625), (1780, 660), (1810, 700), (1840, 740), (1880, 765), (1940, 785), (1985, 805)]
 G_CX, G_SADDLE_Y, G_SPAN = 1625, 590, 720
 BEAK = dict(length=0.065)
+PEAK = 0.198   # 頭の頂を後ろへずらす量（W）。2026-10-17 プロデューサー決定「横の線は C」。頂は前の端から 0.69、眼の開口 0.33
 
 
 def font(size, bold=False):
@@ -63,7 +64,9 @@ def font(size, bold=False):
 class Body:
     """peak = 頭の頂（断面の高さの中心）を、上から見た輪郭の中心から後ろへずらす量（W）。0 が A1 案 a"""
 
-    def __init__(self, peak=0.0):
+    def __init__(self, peak=None):
+        if peak is None:
+            peak = PEAK
         L = json.load(open(os.path.join(OUT, "a1_outline_lines.json"), encoding="utf-8"))
         self.peak = peak
         self.th = np.radians(np.array(L["dorsal"]["theta_deg"]))

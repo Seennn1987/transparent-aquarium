@@ -6,40 +6,40 @@
   "z_front": 0.46205,
   "z_back": -0.4981,
   "height_max": 0.4188,
-  "signed_volume": 0.11116527859465934
+  "signed_volume": 0.11115567958736179
  },
  "parts": {
   "eye_left": {
    "center": [
-    0.13,
-    0.3327,
-    0.0499
+    0.1416,
+    0.3012,
+    0.0077
    ],
    "size": [
     0.12,
     0.12,
     0.12
    ],
-   "top_gap_min": -0.0028,
-   "top_gap_min_mm": -0.4,
-   "above_oral_min": 0.2727,
-   "signed_volume": 0.0008983378302496567
+   "top_gap_min": -0.0063,
+   "top_gap_min_mm": -0.9,
+   "above_oral_min": 0.2412,
+   "signed_volume": 0.0008983378302496537
   },
   "eye_right": {
    "center": [
-    -0.13,
-    0.3327,
-    0.0499
+    -0.1416,
+    0.3012,
+    0.0077
    ],
    "size": [
     0.12,
     0.12,
     0.12
    ],
-   "top_gap_min": -0.0028,
-   "top_gap_min_mm": -0.4,
-   "above_oral_min": 0.2727,
-   "signed_volume": 0.0008983378302496557
+   "top_gap_min": -0.0063,
+   "top_gap_min_mm": -0.9,
+   "above_oral_min": 0.2412,
+   "signed_volume": 0.0008983378302496553
   },
   "shell": {
    "center": [
@@ -52,8 +52,8 @@
     0.0825,
     0.019
    ],
-   "top_gap_min": 0.0567,
-   "top_gap_min_mm": 7.8,
+   "top_gap_min": 0.0379,
+   "top_gap_min_mm": 5.2,
    "above_oral_min": 0.2756,
    "signed_volume": 1.7314976931666996e-05
   },
@@ -68,8 +68,8 @@
     0.0459,
     0.065
    ],
-   "top_gap_min": 0.3625,
-   "top_gap_min_mm": 50.0,
+   "top_gap_min": 0.3338,
+   "top_gap_min_mm": 46.1,
    "above_oral_min": 0.01,
    "signed_volume": 3.1761511921699675e-05
   },
@@ -84,8 +84,8 @@
     0.0752,
     0.0641
    ],
-   "top_gap_min": 0.3184,
-   "top_gap_min_mm": 43.9,
+   "top_gap_min": 0.2958,
+   "top_gap_min_mm": 40.8,
    "above_oral_min": 0.022,
    "signed_volume": 0.00010423274359153969
   }
@@ -103,25 +103,25 @@
   {
    "opening": [
     0.155,
-    0.3865,
+    0.3297,
     0.0588
    ],
    "normal": [
-    0.416,
-    0.897,
-    0.148
+    0.223,
+    0.474,
+    0.852
    ]
   },
   {
    "opening": [
     -0.155,
-    0.3865,
+    0.3297,
     0.0588
    ],
    "normal": [
-    -0.416,
-    0.897,
-    0.148
+    -0.223,
+    0.474,
+    0.852
    ]
   }
  ]
