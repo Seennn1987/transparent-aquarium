@@ -282,6 +282,7 @@ if STAGE=='3':
 if STAGE=='4':
     S=np.load('a5_S.npy',mmap_mode='r+')
     for name in ('dfin1','dfin2','anal'):
+        if name=='dfin1' and _os.environ.get('HH_FIN_PLATE')=='1': continue   # 第 1 背びれは板の面に置き換える（a6a_export_gltf.py）
         d=np.load(f'a5_fin_{name}.npz'); M=d['mask']; lo=d['origin']
         # 背と腹を足した案（HH_TRUNK_PROFILE=ref）: 背びれの膜は背の上がった分だけ上へ、臀びれの膜は腹の下がった分だけ下へ動かす（体軸の断面ごと）
         if _os.path.exists('a5_trunk_width.json') and 'dtop_mm' in json.load(open('a5_trunk_width.json')):
@@ -300,6 +301,33 @@ if STAGE=='4':
         sub=np.asarray(S[lo2[0]:hi2[0],lo2[1]:hi2[1],lo2[2]:hi2[2]])
         sub|=M[lo2[0]-lo[0]:hi2[0]-lo[0],lo2[1]-lo[1]:hi2[1]-lo[1],lo2[2]-lo[2]:hi2[2]-lo[2]]
         S[lo2[0]:hi2[0],lo2[1]:hi2[1],lo2[2]:hi2[2]]=sub
+    # 2026-10-17 案（プロデューサー「第 1 背びれ・第 2 背びれ・胸びれ・腹びれ・臀びれの 5 つとも、直し案を作ってブラウザで並べて見せてください」）:
+    #  HH_FIN_REF=1 で、背びれ 2 つと臀びれの膜を、横からの参考の図 2 枚（Duane Raver、FMIB 45527、パブリックドメイン）の外形の大きさで足す。
+    #  CT の膜はひれの根元しか写っていなかった（横から見て体の線から出る高さ: 第 1 背びれ 0.070・第 2 背びれ 0.006・臀びれ 0.006、参考 0.119〜0.129・0.018〜0.023・0.029〜0.034、全長比）。
+    #  外形は、付け根（前の端 o〜後ろの端 i、全長比）で割った s と、高さ H（全長比）で割った値の多角形。付け根の位置は CT のひれの軟骨と参考の図から:
+    #   第 1 背びれ: o 0.261・i 0.380（CT の軟骨）、H 0.124（参考の平均）。鎌形（前の縁は丸く立ち上がり、頂点は後ろ寄り、後ろの縁は切れ込み、細い後端が 1.33 まで）
+    #   第 2 背びれ: o 0.605・i 0.645（参考の起点、CT の軟骨の後ろの端）、H 0.020。低く、後端が長い（1.8 まで。参考 2 枚とも 0.67〜0.68 まで伸びる）
+    #   臀びれ: o 0.595・i 0.635、H 0.031。後ろの縁は深く切れ込む（ICCAT・FAO の記述）
+    #  膜は正中の板（半分の厚さ 3 mm から先へ 1.6 mm まで細る。1.1 mm では面を作るときのぼかしで先が削れ、第 1 背びれが 0.104 にしかならなかった）で、横から見た背と腹の線（a5_side_fit.json）から 4 mm 体の中から立てる
+    if _os.environ.get('HH_FIN_REF')=='1' and _os.path.exists('a5_side_fit.json'):
+        from matplotlib.path import Path as _Path
+        _SF=json.load(open('a5_side_fit.json')); TLm=1024.0
+        import hh_fins; FINS={k:v for k,v in hh_fins.FINS.items() if not (k=='dfin1' and _os.environ.get('HH_FIN_PLATE')=='1')}   # 外形は hh_fins.py。第 1 背びれは体積の格子（正中から上へ 150 mm まで）から出るので、HH_FIN_PLATE=1 では a6a_export_gltf.py で板の面にする
+        uu=U0+np.arange(NU)*VX; added=0
+        for name,fd in FINS.items():
+            pth=_Path(fd['poly']+[(0,0)]); Lb=(fd['i']-fd['o'])*TLm; Hm=fd['H']*TLm; smax=max(p_[0] for p_ in fd['poly'])
+            hs=np.arange(-4.0,Hm+0.5,0.35)
+            for k in range(int(fd['o']*TLm/VX),int((fd['o']*TLm+smax*Lb)/VX)+2):
+                z=k*VX; sv=(z-fd['o']*TLm)/Lb
+                line=np.interp(z,_SF['z_mm'],_SF['top_target_mm'] if fd['side']<0 else _SF['bot_target_mm'])
+                inside=pth.contains_points(np.c_[np.full(len(hs),sv),np.maximum(hs,0)/Hm])|((hs<=0)&(sv>=0)&(sv<=1))
+                if not inside.any(): continue
+                sl=np.asarray(S[k]).copy()
+                for h in hs[inside]:
+                    t=max(1.6,3.0*(1-0.6*max(h,0)/Hm)); iv=int(round((line+fd['side']*h-V0)/VX))
+                    if 0<=iv<NV: sl[iv,np.abs(uu)<=t]=True
+                S[k]=sl; added+=1
+            print('fin ref',name,'slices',added)
     for k in range(NZ): S[k]=ndi.binary_fill_holes(S[k])
     S.flush()
     out=0; tot=0

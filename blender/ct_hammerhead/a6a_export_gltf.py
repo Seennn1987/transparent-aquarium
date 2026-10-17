@@ -12,7 +12,7 @@
   Viscera   内臓（a8a_viscera.py、CT の体腔から取り出した。2026-10-15）
 CT（Kamminga et al. 2017、figshare、CC0）から作ったので、glb はリポジトリに入れてよい。
 """
-import bpy, bmesh, os
+import bpy, bmesh, os, math
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.environ.get("HH_SCRIPTS", "/Users/shoui/transparent-aquarium/transparent-aquarium/blender/ct_hammerhead"))
 import hh_paths
@@ -77,7 +77,7 @@ def _body_warp(o, n):
             co[:, 2] += (_np.interp(bx, _TW["z_mm"], _TW["dtop_mm"]) if n != "HH_anal" else -_np.interp(bx, _TW["z_mm"], _TW["dbot_mm"])) / 1000
         co[:, 0] = hh_warp.warp_mm(co[:, 0] * 1000) / 1000
         me.vertices.foreach_set("co", co.ravel()); me.update(); return
-    if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID): return
+    if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID) and not (n in _RIGID and (os.environ.get("HH_PECT_DOWN") or os.environ.get("HH_PELV_DOWN"))): return
     me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
     x = co[:, 0] * 1000
     if n in _RIGID:
@@ -86,6 +86,13 @@ def _body_warp(o, n):
         if _TW is not None:
             dy = (_np.interp(bx, _TW["z_mm"], _TW["width_new_mm"]) - _np.interp(bx, _TW["z_mm"], _TW["width_old_mm"])) / 2 / 1000
             co[:, 1] += _np.sign(co[:, 1].mean()) * dy
+        # 2026-10-17 案: 胸びれ・腹びれを付け根のまわりに下へ回す（HH_PECT_DOWN・HH_PELV_DOWN、度。2026-10-14 に決めた姿勢に足す角）。
+        #  体軸（Blender x）のまわりに、付け根（体の中心にいちばん近い頂点のまとまり）を中心に回す。右（+y）のひれは −、左は + の向き（先が下へ）
+        _deg = float(os.environ.get("HH_PECT_DOWN" if "pect" in n else "HH_PELV_DOWN", 0) or 0)
+        if _deg:
+            _near = ay < ay.min() + 0.010; c0 = co[_near].mean(0); th = math.radians(_deg) * (-1 if co[:, 1].mean() > 0 else 1)
+            yy, zz = co[:, 1] - c0[1], co[:, 2] - c0[2]
+            co[:, 1] = c0[1] + yy * math.cos(th) - zz * math.sin(th); co[:, 2] = c0[2] + yy * math.sin(th) + zz * math.cos(th)
     else:
         co[:, 0] = hh_warp.warp_mm(x) / 1000
     me.vertices.foreach_set("co", co.ravel()); me.update()
@@ -98,6 +105,23 @@ for part, (names, target) in PARTS.items():
         # B1 骨組み（2026-10-15）: ひれの膜とひれの軟骨は、まとめる前に出どころの頂点グループを付ける（b1_rig.py が、体の膜ではなくひれだけをひれの骨に付けるため）
         if os.environ.get("HH_RIG") == "1" and n in ("HH_pectmem_L", "HH_pectmem_R", "HH_pelvmem_L", "HH_pelvmem_R", "HH_pect_L", "HH_pect_R", "HH_pelv_L", "HH_pelv_R", "HH_jaw_lower", "HH_teeth_lower"):   # B5: 下あご・下の歯は口の骨へ
             o.vertex_groups.new(name=f"src_{n}").add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
+    # 2026-10-17 案: HH_FIN_PLATE=1 で、第 1 背びれの膜を参考の外形（hh_fins.py）の板の面にして体の膜に足す。
+    #  背の線（a5_side_fit.json、背骨の中心より上の断面の端）から 4 mm 体の中から立て、厚さ 3.2 mm（ひれの先の膜の厚さとして、体積で作るときの最小と同じ）
+    if part == "Skin" and os.environ.get("HH_FIN_PLATE") == "1":
+        import hh_fins
+        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = hh_fins.FINS["dfin1"]; TLm = hh_fins.TL_MM
+        Lb = (fd["i"] - fd["o"]) * TLm; Hm = fd["H"] * TLm
+        bm = bmesh.new(); vs = []
+        for s_, h_ in fd["poly"]:
+            xm = fd["o"] * TLm + s_ * Lb; vtop = _np.interp(xm, _sf["z_mm"], _sf["top_target_mm"])
+            hh = h_ * Hm if h_ > 0 else -4.0
+            vs.append(bm.verts.new((xm / 1000, 0.0, -(vtop - hh) / 1000)))
+        f = bm.faces.new(vs); bmesh.ops.triangulate(bm, faces=[f], quad_method="BEAUTY", ngon_method="BEAUTY")
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
+        bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.0032)
+        bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, -0.0016, 0))
+        me = bpy.data.meshes.new("tmp_finplate"); bm.to_mesh(me); bm.free()
+        ob_ = bpy.data.objects.new("tmp_finplate", me); coll.objects.link(ob_); objs.append(ob_)
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs: o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
