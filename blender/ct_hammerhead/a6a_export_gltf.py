@@ -51,7 +51,7 @@ if os.path.exists(f"{MESH}/HH_vert_arches.ply"):
 for _p, _f, _n in (("Rib", "HH_vert_ribs", 8000), ("CaudalRay", "HH_vert_radials", 12000)):
     if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000),   # 案 2（a8b_viscera_organs.py）
-                   # B5 心臓（推定、b5b_heart.py）。HeartLarge・HeartSmall は見比べの案（試しの glb だけ）
+                   # B5 心臓（b5b_heart.py）。HeartLarge・HeartSmall は見比べの案（試しの glb だけ）
                    ("Heart", "HH_heart", 20000), ("HeartLarge", "HH_heart_large", 20000), ("HeartSmall", "HH_heart_small", 20000)):
     if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 sc = hh_paths.blender_scene("HH_EXPORT")
@@ -75,8 +75,38 @@ def _body_warp(o, n):
         bx = co[:, 0] * 1000   # 膜（a5a_shell.py の段 4）と同じく、体軸の位置ごとに動かす
         if _TW is not None and "dtop_mm" in _TW:
             co[:, 2] += (_np.interp(bx, _TW["z_mm"], _TW["dtop_mm"]) if n != "HH_anal" else -_np.interp(bx, _TW["z_mm"], _TW["dbot_mm"])) / 1000
+        # 2026-10-17 直し（プロデューサー「全てのヒレの色のつき方が変です。サイズを調整した時に色付けする箇所の修正を忘れたのではないでしょうか？」→ 図で示した直しの範囲に「進めて」）:
+        #  HH_FIN_CART_REACH（例 0.53）で、第 2 背びれ・臀びれの軟骨を、参考の外形の膜（hh_fins.py）の付け根の線に合わせて背腹へ動かす。
+        #  軟骨の先（体から最も離れた所）が、膜の高さ H のその割合に来るようにする。0.53 は第 1 背びれの CT: 軟骨の先が背の線から 63 mm、膜の高さ 119 mm。
+        #  前は CT の体の線からの位置のままで、参考の膜の付け根の線（a5_side_fit.json）とずれ、臀びれの軟骨は膜の 2 割までしか届かず体の中に入っていた
+        _reach = os.environ.get("HH_FIN_CART_REACH")
+        if _reach and n in ("HH_dfin2", "HH_anal") and os.environ.get("HH_FIN_REF") == "1":
+            import hh_fins
+            fd = hh_fins.FINS["dfin2" if n == "HH_dfin2" else "anal"]; TLm = hh_fins.TL_MM
+            _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
+            xm = (fd["o"] + fd["i"]) / 2 * TLm
+            line_z = -_np.interp(xm, _sf["z_mm"], _sf["top_target_mm"] if fd["side"] < 0 else _sf["bot_target_mm"]) / 1000   # Blender の z = −v
+            tip = co[:, 2].max() if fd["side"] < 0 else co[:, 2].min()
+            want = line_z - fd["side"] * float(_reach) * fd["H"] * TLm / 1000
+            co[:, 2] += want - tip
+            report[f"fin_cart_shift_{n}_mm"] = round(float(want - tip) * 1000, 1)
         co[:, 0] = hh_warp.warp_mm(co[:, 0] * 1000) / 1000
         me.vertices.foreach_set("co", co.ravel()); me.update(); return
+    # 同じ直し: HH_LOBE_CART=1 で、尾びれの下の葉の軟骨（HH_skel_rest の、背骨の中心より腹側で 690〜860 mm）を、
+    #  膜（a5a_shell.py の HH_TRUNK_LOBE。腹の側を中心から伸ばす）と同じ割合で腹側へ伸ばす。割合 = いまの腹の線までの距離 ÷（それ − 腹の伸び dbot）。
+    #  背骨の中心は椎体の面（HH_vert_centra）の 5 mm ごとの平均
+    if n == "HH_skel_rest" and os.environ.get("HH_LOBE_CART") == "1" and _TW is not None and "dbot_mm" in _TW:
+        me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
+        bpy.ops.wm.ply_import(filepath=f"{MESH}/HH_vert_centra.ply"); _c = bpy.context.selected_objects[0]
+        cc = _np.array([v.co[:] for v in _c.data.vertices]) * 1000; _cm = _c.data; bpy.data.objects.remove(_c, do_unlink=True); bpy.data.meshes.remove(_cm)
+        bins = _np.arange(680, 875, 5.0); vcz = _np.array([cc[_np.abs(cc[:, 0] - b) < 4, 2].mean() for b in bins])
+        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
+        x = co[:, 0] * 1000; z = co[:, 2] * 1000; sel = (x > 690) & (x < 860)
+        vc = _np.interp(x, bins, vcz); belly = -_np.interp(x, _sf["z_mm"], _sf["bot_target_mm"]); B1 = vc - belly
+        dbot = _np.interp(x, _TW["z_mm"], _TW["dbot_mm"]); k = B1 / _np.maximum(B1 - dbot, 1.0)
+        m = sel & (z < vc); z[m] = vc[m] - (vc[m] - z[m]) * k[m]
+        report["lobe_cart_k_max"] = round(float(k[sel].max()), 3)
+        co[:, 2] = z / 1000; me.vertices.foreach_set("co", co.ravel()); me.update()
     if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID) and not (n in _RIGID and (os.environ.get("HH_PECT_DOWN") or os.environ.get("HH_PELV_DOWN"))): return
     me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
     x = co[:, 0] * 1000
