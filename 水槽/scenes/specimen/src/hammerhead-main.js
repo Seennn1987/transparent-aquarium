@@ -121,7 +121,7 @@ async function start() {
     pickerPanel([
       // 2026-10-16 参考の図（FMIB の幅・Raver の高さ）に合わせた案を足した。前の「幅を写真に」の 3 案は、幅が高さを超えて文献と逆の形なので外した（glb は試しのページに残る）
       // 2026-10-16 胴の形は案 2 に決定（プロデューサー「胴の形は案 2 に決めて、既定にしてください」）。前の形の glb は試しのページに specimen_hammerhead_prev として残す
-      ["案", [["胴: 案 2（決定）", "specimen_hammerhead"], ["胴: 前の形", "specimen_hammerhead_prev"], ["尾の骨を足す（前の胴の形で作った案）", "specimen_hammerhead_t1"]], () => GLB_NAME,
+      ["案", [["胴: 案 2（決定）", "specimen_hammerhead"], ["胴: 前の形", "specimen_hammerhead_prev"], ["尾の骨を足す（胴は案 2）", "specimen_hammerhead_t2"]], () => GLB_NAME,
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
       ["弓の色", [["いま（骨 0.3・軟骨 0.08）", "0.3,0.08"], ["ひれの軟骨と同じ青", "0,1"], ["その半分", "0,0.5"]], () => arch,
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0.3,0.08") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
