@@ -100,12 +100,15 @@ def _body_warp(o, n):
         bpy.ops.wm.ply_import(filepath=f"{MESH}/HH_vert_centra.ply"); _c = bpy.context.selected_objects[0]
         cc = _np.array([v.co[:] for v in _c.data.vertices]) * 1000; _cm = _c.data; bpy.data.objects.remove(_c, do_unlink=True); bpy.data.meshes.remove(_cm)
         bins = _np.arange(680, 875, 5.0); vcz = _np.array([cc[_np.abs(cc[:, 0] - b) < 4, 2].mean() for b in bins])
-        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
+        # 腹の線は体の膜（HH_body）の 5 mm ごとのいちばん下（a5_side_fit.json の腹の線は 720 mm より後ろを測っていない）
+        bpy.ops.wm.ply_import(filepath=f"{MESH}/HH_body.ply"); _b = bpy.context.selected_objects[0]
+        bb = _np.empty(len(_b.data.vertices) * 3); _b.data.vertices.foreach_get("co", bb); bb = bb.reshape(-1, 3) * 1000; _bm = _b.data; bpy.data.objects.remove(_b, do_unlink=True); bpy.data.meshes.remove(_bm)
+        bb = bb[_np.abs(bb[:, 1]) < 3]; bel = _np.array([bb[_np.abs(bb[:, 0] - b) < 2.5, 2].min() for b in bins])
         x = co[:, 0] * 1000; z = co[:, 2] * 1000; sel = (x > 690) & (x < 860)
-        vc = _np.interp(x, bins, vcz); belly = -_np.interp(x, _sf["z_mm"], _sf["bot_target_mm"]); B1 = vc - belly
+        vc = _np.interp(x, bins, vcz); belly = _np.interp(x, bins, bel); B1 = vc - belly
         dbot = _np.interp(x, _TW["z_mm"], _TW["dbot_mm"]); k = B1 / _np.maximum(B1 - dbot, 1.0)
         m = sel & (z < vc); z[m] = vc[m] - (vc[m] - z[m]) * k[m]
-        report["lobe_cart_k_max"] = round(float(k[sel].max()), 3)
+        report["lobe_cart_k_max"] = round(float(k[sel].max()), 3); report["lobe_cart_k_at"] = [[int(b), round(float(_np.interp(b, x[sel], k[sel]) if sel.any() else 1), 2)] for b in (720, 750, 765, 780, 810)]
         co[:, 2] = z / 1000; me.vertices.foreach_set("co", co.ravel()); me.update()
     if hh_warp.SHRINK == 1.0 and (_TW is None or n not in _RIGID) and not (n in _RIGID and (os.environ.get("HH_PECT_DOWN") or os.environ.get("HH_PELV_DOWN"))): return
     me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
