@@ -14,6 +14,9 @@ k = float(np.load('pose_jar.npz')['k'])
 z = np.load(skin); v = z['v'].astype(float) / k; f = z['f']        # mm
 v = np.stack([v[:, 0], v[:, 2], -v[:, 1]], 1)                       # ページの glb と同じ向き（背 −X、頭 −Y、左 +Z）
 n = len(v)
+# skinbody.py の膜は面が内向き（符号つき体積が負）。外向きにそろえる（2026-10-17。そろえずに描いた最初の絵は向こう側の壁を描いていた）
+_a, _b, _c = v[f[:, 0]], v[f[:, 1]], v[f[:, 2]]
+if np.einsum('ij,ij->i', _a, np.cross(_b, _c)).sum() < 0: f = f[:, ::-1]
 e = np.r_[f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]
 A = sparse.coo_matrix((np.ones(len(e) * 2), (np.r_[e[:, 0], e[:, 1]], np.r_[e[:, 1], e[:, 0]])), (n, n)).tocsr()
 A.data[:] = 1; deg = np.asarray(A.sum(1)).ravel(); W = sparse.diags(1 / deg) @ A
