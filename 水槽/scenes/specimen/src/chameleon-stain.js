@@ -50,7 +50,9 @@ export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // against 0.592 here), so 0.592 × 0.630 / 0.900 = 0.414 (ct_body_pipeline/fit_skin06.py on both glbs).
 // Again after the limbs were set to the literature's stance and the rib heads put into the vertebrae (C records 23–24,
 // 2026-10-17), always against the glb before C record 21: 0.918 against 0.630, so 0.592 × 0.630 / 0.918 = 0.406.
-export const SKIN_GAIN = 0.406;
+// After the hyoid was made 1.2 times instead of 1.45 and the eyes fill the orbits (C record 26): 0.796, so
+// 0.592 × 0.630 / 0.796 = 0.469.
+export const SKIN_GAIN = 0.469;
 
 // The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
 // only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,
@@ -66,7 +68,8 @@ export const VISCERA_GAIN = 4.8;
 /** The hyoid cartilage's absorbance per model unit (photo 06's throat, fitted; see "06" below). */
 // After the head was made 1.45 times (C record 21, 2026-10-17) the median hyoid path there went 0.0344 → 0.0485 on the
 // Mac's screen, so × 0.709 (was 11.98 / 4.11 / 1.65). After C records 23–24: 0.0344 → 0.0480, × 0.717.
-export const HYOID_CARTILAGE = [8.59, 2.95, 1.18];
+// After C record 26 (the hyoid 1.2 times): 0.0344 → 0.0421, × 0.817.
+export const HYOID_CARTILAGE = [9.79, 3.36, 1.35];
 
 export const STAINS = {
   "06": {
@@ -127,20 +130,23 @@ export const STAINS = {
   // And after the limbs were set to the literature's stance and the rib heads put into the vertebrae (C records 23–24,
   // 2026-10-17). The glb after gives film 0.1147 / 0.0781 / 0.0449, skin 0 / 0.0326 / 0.0819, bone 14.8 / 30.3 / 24.2 on the
   // Mac's screen; the 10-15 values times after / before (the glb before C record 21, as above), channel by channel:
-  //   film 0.1172 / 0.0825 / 0.0462, skin 0 / 0.0273 / 0.0800, bone 14.72 / 30.22 / 24.13 (used below)
+  //   film 0.1172 / 0.0825 / 0.0462, skin 0 / 0.0273 / 0.0800, bone 14.72 / 30.22 / 24.13
+  // And after the hyoid was made 1.2 times and the eyes fill the orbits (C record 26, 2026-10-17): the glb after gives
+  // film 0.1141 / 0.0790 / 0.0456, skin 0 / 0.0296 / 0.0807, bone 14.7 / 30.2 / 24.1; times after / before as above:
+  //   film 0.1166 / 0.0835 / 0.0469, skin 0 / 0.0249 / 0.0789, bone 14.62 / 30.15 / 24.08 (used below)
   // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
   // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.487, 1, 0.798], gain: 30.22 },
+    bone: { spectrum: [0.485, 1, 0.799], gain: 30.15 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.342, 1], gain: 0.0800 },
+    skin: { spectrum: [0, 0.316, 1], gain: 0.0789 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.704, 0.394], gain: 0.1172 },
+    film: { spectrum: [1, 0.716, 0.402], gain: 0.1166 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -171,19 +177,22 @@ export const STAINS = {
     // eye path 0.1706 → 0.2494 (× 0.684). The skin around them is not refitted for this (provisional).
     // After C records 23–24 (limbs, rib heads), against the same glb before: liver 0.2928 → 0.3075 (× 0.952), gut
     // 0.1580 → 0.1958 (× 0.807), eye 0.1706 → 0.2506 (× 0.681).
+    // After C record 26: liver 0.2928 → 0.3082 (× 0.950), gut 0.1580 → 0.1962 (× 0.805). The eyes now fill the orbits
+    // (eyes_orbit.py, radius 5.02 mm) and are made half as dark as photo 01's ring (the producer's choice, C record 26:
+    // "眼窩を埋めて淡く"): eye path 0.1706 → 0.2937, so 4.08 / 4.63 / 5.64 × 0.581 × 0.5.
     // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
     // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.0273 / 0.0800) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.0249 / 0.0789) once more: faint, provisional.
     organs: {
       liver_r: [0.63, 0.97, 1.75], liver_l: [0.63, 0.97, 1.75],
       contents: [0, 0, 0],
-      heart: [0, 0.0273, 0.0800], gallbladder: [0, 0.0273, 0.0800], fat_r: [0, 0.0273, 0.0800], fat_l: [0, 0.0273, 0.0800],
-      kidney_r: [0, 0.0273, 0.0800], kidney_l: [0, 0.0273, 0.0800],
-      stomach: [2.55, 3.10, 3.87], intestine: [2.55, 3.10, 3.87], colon: [2.55, 3.10, 3.87],
-      eye_r: [2.78, 3.15, 3.84], eye_l: [2.78, 3.15, 3.84], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
+      heart: [0, 0.0249, 0.0789], gallbladder: [0, 0.0249, 0.0789], fat_r: [0, 0.0249, 0.0789], fat_l: [0, 0.0249, 0.0789],
+      kidney_r: [0, 0.0249, 0.0789], kidney_l: [0, 0.0249, 0.0789],
+      stomach: [2.54, 3.09, 3.86], intestine: [2.54, 3.09, 3.86], colon: [2.54, 3.09, 3.86],
+      eye_r: [1.18, 1.34, 1.64], eye_l: [1.18, 1.34, 1.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
       // Not measured on 01 (its throat is under the blue film): kept as "06", like the rib-gap cartilage.
       hyoid_cartilage: HYOID_CARTILAGE,
     },
