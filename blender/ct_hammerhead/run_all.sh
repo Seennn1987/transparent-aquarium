@@ -116,6 +116,9 @@ export HH_MESH_TAUBIN=${HH_MESH_TAUBIN-50} HH_MESH_SIGMA=${HH_MESH_SIGMA-1.5}
 #  前の形は HH_FIN_REF= HH_FIN_PLATE= HH_PECT_DOWN=0 HH_PELV_DOWN=0
 # 胸びれは 2026-10-17 の見直しで下へ 5°（水平から約 22° 下。プロデューサー「胸びれはおすすめの約 22° 下で既定にしてください」。泳ぐサメの計測 6〜23°、Wilga & Lauder）
 export HH_FIN_REF=${HH_FIN_REF-1} HH_FIN_PLATE=${HH_FIN_PLATE-1} HH_PECT_DOWN=${HH_PECT_DOWN-5} HH_PELV_DOWN=${HH_PELV_DOWN-15}
+# 2026-10-17 決定（プロデューサー「全てのヒレの色のつき方が変です…」→ 直しの範囲の図に「進めて」）: 第 2 背びれ・臀びれの軟骨を参考の膜の付け根へ（先が膜の高さの 0.53）、
+#  尾びれの下の葉の軟骨を膜と同じだけ腹側へ、腹びれの膜を付け根を中心に 1.4 倍。前の形は HH_FIN_CART_REACH= HH_LOBE_CART= HH_PELV_SCALE=1
+export HH_FIN_CART_REACH=${HH_FIN_CART_REACH-0.53} HH_LOBE_CART=${HH_LOBE_CART-1} HH_PELV_SCALE=${HH_PELV_SCALE-1.4}
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3
@@ -145,7 +148,7 @@ export HH_VERT_HAEMAL=${HH_VERT_HAEMAL-1} HH_VERT_RIBS=${HH_VERT_RIBS-1} HH_VERT
 HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8 step py a8c_vertebrae.py
 export HH_VERT_CENTRA_PART=Centrum HH_VERT_ARCH_PART=Arch   # 弓も別の部品（2026-10-15 H1）
 # A6 glb に書き出す（Blender）
-step py b5b_heart.py   # B5 心臓（推定、案「実物に近い大きさ」、2026-10-15 決定）
+step py b5b_heart.py   # B5 心臓（案「実物に近い大きさ」、2026-10-15 決定）
 step py b5a_jaw_region.py   # B5 口: 下あごといっしょに動く膜の範囲（b1_rig.py が使う）
 export HH_RIG=1   # B1 骨組み（b1_rig.py）を付けて書き出す。標本ページは B3（2026-10-15）から骨組みでうねる
 step blender a6a_export_gltf.py
