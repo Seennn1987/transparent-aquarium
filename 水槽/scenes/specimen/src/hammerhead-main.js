@@ -121,11 +121,12 @@ async function start() {
     pickerPanel([
       // 2026-10-16 参考の図（FMIB の幅・Raver の高さ）に合わせた案を足した。前の「幅を写真に」の 3 案は、幅が高さを超えて文献と逆の形なので外した（glb は試しのページに残る）
       // 2026-10-16 胴の形は案 2 に決定（プロデューサー「胴の形は案 2 に決めて、既定にしてください」）。前の形の glb は試しのページに specimen_hammerhead_prev として残す
-      ["案", [["胴は案 2・尾の骨あり（決定）", "specimen_hammerhead"], ["尾の骨なし", "specimen_hammerhead_notail"], ["胴: 前の形", "specimen_hammerhead_prev"]], () => GLB_NAME,
+      ["案", [["いま（決定）", "specimen_hammerhead"], ["ひれ: 背びれ・臀びれを参考の外形に", "specimen_hammerhead_f1p0"], ["ひれ: ＋胸びれ・腹びれを下へ 15°", "specimen_hammerhead_f1p1"],
+        ["ひれ: ＋胸びれ下へ 30°・腹びれ下へ 25°", "specimen_hammerhead_f1p2"], ["胸びれ・腹びれだけ下へ 15°", "specimen_hammerhead_f0p1"], ["尾の骨なし", "specimen_hammerhead_notail"], ["胴: 前の形", "specimen_hammerhead_prev"]], () => GLB_NAME,
         (v) => reload((q) => { if (v === "specimen_hammerhead") q.delete("glb"); else q.set("glb", v); })],
       ["弓の色", [["ひれの軟骨の半分の青（決定）", "0,0.5"], ["ひれの軟骨と同じ青", "0,1"], ["前（骨 0.3・軟骨 0.08）", "0.3,0.08"]], () => arch,
         (v) => reload((q) => { const [b, c] = v.split(","); if (v === "0,0.5") { q.delete("archbone"); q.delete("arch"); } else { q.set("archbone", b); q.set("arch", c); } })],
-    ], "胴: 案 2 は、幅を FMIB の図・高さを Raver の図（どちらもパブリックドメイン）に合わせ、断面をなめらかな曲線にし、横から見た背と腹の線をならした形。尾の骨: 血道弓を高く、肋骨と尾びれの鰭条を足す");
+    ], "ひれ: 背びれ 2 つと臀びれを、横からの参考の図 2 枚（Duane Raver・FMIB 45527、パブリックドメイン）の外形と大きさに。胸びれ・腹びれは 2026-10-14 に決めた姿勢から下へ回す。胴は案 2、尾の骨あり");
   }
   // ?pick=tissue: 胴の色の案（hammerhead-stain.js の ?tissue=）を読み直して切り替える（2026-10-15）
   if (query.get("pick") === "tissue") pickerPanel([
