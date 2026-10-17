@@ -126,12 +126,12 @@ names = [('now', '今'), ('surf_A', '案 A: 胴だけならす'), ('surf_B', '�
 for j, (key, title) in enumerate(names):
     for i, vw in enumerate(['side', 'ventral']):
         img = Image.open(D + f'opq_{key}_{vw}.png').crop((60, 40, 560, 700) if vw == 'side' else (150, 40, 450, 700))
-        ax = fig.add_axes([0.01 + j * 0.2, 0.68 - i * 0.33, 0.19, 0.3]); ax.imshow(img); ax.axis('off')
+        ax = fig.add_axes([0.01 + j * 0.2, [0.58, 0.31][i], 0.19, [0.29, 0.25][i]]); ax.imshow(img); ax.axis('off')
         if i == 0:
             r = R[key]; extra = '' if key == 'now' else f'\n骨のはみ出し 最大 {diag[key][0]} mm（{diag[key][1]}）'
             ax.set_title(f'{title}\n凹凸 95% {r["凹凸_95"]:.3f}・99% {r["凹凸_99"]:.3f} mm' + (extra if key != 'now' else '\n骨のはみ出し 最大 0.27 mm（v36）'), fontsize=11)
     img = Image.open('shots/cur_ventral.png' if key == 'now' else D + f'shot_{key}_ventral.png').crop((250, 30, 610, 700))
-    ax = fig.add_axes([0.01 + j * 0.2, 0.02, 0.19, 0.31]); ax.imshow(img); ax.axis('off')
+    ax = fig.add_axes([0.01 + j * 0.2, 0.01, 0.19, 0.28]); ax.imshow(img); ax.axis('off')
 note(fig.add_axes([0.81, 0.05, 0.18, 0.88]), '''見えるもの（向きを直して
 描き直した）
 ・腹と横に、肋骨 1 本ごとの
@@ -155,6 +155,10 @@ note(fig.add_axes([0.81, 0.05, 0.18, 0.88]), '''見えるもの（向きを直�
 なめらかになる。頭は今のまま。
 案 C: 頭も含めて全部。頭の後ろの
 継ぎ目の段も弱まる。
+
+下の段（実際の標本ページ）では、
+今でも筋はほとんど見えない。
+膜を通る長さの差が小さいため。
 
 ならすほど膜が少し縮み、骨の
 はみ出しが増える（最大 0.27 →
