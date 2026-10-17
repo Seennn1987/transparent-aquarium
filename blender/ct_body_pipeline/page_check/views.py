@@ -30,10 +30,7 @@ SET = '''([d, up]) => {
   c.updateMatrixWorld(true);
   return [P._centre.toArray(), P._dist];
 }'''
-url, pre = sys.argv[1], sys.argv[2]
-
-
-async def main():
+async def main(url, pre):
     async with async_playwright() as p:
         b = await browser.launch(p)
         pg = await b.new_page(viewport={'width': 800, 'height': 956}); msgs = []; pg.on('pageerror', lambda e: msgs.append(str(e)))
@@ -45,4 +42,5 @@ async def main():
             await pg.wait_for_timeout(2500)
             await pg.screenshot(path=f'{pre}_{name}.png')
         print(info, msgs); await b.close()
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main(sys.argv[1], sys.argv[2]))
