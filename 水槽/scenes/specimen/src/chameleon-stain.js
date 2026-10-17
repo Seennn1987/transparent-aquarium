@@ -45,7 +45,10 @@ export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // Measured again on the skin built from the bones (ct_body_pipeline/skinbody.py 7, after the hyoid rebuild, 2026-10-15):
 // below the neck vertebrae v02–v04, off the bone, the skin crosses 0.627 units (median of 1328 screen pixels,
 // quartile 0.687), so 0.371 / 0.627. (Was 0.66 over 0.56.)
-export const SKIN_GAIN = 0.592;
+// After the head was made 1.45 times, the ribcage widened and the skin smoothed (plan, C record 21, 2026-10-17): the
+// same pixels cross 0.900 units on the Mac's screen against 0.630 for the glb before (whose gain came out 0.589 there,
+// against 0.592 here), so 0.592 × 0.630 / 0.900 = 0.414 (ct_body_pipeline/fit_skin06.py on both glbs).
+export const SKIN_GAIN = 0.414;
 
 // The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
 // only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,
@@ -59,7 +62,9 @@ export const VISCERA_GAIN = 4.8;
 // The colour patterns. "06" is the one above (photo 06); "01" is the user's jar photo, below.
 // Pages pick one with `?stain=01` (chameleon.html and the jar page); without it, "06".
 /** The hyoid cartilage's absorbance per model unit (photo 06's throat, fitted; see "06" below). */
-export const HYOID_CARTILAGE = [11.98, 4.11, 1.65];
+// After the head was made 1.45 times (C record 21, 2026-10-17) the median hyoid path there went 0.0344 → 0.0485 on the
+// Mac's screen, so × 0.709 (was 11.98 / 4.11 / 1.65).
+export const HYOID_CARTILAGE = [8.50, 2.91, 1.17];
 
 export const STAINS = {
   "06": {
@@ -110,20 +115,26 @@ export const STAINS = {
   // And again after the hyoid was rebuilt (blender/ct_body_pipeline/hyoid_rebuild.py, 2026-10-15: the five rods in the
   // chest were taken out, the entoglossal process, basihyal and ceratohyals added as cartilage, and the head skin
   // reaches the throat). Blue film 2.83, skin 0.354; pale 2.11, 0.708; red bone 0.0403, film 2.27, skin 0.627:
-  //   film 0.1189 / 0.0791 / 0.0495, skin 0 / 0.0496 / 0.1000, bone 14.9 / 31.0 / 24.9 (used below)
+  //   film 0.1189 / 0.0791 / 0.0495, skin 0 / 0.0496 / 0.1000, bone 14.9 / 31.0 / 24.9
+  // And after the head was made 1.45 times, the ribcage widened and the skin smoothed (C record 21, 2026-10-17). Fitted
+  // on the Mac's screen (Chrome, not the cloud's SwiftShader) for both the glb before and after; the glb before gives
+  // film 0.1164 / 0.0749 / 0.0481, skin 0 / 0.0591 / 0.1023, bone 15.0 / 31.1 / 24.9 there (not the values above:
+  // the screens differ and the skin had changed since 10-15), the glb after film 0.1136 / 0.0752 / 0.0470,
+  // skin 0 / 0.0390 / 0.0768, bone 14.9 / 30.3 / 24.2. The values above times after / before, channel by channel:
+  //   film 0.1161 / 0.0794 / 0.0483, skin 0 / 0.0327 / 0.0751, bone 14.79 / 30.26 / 24.17 (used below)
   // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
   // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.479, 1, 0.802], gain: 31.02 },
+    bone: { spectrum: [0.489, 1, 0.799], gain: 30.26 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.496, 1], gain: 0.1000 },
+    skin: { spectrum: [0, 0.436, 1], gain: 0.0751 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.666, 0.416], gain: 0.1189 },
+    film: { spectrum: [1, 0.684, 0.416], gain: 0.1161 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -148,19 +159,23 @@ export const STAINS = {
     // screen's eye-only pixels, less the skin, film and bone there, by the median eye path (0.172)
     //                                                                            → eye 3.82 / 4.19 / 5.16
     //     (after the hyoid rebuild: base 0.377 / 0.460 / 0.380, eye path 0.166 → eye 4.08 / 4.63 / 5.64, used)
+    // After the head was made 1.45 times, the ribcage widened and the skin smoothed (C record 21, 2026-10-17), each
+    // organ's absorbance per unit is scaled by its median path before / after on the Mac's screen, so the light let
+    // through stays as fitted: liver path 0.2928 → 0.3061 (× 0.957), gut 0.1580 → 0.1454 (× 1.087), eye-only pixels'
+    // eye path 0.1706 → 0.2494 (× 0.684). The skin around them is not refitted for this (provisional).
     // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
     // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.0496 / 0.1000) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.0327 / 0.0751) once more: faint, provisional.
     organs: {
-      liver_r: [0.66, 1.02, 1.84], liver_l: [0.66, 1.02, 1.84],
+      liver_r: [0.63, 0.98, 1.76], liver_l: [0.63, 0.98, 1.76],
       contents: [0, 0, 0],
-      heart: [0, 0.0496, 0.1000], gallbladder: [0, 0.0496, 0.1000], fat_r: [0, 0.0496, 0.1000], fat_l: [0, 0.0496, 0.1000],
-      kidney_r: [0, 0.0496, 0.1000], kidney_l: [0, 0.0496, 0.1000],
-      stomach: [3.16, 3.84, 4.79], intestine: [3.16, 3.84, 4.79], colon: [3.16, 3.84, 4.79],
-      eye_r: [4.08, 4.63, 5.64], eye_l: [4.08, 4.63, 5.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
+      heart: [0, 0.0327, 0.0751], gallbladder: [0, 0.0327, 0.0751], fat_r: [0, 0.0327, 0.0751], fat_l: [0, 0.0327, 0.0751],
+      kidney_r: [0, 0.0327, 0.0751], kidney_l: [0, 0.0327, 0.0751],
+      stomach: [3.43, 4.17, 5.21], intestine: [3.43, 4.17, 5.21], colon: [3.43, 4.17, 5.21],
+      eye_r: [2.79, 3.17, 3.86], eye_l: [2.79, 3.17, 3.86], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
       // Not measured on 01 (its throat is under the blue film): kept as "06", like the rib-gap cartilage.
       hyoid_cartilage: HYOID_CARTILAGE,
     },
