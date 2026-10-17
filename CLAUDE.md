@@ -37,7 +37,7 @@
 - テスト: `cd 水槽 && npm test`（構文だけなら `npm run check`）
 - Blender: `/Applications/Blender.app/Contents/MacOS/Blender`（5.2.2 LTS）。裏で動かすときは `-b -P <スクリプト>`
 - 開いている Blender に送るとき: `python3 blender/mcp_send.py code <スクリプト>`（MCP for Blender アドオン、ポート 9876）
-- CT の Python: リポジトリ直下の `.venv`。無ければ `python3 -m venv .venv && .venv/bin/pip install numpy scipy scikit-image pillow pydicom matplotlib`
+- CT の Python: リポジトリ直下の `.venv`。無ければ `python3 -m venv .venv && .venv/bin/pip install numpy scipy scikit-image pillow pydicom matplotlib pyfqmr networkx playwright`（`pyfqmr`・`networkx` はカメレオンの膜と臓器、`playwright` は標本ページを撮る道具）
 
 ### 元データの選び方
 
