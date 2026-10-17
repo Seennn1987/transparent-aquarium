@@ -39,36 +39,42 @@ export const HH_CHANNELS = [
 //   赤紫: 赤紫の画素の中央値 写真 1 の 0.776 / 0.351 / 0.430、写真 2 の 0.620 / 0.311 / 0.409 → 0.70 / 0.33 / 0.42
 //   青: 青緑の画素の中央値 写真 1 の 0.500 / 1.032 / 1.067、写真 2 の 0.370 / 0.847 / 0.982 → 0.44 / 0.94 / 0.99
 //   無色: 体の中の色の無い所は液と同じか明るい（1.01〜1.17）→ ほとんど吸わない 0.93 / 0.94 / 0.95
-//  層ごとの色は [赤紫の量, 青の量, 無色の濁りの量]（1 で上の色見本の濃さ）の足し合わせ。調整の欄もこの 3 つの量だけを動かす。
+//   黄ばみ（2026-10-17 足す、プロデューサー「色を染めるのは２色しかないのですか？緑とか黄色っぽいん標本ってどうなってるの？」→「あなたの案でパレットを作り替えて」）:
+//    染料ではなく、脱色が足りない組織・脂肪・ホルマリンやグリセリンで古くなった組織の淡い黄。奥の青い軟骨が緑寄りに見えるのはこの黄ばみ越しに見るため。
+//    色 0.97 / 0.93 / 0.78 は測った値ではない（黄ばんだ標本の写真がまだ無い）。写真をいただいたら画素で測り直す
+//  層ごとの色は [赤紫の量, 青の量, 無色の濁りの量, 黄ばみの量]（1 で上の色見本の濃さ）の足し合わせ。調整の欄もこの 4 つの量だけを動かす。
+//  黄ばみの量は ?yellow=（既定 0。いただいた写真の体は黄ばんでいない）で、肉と内臓に掛かる
 //  塗り分けの案（?palette=）: calcified = 石灰化で塗り分け（CT に写る骨格はすべて赤紫）、double = 石灰化した軟骨は赤紫と青の両方、
 //   juvenile = 幼魚・胚（石灰化は背骨と歯だけ、ほかの軟骨は青）。photo は前の版（juvenile と同じで内臓が青）、embryo はその前の胚の色
-export const HH_STAIN_T = { alizarin: [0.70, 0.33, 0.42], alcian: [0.44, 0.94, 0.99], clear: [0.93, 0.94, 0.95] };
+export const HH_STAIN_T = { alizarin: [0.70, 0.33, 0.42], alcian: [0.44, 0.94, 0.99], clear: [0.93, 0.94, 0.95], yellow: [0.97, 0.93, 0.78] };
+export const HH_YELLOW = Number(Q.get("yellow") ?? 0);
 export const HH_STAIN_A = Object.fromEntries(Object.entries(HH_STAIN_T).map(([k, t]) => [k, t.map((v) => -Math.log(v))]));
 const SPINE = [1.5, 0, 0];   // 背骨（椎体）は骨の中でも濃い（写真の赤紫の濃い 10% と中央値の間、透過 約 0.59 / 0.19 / 0.27）
 export const HH_PALETTES = {
-  calcified: { spine: SPINE, teeth: [1, 0, 0], head: [1, 0, 0], gill: [1, 0, 0], fin: [1, 0, 0], pelvic: [1, 0, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
-  double: { spine: SPINE, teeth: [1, 0, 0], head: [0.4, 0.4, 0], gill: [0.4, 0.4, 0], fin: [0.4, 0.4, 0], pelvic: [0.4, 0.4, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
-  juvenile: { spine: SPINE, teeth: [1, 0, 0], head: [0, 1, 0], gill: [0, 1, 0], fin: [0, 1, 0], pelvic: [0, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
+  calcified: { spine: SPINE, teeth: [1, 0, 0], head: [1, 0, 0], gill: [1, 0, 0], fin: [1, 0, 0], pelvic: [1, 0, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] },
+  double: { spine: SPINE, teeth: [1, 0, 0], head: [0.4, 0.4, 0], gill: [0.4, 0.4, 0], fin: [0.4, 0.4, 0], pelvic: [0.4, 0.4, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] },
+  juvenile: { spine: SPINE, teeth: [1, 0, 0], head: [0, 1, 0], gill: [0, 1, 0], fin: [0, 1, 0], pelvic: [0, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] },
 };
 HH_PALETTES.photo = HH_PALETTES.juvenile;
 const PALETTE = Q.get("palette") ?? "photo";
 const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0
 const effOf = (c) => (c.sat ? T0 * (1 - Math.exp(-c.ref / T0)) : c.ref);
-/** 染料の量 [赤紫, 青, 無色] → 吸い方の比（spectrum）と 1 m あたりの利得（gain）。 */
+/** 染料の量 [赤紫, 青, 無色, 黄ばみ] → 吸い方の比（spectrum）と 1 m あたりの利得（gain）。 */
+export const stainAbsorb = (m) => [0, 1, 2].map((i) => m[0] * HH_STAIN_A.alizarin[i] + m[1] * HH_STAIN_A.alcian[i] + m[2] * HH_STAIN_A.clear[i] + (m[3] ?? 0) * HH_STAIN_A.yellow[i]);
 export function stainToChannel(c, m) {
-  const A = [0, 1, 2].map((i) => m[0] * HH_STAIN_A.alizarin[i] + m[1] * HH_STAIN_A.alcian[i] + m[2] * HH_STAIN_A.clear[i]), top = Math.max(...A, 1e-6);
+  const A = stainAbsorb(m), top = Math.max(...A, 1e-6);
   return { spectrum: A.map((v) => v / top), gain: top / effOf(c) };
 }
 /** いまの染料の量（調整の欄が動かす）。embryo では null（前の色のまま、欄で動かすと染料の量に置きかわる） */
 export const hhStainMix = {};
 for (const c of HH_CHANNELS) {
   const m = HH_PALETTES[PALETTE]?.[c.key];
-  hhStainMix[c.key] = m ? [...m] : null;
+  hhStainMix[c.key] = m ? [...m, 0, 0, 0, 0].slice(0, 4) : null;
   if (m) Object.assign(c, stainToChannel(c, m));
 }
 if (HH_PALETTES[PALETTE]) {
   // 肉のまだらも無色の濁りの比で（前は胚の肉のクリーム色から作っていた）
-  const As = HH_STAIN_A.clear, ts = Math.max(...As);
+  const As = stainAbsorb([0, 0, 1, HH_YELLOW]), ts = Math.max(...As);
   if (K.organs) K.organs.mottle = As.map((v) => (v / ts) * 0.12);
 }
 export const HH_BONE_PHOTO_SPECTRUM = (() => { const A = HH_STAIN_A.alizarin, top = Math.max(...A); return A.map((v) => v / top); })();

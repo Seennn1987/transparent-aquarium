@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { chameleonOrgans } from "./chameleon-material.js";
+import { stainAbsorb, HH_YELLOW } from "./hammerhead-lightbox.js";
 
 // The path materials for specimen_hammerhead.glb (blender/ct_hammerhead/a6a_export_gltf.py): each part is a
 // closed solid, and its path along the view ray is the depth of the faces turned away minus the depth of the
@@ -245,14 +246,15 @@ const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1,
 const ORGAN_PALETTE = new URLSearchParams(location.search).get("palette") ?? "photo";
 const ORGAN_PHOTO = ORGAN_PALETTE === "photo";
 // 2026-10-17 内臓は軟骨ではないので染まらない（透明にした組織、ほぼ無色）。calcified・double・juvenile では、無色の濁りの量（色見本 40 mm）で
-//  肝臓 1.5・消化管 1・らせん弁 1.5・心臓 1.2（量は目で見た仮の値）。値は [赤紫, 青, 無色] の量（hammerhead-lightbox.js の HH_STAIN_A）
-export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5], Gut: [0, 0, 1], Spiral: [0, 0, 1.5], Heart: [0, 0, 1.2], HeartLarge: [0, 0, 1.2], HeartSmall: [0, 0, 1.2] } : null;
-const STAIN_A = { alizarin: [0.70, 0.33, 0.42].map((v) => -Math.log(v)), alcian: [0.44, 0.94, 0.99].map((v) => -Math.log(v)), clear: [0.93, 0.94, 0.95].map((v) => -Math.log(v)) };
+//  肝臓 1.5・消化管 1・らせん弁 1.5・心臓 1.2（量は目で見た仮の値）。値は [赤紫, 青, 無色, 黄ばみ] の量（hammerhead-lightbox.js の HH_STAIN_A）。
+//  黄ばみ（?yellow=）は脂の多い肝臓に 2 倍、ほかは肉と同じ量
+const OY = HH_YELLOW;
+export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5, 2 * OY], Gut: [0, 0, 1, OY], Spiral: [0, 0, 1.5, OY], Heart: [0, 0, 1.2, OY], HeartLarge: [0, 0, 1.2, OY], HeartSmall: [0, 0, 1.2, OY] } : null;
 /** 染料の量 → 内臓の色の値（visceraMaterial の color。強さ visceraLook.amount × 7.5 × 色見本 40 mm で割る） */
-export function organMixToColor(m, amount) { const k = amount * 7.5 * 0.04; return [0, 1, 2].map((i) => (m[0] * STAIN_A.alizarin[i] + m[1] * STAIN_A.alcian[i] + m[2] * STAIN_A.clear[i]) / k); }
+export function organMixToColor(m, amount) { const k = amount * 7.5 * 0.04; return stainAbsorb(m).map((v) => v / k); }
 //  肝臓は写真に黄色い臓器が見えないので、ほとんど色の無い淡い膜に（透過 0.90 / 0.91 / 0.93、色見本の厚み 40 mm・強さ 2）
 const ORGAN_COLORS_BASE = { Liver: ORGAN_PHOTO ? [0.176, 0.157, 0.121] : [0.25, 0.45, 1], Gut: ORGAN_PHOTO ? [1, 0.213, 0.085] : [1, 0.5, 0.42], Spiral: ORGAN_PHOTO ? [1.5, 0.32, 0.13] : [3, 1.5, 1.2],
-  // 心臓（推定）: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
+  // 心臓: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
   Heart: [0.42, 0.74, 1], HeartLarge: [0.42, 0.74, 1], HeartSmall: [0.42, 0.74, 1] };
 const ORGAN_VISC_AMOUNT = Number(new URLSearchParams(location.search).get("visc") ?? 2);
 const ORGAN_COLORS = HH_ORGAN_MIX ? Object.fromEntries(Object.keys(ORGAN_COLORS_BASE).map((k) => [k, organMixToColor(HH_ORGAN_MIX[k], ORGAN_VISC_AMOUNT)])) : ORGAN_COLORS_BASE;

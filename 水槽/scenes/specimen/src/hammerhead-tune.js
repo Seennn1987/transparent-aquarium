@@ -8,9 +8,9 @@ import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 //  その厚みでその色になる吸い方に置きかえる。濃さは吸い方の倍率（1 が既定）。値はこの画面の中だけで、ブラウザに覚えさせる（localStorage）。
 //  決めた値は「値をコピー」で取り出して、コードの既定に入れる。
 // 2026-10-17 直し（プロデューサー「着色剤の種類はある程度決まっているわけで、色編集パレットは完全自由な色使いではなくて、それをベースに色を選べるようにして」）:
-//  色は自由に選ばず、染料の 3 つの量（赤紫 = アリザリンレッド S、青 = アルシアンブルー、無色 = 染まらない組織の濁り。hammerhead-lightbox.js の HH_STAIN_T）を
+//  色は自由に選ばず、染料の量（赤紫 = アリザリンレッド S、青 = アルシアンブルー、無色 = 染まらない組織の濁り、黄ばみ = 2026-10-17 足した組織の淡い黄。hammerhead-lightbox.js の HH_STAIN_T）を
 //  動かして決める。色見本（四角）はその種別のふつうの厚みを通った光の色で、見るだけ。内臓も同じ 3 つの量（色見本の厚み 40 mm）
-const STORE = "hh-tune-v2";
+const STORE = "hh-tune-v3";
 const organMix = Object.fromEntries(Object.keys(hhOrganColor).map((k) => [k, HH_ORGAN_MIX?.[k] ? [...HH_ORGAN_MIX[k]] : null]));
 const setMix = (c, m) => { hhStainMix[c.key] = [...m]; const r = stainToChannel(c, m), L = hhColorLook[c.key]; L.spectrum.value.set(...r.spectrum); L.gain.value = r.gain; L.density.value = 1; };
 const setOrganMix = (k, m) => { organMix[k] = [...m]; hhOrganColor[k]?.value.set(...organMixToColor(m, visceraLook.amount.value)); };
@@ -114,11 +114,11 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
     #hh-tune .name.changed::before { content: "● "; color: #d35400; }
     #hh-tune .row.stainrow { grid-template-columns: 1fr 44px; margin-top: 8px; }
     #hh-tune .swatch { display: inline-block; width: 40px; height: 18px; border: 1px solid #aaa; border-radius: 3px; }
-    #hh-tune .stains { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 1px 0 2px; }
-    #hh-tune .stain { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; font-size: 11px; align-items: center; }
+    #hh-tune .stains { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 14px; margin: 1px 0 2px; }
+    #hh-tune .stain { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; font-size: 11px; align-items: center; }
     #hh-tune .stain input[type=range] { width: 100%; grid-column: 1 / -1; }
     #hh-tune .stain .val { grid-row: 1; grid-column: 2; font-size: 11px; }
-    #hh-tune .stain.r span:first-child { color: #b03060; } #hh-tune .stain.b span:first-child { color: #1f8fbf; } #hh-tune .stain.n span:first-child { color: #888; }`;
+    #hh-tune .stain.r span:first-child { color: #b03060; } #hh-tune .stain.b span:first-child { color: #1f8fbf; } #hh-tune .stain.n span:first-child { color: #888; } #hh-tune .stain.y span:first-child { color: #b08a00; }`;
   document.head.append(css);
   const btn = document.createElement("button"); btn.id = "hh-tune-btn"; btn.type = "button"; btn.textContent = "調整";
   const panel = document.createElement("aside"); panel.id = "hh-tune"; panel.setAttribute("aria-label", "色と濃さの調整");
@@ -148,7 +148,7 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
   try { if (localStorage.getItem(STORE + "-side") === "left") setSide(true); } catch {}
   panel.append(bar);
   const head = document.createElement("div");
-  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色は染料の量で決める: 赤紫 = アリザリンレッド S（石灰化した組織）、青 = アルシアンブルー（軟骨）、無色 = 染まらない組織の濁り。四角 = その種別のふつうの厚みを通った光の色。この画面だけの値で、ブラウザが覚えます（ギャラリーの器の中も同じ値）。● = 既定から変えた行。名前をダブルクリックでその行だけ既定に戻る。</div>";
+  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色は染料の量で決める: 赤紫 = アリザリンレッド S（石灰化した組織）、青 = アルシアンブルー（軟骨）、無色 = 染まらない組織の濁り、黄ばみ = 脱色の足りない組織や古くなった標本の淡い黄（染料ではない）。四角 = その種別のふつうの厚みを通った光の色。この画面だけの値で、ブラウザが覚えます（ギャラリーの器の中も同じ値）。● = 既定から変えた行。名前をダブルクリックでその行だけ既定に戻る。</div>";
   panel.append(head);
   const refreshers = [];
   const slider = (min, max, step, get, set) => {
@@ -189,12 +189,12 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
         refreshers.push(() => { sw.style.background = r.channel ? channelColor(c) : organColor(r.organ); });
         row.classList.add("stainrow"); row.append(name, sw);
         const st = document.createElement("div"); st.className = "stains";
-        const getM = () => (r.channel ? hhStainMix[c.key] : organMix[r.organ]) ?? [0, 0, 0];
+        const getM = () => (r.channel ? hhStainMix[c.key] : organMix[r.organ]) ?? [0, 0, 0, 0];
         const setM = (m) => (r.channel ? setMix(c, m) : setOrganMix(r.organ, m));
-        for (const [i, lab, cls] of [[0, "赤紫", "r"], [1, "青", "b"], [2, "無色", "n"]]) {
-          const cell = document.createElement("label"); cell.className = "stain " + cls; cell.title = ["アリザリンレッド S（カルシウムに付く。石灰化した組織）", "アルシアンブルー（軟骨の基質に付く）", "染まらない組織の濁り"][i];
+        for (const [i, lab, cls] of [[0, "赤紫", "r"], [1, "青", "b"], [2, "無色", "n"], [3, "黄ばみ", "y"]]) {
+          const cell = document.createElement("label"); cell.className = "stain " + cls; cell.title = ["アリザリンレッド S（カルシウムに付く。石灰化した組織）", "アルシアンブルー（軟骨の基質に付く）", "染まらない組織の濁り", "黄ばみ（脱色の足りない組織・脂・古くなった標本。奥の青が緑寄りに見える）"][i];
           const t = document.createElement("span"); t.textContent = lab;
-          const [rr, vv] = slider(0, 3, 0.05, () => getM()[i], (v) => { const m = [...getM()]; m[i] = v; setM(m); });
+          const [rr, vv] = slider(0, 3, 0.05, () => getM()[i] ?? 0, (v) => { const m = [...getM()]; m[i] = v; setM(m); });
           cell.append(t, rr, vv); st.append(cell);
         }
         panel.append(row); row.dataset.group = title;
