@@ -26,3 +26,6 @@ blender/ct_hammerhead/mesh/
 blender/ct_hammerhead/work/
 # シュモクザメ: 作り直しの検算（work/ の複製と作り直した中間ファイル）
 blender/ct_hammerhead/rebuild/
+
+# メンダコ: 部品の面（a2_parts.py などで作り直せる）
+blender/mendako/work/
