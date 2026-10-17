@@ -64,7 +64,16 @@ function restore(s) {
 }
 const DEFAULTS = {};   // 欄を作るときの値（既定）
 
-export function installHammerheadTune({ open = false } = {}) {
+/** 欄を出さずに、ブラウザが覚えている値だけを当てる（ギャラリーの器の中のシュモクザメ。2026-10-17 から） */
+export function applySavedHammerheadTune() {
+  try { const saved = JSON.parse(localStorage.getItem(STORE) ?? "null"); if (saved) restore(saved); return Boolean(saved); } catch { return false; }
+}
+
+// 2026-10-17 直し（プロデューサー「色の調整をしたいので、以前作った色のパネルを表示して。必要であればパネルの機能改善もして」）:
+//  上の帯: 「既定と見比べる」（押している間だけ既定の値で描く）、「止める／動かす」、向き（背中・横・腹・展示。欄を開いたまま読み直す）、「左へ／右へ」（欄の置き場）。
+//  行: 既定から変えた行は名前の前に ● が付く。名前をダブルクリックすると、その行だけ既定に戻る。見出しをクリックすると、その組をたたむ。
+//  ギャラリー（?specimen=hammerhead の前の台）も、この欄で覚えた値で描く（specimen-hammerhead.js が applySavedHammerheadTune を呼ぶ）
+export function installHammerheadTune({ open = false, page = null } = {}) {
   Object.assign(DEFAULTS, snapshot());
   try { const saved = JSON.parse(localStorage.getItem(STORE) ?? "null"); if (saved) restore(saved); } catch {}
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(snapshot())); } catch {} };
@@ -82,14 +91,46 @@ export function installHammerheadTune({ open = false } = {}) {
     #hh-tune .val { font-variant-numeric: tabular-nums; text-align: right; }
     #hh-tune .btns { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
     #hh-tune button { font: inherit; padding: 4px 10px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
-    #hh-tune textarea { width: 100%; height: 120px; font: 11px monospace; margin-top: 6px; display: none; }`;
+    #hh-tune textarea { width: 100%; height: 120px; font: 11px monospace; margin-top: 6px; display: none; }
+    #hh-tune.left { right: auto; left: 12px; }
+    #hh-tune .bar { position: sticky; top: -10px; background: rgba(255,255,255,.97); margin: -10px -12px 6px; padding: 8px 12px 6px; border-bottom: 1px solid #ddd; display: flex; gap: 4px; flex-wrap: wrap; z-index: 1; }
+    #hh-tune .bar button { padding: 3px 8px; font-size: 12px; }
+    #hh-tune .bar button.on { background: #222; color: #fff; }
+    #hh-tune h3 { cursor: pointer; user-select: none; }
+    #hh-tune h3::before { content: "▾ "; color: #999; }
+    #hh-tune h3.folded::before { content: "▸ "; }
+    #hh-tune .name { cursor: default; }
+    #hh-tune .name.changed::before { content: "● "; color: #d35400; }`;
   document.head.append(css);
   const btn = document.createElement("button"); btn.id = "hh-tune-btn"; btn.type = "button"; btn.textContent = "調整";
   const panel = document.createElement("aside"); panel.id = "hh-tune"; panel.setAttribute("aria-label", "色と濃さの調整");
   panel.style.display = open ? "block" : "none";
   btn.onclick = () => { panel.style.display = panel.style.display === "none" ? "block" : "none"; };
+  // 上の帯
+  const bar = document.createElement("div"); bar.className = "bar";
+  const mk = (label, title) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; if (title) b.title = title; bar.append(b); return b; };
+  const cmp = mk("既定と見比べる", "押している間だけ、既定の値で描く");
+  let held = null;
+  const down = (e) => { e.preventDefault(); if (held) return; held = snapshot(); restore(DEFAULTS); cmp.classList.add("on"); };
+  const up = () => { if (!held) return; restore(held); held = null; cmp.classList.remove("on"); };
+  cmp.addEventListener("pointerdown", down); for (const ev of ["pointerup", "pointerleave", "pointercancel"]) cmp.addEventListener(ev, up);
+  if (page) {
+    const pz = mk(page.paused ? "動かす" : "止める", "泳ぎ・口・心臓を止める（Space でも同じ）");
+    pz.onclick = () => { page.setPaused(!page.paused); pz.textContent = page.paused ? "動かす" : "止める"; };
+  }
+  const Q = new URLSearchParams(location.search);
+  for (const [label, v] of [["背中", "top"], ["横", "side"], ["腹", "below"], ["展示", ""]]) {
+    const b = mk(label, "この向きで読み直す（欄は開いたまま、値はそのまま）");
+    if ((Q.get("view") ?? "") === v) b.classList.add("on");
+    b.onclick = () => { const q = new URLSearchParams(location.search); if (v) q.set("view", v); else q.delete("view"); q.set("tune", "1"); location.search = q.toString(); };
+  }
+  const side = mk("左へ", "欄を画面の左右に移す");
+  const setSide = (left) => { panel.classList.toggle("left", left); side.textContent = left ? "右へ" : "左へ"; try { localStorage.setItem(STORE + "-side", left ? "left" : "right"); } catch {} };
+  side.onclick = () => setSide(!panel.classList.contains("left"));
+  try { if (localStorage.getItem(STORE + "-side") === "left") setSide(true); } catch {}
+  panel.append(bar);
   const head = document.createElement("div");
-  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色 = その種別のふつうの厚みを通った光の色。濃さ = 吸い方の倍率（1 が既定）。この画面だけの値で、ブラウザが覚えます。</div>";
+  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色 = その種別のふつうの厚みを通った光の色。濃さ = 吸い方の倍率（1 が既定）。この画面だけの値で、ブラウザが覚えます（ギャラリーの器の中も同じ値）。● = 既定から変えた行。名前をダブルクリックでその行だけ既定に戻る。</div>";
   panel.append(head);
   const refreshers = [];
   const slider = (min, max, step, get, set) => {
@@ -102,15 +143,24 @@ export function installHammerheadTune({ open = false } = {}) {
   const colorInput = (get, set) => {
     const c = document.createElement("input"); c.type = "color";
     const sync = () => { c.value = get(); };
-    c.oninput = () => { set(c.value); save(); };
+    c.oninput = () => { set(c.value); save(); refreshAll(); };
     refreshers.push(sync); sync(); return c;
   };
   const refreshAll = () => refreshers.forEach((f) => f());
   for (const [title, rows] of GROUPS) {
     const h = document.createElement("h3"); h.textContent = title; panel.append(h);
+    h.onclick = () => { const f = h.classList.toggle("folded"); panel.querySelectorAll(`.row[data-group="${title}"]`).forEach((e) => { e.style.display = f ? "none" : ""; }); };
     for (const r of rows) {
-      const row = document.createElement("div"); row.className = "row";
-      const name = document.createElement("span");
+      const row = document.createElement("div"); row.className = "row"; row.dataset.group = title;
+      const name = document.createElement("span"); name.className = "name"; name.title = "ダブルクリックで、この行を既定に戻す";
+      const cur = () => snapshot(), key = r.channel ? ["channels", r.channel] : r.part ? ["parts", r.part] : r.organ ? ["organs", r.organ] : ["looks", r.key];
+      const isChanged = () => { const a = cur()[key[0]]?.[key[1]], b = DEFAULTS[key[0]]?.[key[1]]; return JSON.stringify(a) !== JSON.stringify(b) || Boolean(r.organ && cur().parts[r.organ] !== DEFAULTS.parts[r.organ]); };   // Boolean: classList.toggle に undefined を渡すと、印が付け外しを繰り返す
+      refreshers.push(() => name.classList.toggle("changed", isChanged()));
+      name.ondblclick = () => {
+        const one = { channels: {}, parts: {}, organs: {}, looks: {} }; one[key[0]][key[1]] = DEFAULTS[key[0]][key[1]];
+        if (r.organ) one.parts[r.organ] = DEFAULTS.parts[r.organ];
+        restore(one); save(); refreshAll();
+      };
       if (r.channel) {
         const c = HH_CHANNELS.find((x) => x.key === r.channel); const L = hhColorLook[c.key];
         name.textContent = c.label;
@@ -128,7 +178,7 @@ export function installHammerheadTune({ open = false } = {}) {
         row.append(name, document.createElement("span"), ...slider(0, r.max ?? 3, 0.01, () => r.look.value, (v) => { r.look.value = v; }));
       }
       panel.append(row);
-      if (r.note) { const n = document.createElement("div"); n.className = "row"; const t = document.createElement("span"); t.className = "note"; t.textContent = r.note; n.append(t); panel.append(n); }
+      if (r.note) { const n = document.createElement("div"); n.className = "row"; n.dataset.group = title; const t = document.createElement("span"); t.className = "note"; t.textContent = r.note; n.append(t); panel.append(n); }
     }
   }
   const btns = document.createElement("div"); btns.className = "btns";
@@ -140,5 +190,6 @@ export function installHammerheadTune({ open = false } = {}) {
     try { await navigator.clipboard.writeText(text); b2.textContent = "コピーしました"; setTimeout(() => { b2.textContent = "値をコピー"; }, 1500); } catch { out.select(); } };
   btns.append(b1, b2); panel.append(btns, out);
   document.body.append(btn, panel);
-  return { panel, snapshot, restore };
+  refreshAll();
+  return { panel, snapshot, restore, defaults: DEFAULTS };
 }

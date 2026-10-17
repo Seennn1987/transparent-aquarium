@@ -135,7 +135,7 @@ async function start() {
       (v) => { const q = new URLSearchParams(location.search); if (v === "D") q.delete("tissue"); else q.set("tissue", v); location.search = q.toString(); }],
   ], "参考の胚の体の組織: 前に測った 1 点 0.79 / 0.66 / 0.57（A）、胴の真ん中 0.81 / 0.76 / 0.69（B）、胴全体 0.80 / 0.81 / 0.75（C）。D は皮歯・まだら・内臓の分を差し引いて、画面で C の値になるようにした");
   // 色と濃さの調整の欄（右上の「調整」。?tune=1 で開いて始める、?tune=0 で出さない）。撮る道具は ?tune=0 を付けなくても欄は閉じている
-  const tune = query.get("tune") !== "0" ? installHammerheadTune({ open: query.get("tune") === "1" }) : null;
+  const tune = query.get("tune") !== "0" ? installHammerheadTune({ open: query.get("tune") === "1", page: { setPaused(v) { paused = Boolean(v); }, get paused() { return paused; } } }) : null;
   document.body.dataset.ready = "1";
   window.hammerheadPage = {
     look: chameleonLook, renderer, lightbox, camera, model, swim, swimLook,

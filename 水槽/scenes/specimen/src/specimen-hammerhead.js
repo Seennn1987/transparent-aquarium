@@ -4,6 +4,7 @@ import { chameleonLook } from "./chameleon-material.js";
 import { createHammerheadLightbox } from "./hammerhead-lightbox.js";
 import { HH_BONE_T0 } from "./hammerhead-stain.js";   // registers STAINS.hammerhead
 import { applyHammerheadTissue } from "./hammerhead-material.js";
+import { applySavedHammerheadTune } from "./hammerhead-tune.js";
 import { createSwim, swimLook, mouthLook } from "./hammerhead-swim.js";
 import { circlePose, circleSpeed, dishBaseScale, fitCircle, HH_HEIGHT } from "./hammerhead-path.js";
 
@@ -37,6 +38,8 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
   chameleonLook.boneT0.value = HH_BONE_T0;
   chameleonLook.film.value = 1;     // 皮歯（hammerhead-main.js と同じ既定）
   chameleonLook.organs.value = 1;   // まだら・鰓条・内臓の通り道
+  // 標本ページの調整の欄（hammerhead-tune.js）でブラウザが覚えた色と濃さを、器の中でも使う（2026-10-17）
+  applySavedHammerheadTune();
 
   const body = new THREE.Group();
   body.name = "Specimen";
