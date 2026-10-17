@@ -9,8 +9,9 @@
 
 - シロシュモクザメ: `docs/シュモクザメ_ClaudeCode引き継ぎ.md`
 - エボシカメレオン: `docs/カメレオン_ClaudeCode引き継ぎ.md`（Cowork から移す。2026-10-17）
+- メンダコ: `docs/メンダコ透明標本_計画書_v1.0.md`（2026-10-17 着手。手順 0 の途中）
 
-ある標本の作業では、ほかの標本（イカ・カメレオン・シュモクザメ）のファイルを変えない。共通のファイル（下の「共通のファイル」）を変えるときは、先にプロデューサーに聞く。
+ある標本の作業では、ほかの標本（イカ・カメレオン・シュモクザメ・メンダコ）のファイルを変えない。共通のファイル（下の「共通のファイル」）を変えるときは、先にプロデューサーに聞く。
 2 体を同時に進めるときは、標本ごとに別の会話にし、同じファイルを 2 つの会話で同時に編集しない。
 
 ## 共通
@@ -94,3 +95,11 @@
   - 標本ページを撮る・測る道具: `blender/ct_body_pipeline/page_check/`
 - 元データ: 全身 CT の zip（MorphoSource 000050726）と頭骨の STL（Digimorph TNHC 62768）は `~/transparent-aquarium/画像サンプル収集/エボシカメレオン/`（リポジトリの外）
 - 権利: CT（MorphoSource 000050726・Digimorph）から作ったものは `blender/private/` と `assets/private/`。商用不可・再配布しない。参考写真は `docs/references/chameleon/`（出典は `SOURCES.md`）。写真 01 など透かし入りの写真は git に入れない。写真 05・06 は CC BY-SA 4.0（Brianwray26、Wikimedia Commons）なので、使った図には出典を書く
+
+### メンダコ
+
+- 計画書: `docs/メンダコ透明標本_計画書_v1.0.md`（手順 0 の元データの表と生物カードは第 1〜3 節）。引き継ぎ文書はまだ無いので、計画書の冒頭の状態の表から読む
+- 種: *Exsuperoteuthis depressa*（旧名 *Opisthoteuthis depressa* Ijima & Ikeda, 1895）。硬い骨が無いので、イカと同じく写真・図・文献から作る（振り返り 第 4 節）。CT は形の正にしない
+- 参考画像: `docs/references/mendako/`（出典は `SOURCES.md`）。ライセンスを確かめていない画像と透かし入りの画像は git に入れない
+- 形のスクリプト: `blender/mendako/`（まだ無い）。ページは `水槽/scenes/specimen/mendako.html`、`src/mendako-*.js` の予定（まだ無い）
+- 器と姿勢はまだ決めていない。案の絵を見せてから決めてもらう
