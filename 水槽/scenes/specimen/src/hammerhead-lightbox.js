@@ -55,6 +55,14 @@ export const HH_PALETTES = {
   double: { spine: SPINE, teeth: [1, 0, 0], head: [0.4, 0.4, 0], gill: [0.4, 0.4, 0], fin: [0.4, 0.4, 0], pelvic: [0.4, 0.4, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] },
   juvenile: { spine: SPINE, teeth: [1, 0, 0], head: [0, 1, 0], gill: [0, 1, 0], fin: [0, 1, 0], pelvic: [0, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] },
 };
+// ct（2026-10-17、プロデューサー「色分けの仕方って本当にこれで正しいですか？背骨だけが紫なんですか？」→「進めて。内臓は黄ばませて。」）:
+//  CT に写る所は石灰化している。アリザリンはカルシウムの量だけ付くので、赤紫の量を CT の濃さで決める。
+//  濃さ = 元の CT（rebuild/full2/work/zyg_clean.npy、骨は 250 以上）の部位ごとの中央値から、肉の濃さ（約 50）を引いたもの。背骨を 1.5 とする比:
+//   背骨（m_spine）621 → 1.5、頭（m_head、頭骨・顎・エラ）365 → 0.83、肩帯＋胸びれ（塊 833）334 → 0.75、胸びれ（塊 1546）350 → 0.79、
+//   第 1 背びれ付近（塊 2670）362 → 0.82、尾（塊 4874）386 → 0.88、腹びれ（塊 3067・3064）305・311 → 0.68
+//  サメの軟骨は芯が石灰化していない基質（アルシアンで青）で、表面を石灰化した小板が覆うので、頭・ひれは青 1 を足す。椎体と歯は青なし。
+//  薄い部位は CT の画素（0.5〜0.735 mm）に骨と液がまざって薄く写るので、頭・ひれの赤紫は少なめに出ている見込み
+HH_PALETTES.ct = { spine: SPINE, teeth: [1, 0, 0], head: [0.83, 1, 0], gill: [0.83, 1, 0], fin: [0.8, 1, 0], pelvic: [0.68, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1, HH_YELLOW] };
 HH_PALETTES.photo = HH_PALETTES.juvenile;
 const PALETTE = Q.get("palette") ?? "photo";
 const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0

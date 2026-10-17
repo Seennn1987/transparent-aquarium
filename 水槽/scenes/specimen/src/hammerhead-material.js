@@ -247,9 +247,9 @@ const ORGAN_PALETTE = new URLSearchParams(location.search).get("palette") ?? "ph
 const ORGAN_PHOTO = ORGAN_PALETTE === "photo";
 // 2026-10-17 内臓は軟骨ではないので染まらない（透明にした組織、ほぼ無色）。calcified・double・juvenile では、無色の濁りの量（色見本 40 mm）で
 //  肝臓 1.5・消化管 1・らせん弁 1.5・心臓 1.2（量は目で見た仮の値）。値は [赤紫, 青, 無色, 黄ばみ] の量（hammerhead-lightbox.js の HH_STAIN_A）。
-//  黄ばみ（?yellow=）は脂の多い肝臓に 2 倍、ほかは肉と同じ量
-const OY = HH_YELLOW;
-export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5, 2 * OY], Gut: [0, 0, 1, OY], Spiral: [0, 0, 1.5, OY], Heart: [0, 0, 1.2, OY], HeartLarge: [0, 0, 1.2, OY], HeartSmall: [0, 0, 1.2, OY] } : null;
+//  黄ばみ: 2026-10-17 プロデューサー「内臓は黄ばませて」。内臓は脱色が届きにくく脂も多いので、肉の黄ばみ（?yellow=）に足して ?visy=（既定 1）。脂の多い肝臓は 2 倍
+const OY = HH_YELLOW + Number(new URLSearchParams(location.search).get("visy") ?? 1);
+export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo", "ct"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5, 2 * OY], Gut: [0, 0, 1, OY], Spiral: [0, 0, 1.5, OY], Heart: [0, 0, 1.2, OY], HeartLarge: [0, 0, 1.2, OY], HeartSmall: [0, 0, 1.2, OY] } : null;
 /** 染料の量 → 内臓の色の値（visceraMaterial の color。強さ visceraLook.amount × 7.5 × 色見本 40 mm で割る） */
 export function organMixToColor(m, amount) { const k = amount * 7.5 * 0.04; return stainAbsorb(m).map((v) => v / k); }
 //  肝臓は写真に黄色い臓器が見えないので、ほとんど色の無い淡い膜に（透過 0.90 / 0.91 / 0.93、色見本の厚み 40 mm・強さ 2）
