@@ -410,6 +410,27 @@ for _ in range(TAUBIN):
     v = v + 0.5 * (Lap @ v - v)
     v = v - 0.53 * (Lap @ v - v)
 print('mesh', len(v), len(f), f'{time.time()-t0:.0f}s', flush=True)
+# ---- 膜をならす（計画書 C の記録 21、案 3B。2026-10-17 プロデューサー決定「頭を除いてならす」）----
+#   上の Taubin（μ −0.53）は通す帯が広く、肋骨ごとの横の筋（波長 約 4.5 mm）が残った（記録 20）。μ −0.505（通す帯 約 0.02）で
+#   SKIN_SMOOTH 回ならす。頭の膜（頭骨からの距離が胴の体軸からの距離より近い所）は動かさず、境目はなめらかに移す。
+#   ならすと膜が縮むので、10 回ごとに、骨（軟骨を含む）までの距離が min（元の距離, SMOOTH_CLEAR_MM）より近くなった頂点を戻す
+SKIN_SMOOTH = int(os.environ.get('SKIN_SMOOTH', '120'))
+SMOOTH_CLEAR_MM = float(os.environ.get('SMOOTH_CLEAR_MM', '0.6'))
+if SKIN_SMOOTH:
+    dAX = TRUNK.dist(v)[0]; dHD = HEAD.dist(v)[0]
+    wsm = np.clip((dHD - dAX) / (1.0 * MM) + 0.5, 0, 1)
+    for _ in range(4): wsm = Lap @ wsm
+    XB = np.concatenate([posed(n)[::2] for n in bn if n in rest or n in rest_cart])
+    TB = cKDTree(XB); d0 = TB.query(v, workers=-1)[0]; dmin = np.minimum(d0, SMOOTH_CLEAR_MM * MM)
+    nback = 0
+    for it in range(0, SKIN_SMOOTH, 10):
+        vp = v.copy()
+        for _ in range(min(10, SKIN_SMOOTH - it)):
+            v = v + (0.5 * wsm)[:, None] * (Lap @ v - v)
+            v = v + (-0.505 * wsm)[:, None] * (Lap @ v - v)
+        bad = TB.query(v, workers=-1)[0] < dmin
+        v[bad] = vp[bad]; nback += int(bad.sum())
+    print('smoothed %d times outside the head (%d vertex steps held back near bone)' % (SKIN_SMOOTH, nback), f'{time.time()-t0:.0f}s', flush=True)
 # ---- 重み: 胴の膜は椎骨（と近い肋骨）、頭の膜は頭骨、手足は skinloft3 と同じ ----
 cols = ['AX', 'HD'] + list(limbs)
 D = np.zeros((len(v), len(cols)), np.float32)
