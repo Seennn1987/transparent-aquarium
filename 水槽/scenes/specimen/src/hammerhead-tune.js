@@ -1,13 +1,19 @@
 import { chameleonLook } from "./chameleon-material.js";
-import { HH_CHANNELS, hhColorLook } from "./hammerhead-lightbox.js";
-import { hhPartLook, hhOrganColor, mottleLook, gillRayLook, visceraLook } from "./hammerhead-material.js";
+import { HH_CHANNELS, hhColorLook, hhStainMix, stainToChannel } from "./hammerhead-lightbox.js";
+import { hhPartLook, hhOrganColor, mottleLook, gillRayLook, visceraLook, HH_ORGAN_MIX, organMixToColor } from "./hammerhead-material.js";
 import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 
 // シロシュモクザメの調整の欄（2026-10-15、プロデューサー「骨、内臓、軟骨、肉など、パーツ種別ごとに色や濃さを調整できるようにしたいです。調整パネルを作成して下さい」）。
 //  種別ごとに「色」と「濃さ」。色は、その種別のふつうの厚み（hammerhead-lightbox.js の ref）を通ったライトボックスの光の色で見せ、選ぶと
 //  その厚みでその色になる吸い方に置きかえる。濃さは吸い方の倍率（1 が既定）。値はこの画面の中だけで、ブラウザに覚えさせる（localStorage）。
 //  決めた値は「値をコピー」で取り出して、コードの既定に入れる。
-const STORE = "hh-tune-v1";
+// 2026-10-17 直し（プロデューサー「着色剤の種類はある程度決まっているわけで、色編集パレットは完全自由な色使いではなくて、それをベースに色を選べるようにして」）:
+//  色は自由に選ばず、染料の 3 つの量（赤紫 = アリザリンレッド S、青 = アルシアンブルー、無色 = 染まらない組織の濁り。hammerhead-lightbox.js の HH_STAIN_T）を
+//  動かして決める。色見本（四角）はその種別のふつうの厚みを通った光の色で、見るだけ。内臓も同じ 3 つの量（色見本の厚み 40 mm）
+const STORE = "hh-tune-v2";
+const organMix = Object.fromEntries(Object.keys(hhOrganColor).map((k) => [k, HH_ORGAN_MIX?.[k] ? [...HH_ORGAN_MIX[k]] : null]));
+const setMix = (c, m) => { hhStainMix[c.key] = [...m]; const r = stainToChannel(c, m), L = hhColorLook[c.key]; L.spectrum.value.set(...r.spectrum); L.gain.value = r.gain; L.density.value = 1; };
+const setOrganMix = (k, m) => { organMix[k] = [...m]; hhOrganColor[k]?.value.set(...organMixToColor(m, visceraLook.amount.value)); };
 const T0 = chameleonLook.boneT0;
 const eff = (c) => (c.sat ? T0.value * (1 - Math.exp(-c.ref / T0.value)) : c.ref);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -29,19 +35,20 @@ const setOrganColor = (k, hex) => { const a = visceraLook.amount.value * 7.5 * O
 // 欄に出す種別（順に）。color: 色の層、part: 部品の濃さだけ、organ: 内臓、look: 模様の強さ
 const GROUPS = [
   ["骨・軟骨", [
-    { channel: "spine", note: "椎骨（CT の殻・椎体・弓）。石灰化してアリザリンで赤紫" },
-    { part: "Centrum", label: "　椎体（背骨の中の濃さ）", max: 5 }, { part: "Arch", label: "　弓（背骨の中の濃さ）", max: 5 },
-    { part: "Rib", label: "　肋骨", max: 5 }, { part: "CaudalRay", label: "　尾びれの鰭条", max: 5 },
-    { channel: "head", note: "頭骨（厚い軟骨、アルシアンで青）" },
-    { channel: "jaw" }, { channel: "teeth" }, { channel: "gill" },
-    { channel: "fin", note: "胸びれ・背びれ・尾・肩帯・腰帯の放射軟骨" },
+    { channel: "spine", note: "椎骨（CT の殻と椎体）。石灰化している" },
+    { part: "Centrum", label: "　椎体（背骨の中の濃さ）", max: 5 },
+    { channel: "head", note: "頭骨と顎。成魚では軟骨の表面が石灰化した小板で覆われる" },
+    { channel: "teeth", note: "石灰化している" }, { channel: "gill" },
+    { channel: "fin", note: "胸びれ・背びれ・尾・肩帯・腰帯の軟骨（CT に写る）" },
     { channel: "pelvic" },
+    { channel: "uncal", note: "弓・肋骨・尾びれの鰭条（形は図と文献から）" },
+    { part: "Arch", label: "　弓（濃さ）", max: 5 }, { part: "Rib", label: "　肋骨（濃さ）", max: 5 }, { part: "CaudalRay", label: "　尾びれの鰭条（濃さ）", max: 5 },
   ]],
   ["肉・膜", [
-    { channel: "skin", note: "体の組織（胴・胸びれの膜）" },
+    { channel: "skin", note: "体の組織（胴・ひれの膜）。透明にして染まらない" },
     { part: "PelvicSkin", label: "腹びれの膜（肉の色の濃さ）", max: 30 },   // 膜は数 mm と薄く、肉の色（80 mm の胴に合わせた）では 3 倍でもほとんど見えない
   ]],
-  ["内臓", [{ organ: "Liver", label: "肝臓" }, { organ: "Gut", label: "消化管" }, { organ: "Spiral", label: "らせん弁" }, { organ: "Heart", label: "心臓" }]],
+  ["内臓（透明にした組織、ふつうは染まらない）", [{ organ: "Liver", label: "肝臓" }, { organ: "Gut", label: "消化管" }, { organ: "Spiral", label: "らせん弁" }, { organ: "Heart", label: "心臓" }]],
   ["表面の模様", [
     { look: chameleonLook.film, key: "dent", label: "皮歯", max: 3 }, { look: mottleLook.amount, key: "mottle", label: "まだら", max: 2 },
     { look: gillRayLook.amount, key: "rays", label: "鰓条", max: 5 }, { look: visceraLook.amount, key: "visc", label: "内臓ぜんぶ", max: 5 },
@@ -54,6 +61,8 @@ function snapshot() {
     parts: Object.fromEntries(Object.entries(hhPartLook).map(([k, v]) => [k, +v.value.toFixed(3)])),
     organs: Object.fromEntries(Object.entries(hhOrganColor).map(([k, v]) => [k, v.value.toArray().map((x) => +x.toFixed(4))])),
     looks: Object.fromEntries(GROUPS.flatMap(([, rows]) => rows.filter((r) => r.look).map((r) => [r.key, +r.look.value.toFixed(3)]))),
+    mix: Object.fromEntries(Object.entries(hhStainMix).map(([k, m]) => [k, m && m.map((v) => +v.toFixed(3))])),
+    organMix: Object.fromEntries(Object.entries(organMix).map(([k, m]) => [k, m && m.map((v) => +v.toFixed(3))])),
   };
 }
 function restore(s) {
@@ -61,6 +70,8 @@ function restore(s) {
   for (const [k, v] of Object.entries(s.parts ?? {})) if (hhPartLook[k]) hhPartLook[k].value = v;
   for (const [k, v] of Object.entries(s.organs ?? {})) if (hhOrganColor[k]) hhOrganColor[k].value.set(...v);
   for (const [, rows] of GROUPS) for (const r of rows) if (r.look && s.looks?.[r.key] != null) r.look.value = s.looks[r.key];
+  for (const [k, m] of Object.entries(s.mix ?? {})) { const c = HH_CHANNELS.find((x) => x.key === k); if (c && m) setMix(c, m); else if (c) hhStainMix[k] = null; }
+  for (const [k, m] of Object.entries(s.organMix ?? {})) { if (m && k in organMix) setOrganMix(k, m); else if (k in organMix) organMix[k] = null; }
 }
 const DEFAULTS = {};   // 欄を作るときの値（既定）
 
@@ -100,7 +111,14 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
     #hh-tune h3::before { content: "▾ "; color: #999; }
     #hh-tune h3.folded::before { content: "▸ "; }
     #hh-tune .name { cursor: default; }
-    #hh-tune .name.changed::before { content: "● "; color: #d35400; }`;
+    #hh-tune .name.changed::before { content: "● "; color: #d35400; }
+    #hh-tune .row.stainrow { grid-template-columns: 1fr 44px; margin-top: 8px; }
+    #hh-tune .swatch { display: inline-block; width: 40px; height: 18px; border: 1px solid #aaa; border-radius: 3px; }
+    #hh-tune .stains { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 1px 0 2px; }
+    #hh-tune .stain { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; font-size: 11px; align-items: center; }
+    #hh-tune .stain input[type=range] { width: 100%; grid-column: 1 / -1; }
+    #hh-tune .stain .val { grid-row: 1; grid-column: 2; font-size: 11px; }
+    #hh-tune .stain.r span:first-child { color: #b03060; } #hh-tune .stain.b span:first-child { color: #1f8fbf; } #hh-tune .stain.n span:first-child { color: #888; }`;
   document.head.append(css);
   const btn = document.createElement("button"); btn.id = "hh-tune-btn"; btn.type = "button"; btn.textContent = "調整";
   const panel = document.createElement("aside"); panel.id = "hh-tune"; panel.setAttribute("aria-label", "色と濃さの調整");
@@ -130,7 +148,7 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
   try { if (localStorage.getItem(STORE + "-side") === "left") setSide(true); } catch {}
   panel.append(bar);
   const head = document.createElement("div");
-  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色 = その種別のふつうの厚みを通った光の色。濃さ = 吸い方の倍率（1 が既定）。この画面だけの値で、ブラウザが覚えます（ギャラリーの器の中も同じ値）。● = 既定から変えた行。名前をダブルクリックでその行だけ既定に戻る。</div>";
+  head.innerHTML = "<b>色と濃さの調整</b><div style='font-size:11px;color:#777'>色は染料の量で決める: 赤紫 = アリザリンレッド S（石灰化した組織）、青 = アルシアンブルー（軟骨）、無色 = 染まらない組織の濁り。四角 = その種別のふつうの厚みを通った光の色。この画面だけの値で、ブラウザが覚えます（ギャラリーの器の中も同じ値）。● = 既定から変えた行。名前をダブルクリックでその行だけ既定に戻る。</div>";
   panel.append(head);
   const refreshers = [];
   const slider = (min, max, step, get, set) => {
@@ -153,26 +171,40 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
     for (const r of rows) {
       const row = document.createElement("div"); row.className = "row"; row.dataset.group = title;
       const name = document.createElement("span"); name.className = "name"; name.title = "ダブルクリックで、この行を既定に戻す";
-      const cur = () => snapshot(), key = r.channel ? ["channels", r.channel] : r.part ? ["parts", r.part] : r.organ ? ["organs", r.organ] : ["looks", r.key];
-      const isChanged = () => { const a = cur()[key[0]]?.[key[1]], b = DEFAULTS[key[0]]?.[key[1]]; return JSON.stringify(a) !== JSON.stringify(b) || Boolean(r.organ && cur().parts[r.organ] !== DEFAULTS.parts[r.organ]); };   // Boolean: classList.toggle に undefined を渡すと、印が付け外しを繰り返す
+      const cur = () => snapshot(), key = r.channel ? ["mix", r.channel] : r.part ? ["parts", r.part] : r.organ ? ["organMix", r.organ] : ["looks", r.key];
+      const isChanged = () => { const a = cur()[key[0]]?.[key[1]], b = DEFAULTS[key[0]]?.[key[1]]; return JSON.stringify(a) !== JSON.stringify(b); };
       refreshers.push(() => name.classList.toggle("changed", isChanged()));
       name.ondblclick = () => {
-        const one = { channels: {}, parts: {}, organs: {}, looks: {} }; one[key[0]][key[1]] = DEFAULTS[key[0]][key[1]];
-        if (r.organ) one.parts[r.organ] = DEFAULTS.parts[r.organ];
+        const one = { channels: {}, parts: {}, organs: {}, looks: {}, mix: {}, organMix: {} };
+        if (r.channel) one.channels[r.channel] = DEFAULTS.channels[r.channel];
+        if (r.organ) one.organs[r.organ] = DEFAULTS.organs[r.organ];
+        one[key[0]][key[1]] = DEFAULTS[key[0]][key[1]];
         restore(one); save(); refreshAll();
       };
-      if (r.channel) {
-        const c = HH_CHANNELS.find((x) => x.key === r.channel); const L = hhColorLook[c.key];
-        name.textContent = c.label;
-        row.append(name, colorInput(() => channelColor(c), (hex) => setChannelColor(c, hex)), ...slider(0, 10, 0.01, () => L.density.value, (v) => { L.density.value = v; }));
+      if (r.channel || r.organ) {
+        const c = r.channel && HH_CHANNELS.find((x) => x.key === r.channel);
+        if (r.organ && !hhOrganColor[r.organ]) continue;
+        name.textContent = r.channel ? c.label : r.label;
+        const sw = document.createElement("span"); sw.className = "swatch"; sw.title = "その種別のふつうの厚みを通った光の色（見るだけ）";
+        refreshers.push(() => { sw.style.background = r.channel ? channelColor(c) : organColor(r.organ); });
+        row.classList.add("stainrow"); row.append(name, sw);
+        const st = document.createElement("div"); st.className = "stains";
+        const getM = () => (r.channel ? hhStainMix[c.key] : organMix[r.organ]) ?? [0, 0, 0];
+        const setM = (m) => (r.channel ? setMix(c, m) : setOrganMix(r.organ, m));
+        for (const [i, lab, cls] of [[0, "赤紫", "r"], [1, "青", "b"], [2, "無色", "n"]]) {
+          const cell = document.createElement("label"); cell.className = "stain " + cls; cell.title = ["アリザリンレッド S（カルシウムに付く。石灰化した組織）", "アルシアンブルー（軟骨の基質に付く）", "染まらない組織の濁り"][i];
+          const t = document.createElement("span"); t.textContent = lab;
+          const [rr, vv] = slider(0, 3, 0.05, () => getM()[i], (v) => { const m = [...getM()]; m[i] = v; setM(m); });
+          cell.append(t, rr, vv); st.append(cell);
+        }
+        panel.append(row); row.dataset.group = title;
+        st.dataset.group = title; st.classList.add("row"); panel.append(st);
+        if (r.note) { const n = document.createElement("div"); n.className = "row"; n.dataset.group = title; const t = document.createElement("span"); t.className = "note"; t.textContent = r.note; n.append(t); panel.append(n); }
+        continue;
       } else if (r.part) {
         if (!hhPartLook[r.part]) continue;
         name.textContent = r.label;
         row.append(name, document.createElement("span"), ...slider(0, r.max ?? 4, 0.01, () => hhPartLook[r.part].value, (v) => { hhPartLook[r.part].value = v; }));
-      } else if (r.organ) {
-        if (!hhOrganColor[r.organ]) continue;
-        name.textContent = r.label;
-        row.append(name, colorInput(() => organColor(r.organ), (hex) => setOrganColor(r.organ, hex)), ...slider(0, 5, 0.01, () => hhPartLook[r.organ].value, (v) => { hhPartLook[r.organ].value = v; }));
       } else if (r.look) {
         name.textContent = r.label;
         row.append(name, document.createElement("span"), ...slider(0, r.max ?? 3, 0.01, () => r.look.value, (v) => { r.look.value = v; }));

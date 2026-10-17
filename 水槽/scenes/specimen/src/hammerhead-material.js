@@ -32,9 +32,12 @@ const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth")
 //  顎・エラの骨の色の混ぜ方（?jawbone=・?gillbone=・?gillcart=）は、層の色（HH_CHANNELS）の方に入る。腹びれの軟骨と膜は別の部品にした（a6a_export_gltf.py）
 CHANNEL.PelvicCartilage = 1; CHANNEL.PelvicSkin = 2;
 const LAYERS = {
-  Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: CHANNEL.Arch }, Rib: { a: CHANNEL.Rib }, CaudalRay: { a: CHANNEL.CaudalRay }, Cartilage: { a: [0, 1, 0, 0] },
+  Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: [CHANNEL.Arch[0], 0, 0, 0], b: [CHANNEL.Arch[1], 0, 0, 0] },
+  Rib: { b: [CHANNEL.Rib[1], 0, 0, 0] }, CaudalRay: { b: [CHANNEL.CaudalRay[1], 0, 0, 0] }, Cartilage: { a: [0, 1, 0, 0] },
   Skin: { a: [0, 0, 1, 0] }, PelvicSkin: { a: [0, 0, 1, 0] }, HeadCartilage: { a: [0, 0, 0, 1] },
-  Jaw: { b: [1, 0, 0, 0] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
+  // 2026-10-17: 顎は頭骨と同じ層（同じ組織）。弓・肋骨・尾びれの鰭条は「石灰化していない軟骨」の層（層 B の 1 つ目）。
+  //  弓の骨の色の混ぜ（?archbone=）は層 A の背骨へ、軟骨の分（?arch=、既定 0.5）は石灰化していない軟骨の層へ
+  Jaw: { a: [0, 0, 0, 1] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
 };
 /** 部品ごとの濃さの倍率（調整の欄。既定 1）。 */
 export const hhPartLook = Object.fromEntries([...Object.keys(LAYERS), "Liver", "Gut", "Spiral", "Heart", "HeartLarge", "HeartSmall", "Viscera"].map((k) => [k, { value: 1 }]));
@@ -239,11 +242,20 @@ const VISC_COLORS = { cream: [0.42, 0.74, 1], yellow: [0.25, 0.45, 1], blue: [1,
 // 案 2 の部品ごとの色（仮、出典なし）: 肝臓は黄みのクリーム、消化管は淡い青、らせん弁の仕切りは濃い青（強さ 3 倍）
 // 2026-10-17 色の既定（写真の透明標本、hammerhead-lightbox.js の PALETTE）: 消化管とらせん弁は、写真の腹の青い塊（粘液がアルシアンで青く染まる）に合わせて
 //  色見本の厚み 40 mm・強さ 2 で 透過 0.55 / 0.88 / 0.95 の青緑（らせん弁はその 1.5 倍）。肝臓と心臓は前のまま。前の色は ?palette=embryo
-const ORGAN_PHOTO = new URLSearchParams(location.search).get("palette") !== "embryo";
+const ORGAN_PALETTE = new URLSearchParams(location.search).get("palette") ?? "photo";
+const ORGAN_PHOTO = ORGAN_PALETTE === "photo";
+// 2026-10-17 内臓は軟骨ではないので染まらない（透明にした組織、ほぼ無色）。calcified・double・juvenile では、無色の濁りの量（色見本 40 mm）で
+//  肝臓 1.5・消化管 1・らせん弁 1.5・心臓 1.2（量は目で見た仮の値）。値は [赤紫, 青, 無色] の量（hammerhead-lightbox.js の HH_STAIN_A）
+export const HH_ORGAN_MIX = ["calcified", "double", "juvenile", "photo"].includes(ORGAN_PALETTE) ? { Liver: [0, 0, 1.5], Gut: [0, 0, 1], Spiral: [0, 0, 1.5], Heart: [0, 0, 1.2], HeartLarge: [0, 0, 1.2], HeartSmall: [0, 0, 1.2] } : null;
+const STAIN_A = { alizarin: [0.70, 0.33, 0.42].map((v) => -Math.log(v)), alcian: [0.44, 0.94, 0.99].map((v) => -Math.log(v)), clear: [0.93, 0.94, 0.95].map((v) => -Math.log(v)) };
+/** 染料の量 → 内臓の色の値（visceraMaterial の color。強さ visceraLook.amount × 7.5 × 色見本 40 mm で割る） */
+export function organMixToColor(m, amount) { const k = amount * 7.5 * 0.04; return [0, 1, 2].map((i) => (m[0] * STAIN_A.alizarin[i] + m[1] * STAIN_A.alcian[i] + m[2] * STAIN_A.clear[i]) / k); }
 //  肝臓は写真に黄色い臓器が見えないので、ほとんど色の無い淡い膜に（透過 0.90 / 0.91 / 0.93、色見本の厚み 40 mm・強さ 2）
-const ORGAN_COLORS = { Liver: ORGAN_PHOTO ? [0.176, 0.157, 0.121] : [0.25, 0.45, 1], Gut: ORGAN_PHOTO ? [1, 0.213, 0.085] : [1, 0.5, 0.42], Spiral: ORGAN_PHOTO ? [1.5, 0.32, 0.13] : [3, 1.5, 1.2],
+const ORGAN_COLORS_BASE = { Liver: ORGAN_PHOTO ? [0.176, 0.157, 0.121] : [0.25, 0.45, 1], Gut: ORGAN_PHOTO ? [1, 0.213, 0.085] : [1, 0.5, 0.42], Spiral: ORGAN_PHOTO ? [1.5, 0.32, 0.13] : [3, 1.5, 1.2],
   // 心臓（推定）: 体の組織と同じクリームの吸い方（visccol=cream）。心室は筋肉が厚いので、通り道が長いぶん濃く見える（色の出典なし）
   Heart: [0.42, 0.74, 1], HeartLarge: [0.42, 0.74, 1], HeartSmall: [0.42, 0.74, 1] };
+const ORGAN_VISC_AMOUNT = Number(new URLSearchParams(location.search).get("visc") ?? 2);
+const ORGAN_COLORS = HH_ORGAN_MIX ? Object.fromEntries(Object.keys(ORGAN_COLORS_BASE).map((k) => [k, organMixToColor(HH_ORGAN_MIX[k], ORGAN_VISC_AMOUNT)])) : ORGAN_COLORS_BASE;
 export const visceraLook = { amount: { value: Number(DENT_Q.get("visc") ?? 2) },   // 既定 2（2026-10-15 プロデューサー決定、案 2c）
  
   color: { value: new THREE.Vector3(...(VISC_COLORS[DENT_Q.get("visccol") ?? "cream"] ?? VISC_COLORS.cream)) } };

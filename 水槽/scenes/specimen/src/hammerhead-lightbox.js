@@ -22,35 +22,56 @@ export const HH_CHANNELS = [
   { key: "spine", label: "背骨", layer: 0, index: 0, sat: true, ref: 0.012, ...K.bone },
   { key: "fin", label: "ひれ・肩帯の軟骨", layer: 0, index: 1, ref: 0.00225, ...K.cartilage },
   { key: "skin", label: "肉（体の組織）", layer: 0, index: 2, ref: 0.080, ...K.skin },
-  { key: "head", label: "頭骨", layer: 0, index: 3, ref: 0.0031, ...K.viscera },
-  { key: "jaw", label: "顎", layer: 1, index: 0, ref: 0.0027, ...mix([[K.cartilage.gain, K.cartilage.spectrum], [K.bone.gain * JAW_BONE, K.bone.spectrum]]) },
+  { key: "head", label: "頭骨・顎", layer: 0, index: 3, ref: 0.0031, ...K.viscera },
+  // 2026-10-17: 顎は頭骨と同じ層（hammerhead-material.js の LAYERS）にし、空いた層を「石灰化していない軟骨」（弓・肋骨・尾びれの鰭条）に使う
+  { key: "uncal", label: "石灰化していない軟骨（弓・肋骨・尾びれの鰭条）", layer: 1, index: 0, ref: 0.00225, ...K.cartilage },
   { key: "gill", label: "エラの骨", layer: 1, index: 1, ref: 0.0033, ...mix([[K.cartilage.gain * GILL_CART, K.cartilage.spectrum], [K.bone.gain * GILL_BONE, K.bone.spectrum]]) },
   { key: "pelvic", label: "腹びれの軟骨", layer: 1, index: 2, ref: 0.002, ...K.cartilage },
   { key: "teeth", label: "歯", layer: 1, index: 3, sat: true, ref: 0.009, ...K.bone },
 ];
-// 2026-10-17 色の既定（プロデューサー「一旦これを参考に色付けしてみて。それを規定にして。組織種別ごとに色分けすることを意識して」、
-//  いただいた透明標本の写真 2 枚、プロデューサーの撮影）: 組織の種別ごとに 1 つの色にそろえる。種別ごとの、色見本の厚み（ref）を通ったときの透過（背景の液で割った値）:
-//   骨（石灰化。背骨・歯）: 赤紫の画素の中央値 写真 1 の 0.776 / 0.351 / 0.430、写真 2 の 0.620 / 0.311 / 0.409 → 0.70 / 0.33 / 0.42
-//   軟骨（頭骨・顎・エラの骨・ひれ・腹びれ）: 青緑の画素の中央値 写真 1 の 0.500 / 1.032 / 1.067、写真 2 の 0.370 / 0.847 / 0.982 → 0.44 / 0.94 / 0.99
-//   肉: 体の中の色の無い所は液より明るいか同じ（写真 1 の 1.17 / 1.17 / 1.11、写真 2 の 1.01 / 1.07 / 1.13）。ほとんど吸わない色の無い膜として 0.93 / 0.94 / 0.95
-//  頭骨は前は胚の濃い青緑、顎は淡い青、エラの骨は青緑と分けていたのを、軟骨の 1 色にそろえた（厚いところほど濃く見えるのは、通り道の長さで出る）。
-//  前の色は ?palette=embryo
+// 2026-10-17 染料で色を決める（プロデューサー「なんで頭部の骨と背骨が別の色なんでしょうか。なんで、内臓や軟骨も同じ青系統なんでしょうか。ちゃんと考えて。
+//  あと着色剤の種類はある程度決まっているわけで、色編集パレットは完全自由な色使いではなくて、それをベースに色を選べるようにして」）。
+//  透明標本の二重染色の色は、染料の 2 つと、染まらない組織の濁りの 3 つの足し合わせで決まる:
+//   アリザリンレッド S（カルシウムに付く → 石灰化した組織: 背骨の椎体、歯、皮歯、成魚の軟骨の表面の石灰化した小板）: 赤紫
+//   アルシアンブルー（軟骨の基質に付く → 石灰化していない軟骨）: 青
+//   染まらない組織（透明にした肉・膜・内臓）: ほとんど無色
+//  それぞれの色見本（色見本の厚み ref を通ったときの透過、背景の液で割った値）は、いただいた透明標本の写真 2 枚から:
+//   赤紫: 赤紫の画素の中央値 写真 1 の 0.776 / 0.351 / 0.430、写真 2 の 0.620 / 0.311 / 0.409 → 0.70 / 0.33 / 0.42
+//   青: 青緑の画素の中央値 写真 1 の 0.500 / 1.032 / 1.067、写真 2 の 0.370 / 0.847 / 0.982 → 0.44 / 0.94 / 0.99
+//   無色: 体の中の色の無い所は液と同じか明るい（1.01〜1.17）→ ほとんど吸わない 0.93 / 0.94 / 0.95
+//  層ごとの色は [赤紫の量, 青の量, 無色の濁りの量]（1 で上の色見本の濃さ）の足し合わせ。調整の欄もこの 3 つの量だけを動かす。
+//  塗り分けの案（?palette=）: calcified = 石灰化で塗り分け（CT に写る骨格はすべて赤紫）、double = 石灰化した軟骨は赤紫と青の両方、
+//   juvenile = 幼魚・胚（石灰化は背骨と歯だけ、ほかの軟骨は青）。photo は前の版（juvenile と同じで内臓が青）、embryo はその前の胚の色
+export const HH_STAIN_T = { alizarin: [0.70, 0.33, 0.42], alcian: [0.44, 0.94, 0.99], clear: [0.93, 0.94, 0.95] };
+export const HH_STAIN_A = Object.fromEntries(Object.entries(HH_STAIN_T).map(([k, t]) => [k, t.map((v) => -Math.log(v))]));
+const SPINE = [1.5, 0, 0];   // 背骨（椎体）は骨の中でも濃い（写真の赤紫の濃い 10% と中央値の間、透過 約 0.59 / 0.19 / 0.27）
+export const HH_PALETTES = {
+  calcified: { spine: SPINE, teeth: [1, 0, 0], head: [1, 0, 0], gill: [1, 0, 0], fin: [1, 0, 0], pelvic: [1, 0, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
+  double: { spine: SPINE, teeth: [1, 0, 0], head: [0.4, 0.4, 0], gill: [0.4, 0.4, 0], fin: [0.4, 0.4, 0], pelvic: [0.4, 0.4, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
+  juvenile: { spine: SPINE, teeth: [1, 0, 0], head: [0, 1, 0], gill: [0, 1, 0], fin: [0, 1, 0], pelvic: [0, 1, 0], uncal: [0, 1, 0], skin: [0, 0, 1] },
+};
+HH_PALETTES.photo = HH_PALETTES.juvenile;
 const PALETTE = Q.get("palette") ?? "photo";
-//   背骨（椎骨の列）は骨の中でも濃いので、赤紫の画素の中央値（0.70 / 0.33 / 0.42）と濃い 10% の平均（写真 1 の 0.385 / 0.147 / 0.219、写真 2 の 0.320 / 0.142 / 0.220 → 0.35 / 0.145 / 0.22）の間（幾何平均 0.52 / 0.23 / 0.31）。濃い 10% にすると画面の背骨は黒ずんだ赤（透過 0.46 / 0.28 / 0.38）になり、
-//    中央値にすると写真の背骨より淡い桃色になった
-const PHOTO_T = { bone: [0.70, 0.33, 0.42], spine: [0.52, 0.23, 0.31], cartilage: [0.44, 0.94, 0.99], skin: [0.93, 0.94, 0.95] };
-const CLASS = { spine: "spine", teeth: "bone", fin: "cartilage", head: "cartilage", jaw: "cartilage", gill: "cartilage", pelvic: "cartilage", skin: "skin" };
-export const HH_BONE_PHOTO_SPECTRUM = (() => { const A = PHOTO_T.bone.map((t) => -Math.log(t)), top = Math.max(...A); return A.map((v) => v / top); })();
-if (PALETTE === "photo") {
-  const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0
-  for (const c of HH_CHANNELS) {
-    const A = PHOTO_T[CLASS[c.key]].map((t) => -Math.log(t)), top = Math.max(...A), eff = c.sat ? T0 * (1 - Math.exp(-c.ref / T0)) : c.ref;
-    c.spectrum = A.map((v) => v / top); c.gain = top / eff;
-  }
-  // 肉のまだらも、色の無い肉の吸い方の比で（前は胚の肉のクリーム色から作っていた）
-  const As = PHOTO_T.skin.map((t) => -Math.log(t)), ts = Math.max(...As);
+const T0 = 0.02;   // hammerhead-stain.js の HH_BONE_T0
+const effOf = (c) => (c.sat ? T0 * (1 - Math.exp(-c.ref / T0)) : c.ref);
+/** 染料の量 [赤紫, 青, 無色] → 吸い方の比（spectrum）と 1 m あたりの利得（gain）。 */
+export function stainToChannel(c, m) {
+  const A = [0, 1, 2].map((i) => m[0] * HH_STAIN_A.alizarin[i] + m[1] * HH_STAIN_A.alcian[i] + m[2] * HH_STAIN_A.clear[i]), top = Math.max(...A, 1e-6);
+  return { spectrum: A.map((v) => v / top), gain: top / effOf(c) };
+}
+/** いまの染料の量（調整の欄が動かす）。embryo では null（前の色のまま、欄で動かすと染料の量に置きかわる） */
+export const hhStainMix = {};
+for (const c of HH_CHANNELS) {
+  const m = HH_PALETTES[PALETTE]?.[c.key];
+  hhStainMix[c.key] = m ? [...m] : null;
+  if (m) Object.assign(c, stainToChannel(c, m));
+}
+if (HH_PALETTES[PALETTE]) {
+  // 肉のまだらも無色の濁りの比で（前は胚の肉のクリーム色から作っていた）
+  const As = HH_STAIN_A.clear, ts = Math.max(...As);
   if (K.organs) K.organs.mottle = As.map((v) => (v / ts) * 0.12);
 }
+export const HH_BONE_PHOTO_SPECTRUM = (() => { const A = HH_STAIN_A.alizarin, top = Math.max(...A); return A.map((v) => v / top); })();
 export const HH_PALETTE = PALETTE;
 
 /** 調整の欄が動かす値（uniform の形）。spectrum は vec3、gain は 1 m あたり、density は濃さの倍率。 */
@@ -95,7 +116,7 @@ export function createHammerheadLightbox(renderer, { linear = false, alphaScale 
   const material = new THREE.ShaderMaterial({
     uniforms: {
       tPath: { value: target.texture }, tPath2: { value: target2.texture }, tFilm: { value: filmTarget.texture }, tOrgan: { value: organTarget.texture },
-      organGain: { value: 1 }, filmGain: { value: K.film.gain }, filmSpectrum: { value: new THREE.Vector3(...(PALETTE === "photo" ? HH_BONE_PHOTO_SPECTRUM : K.film.spectrum)) },   // 皮歯も骨の色
+      organGain: { value: 1 }, filmGain: { value: K.film.gain }, filmSpectrum: { value: new THREE.Vector3(...(HH_PALETTES[PALETTE] ? HH_BONE_PHOTO_SPECTRUM : K.film.spectrum)) },   // 皮歯は石灰化しているので赤紫
       lightbox: { value: new THREE.Vector3(...K.lightbox) }, boneT0: chameleonLook.boneT0,
       gainA: { value: new THREE.Vector4() }, gainB: { value: new THREE.Vector4() },
       ...Object.fromEntries(A.map((c, i) => [`specA${i}`, spec(c)])), ...Object.fromEntries(B.map((c, i) => [`specB${i}`, spec(c)])),
