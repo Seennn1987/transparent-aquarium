@@ -5,10 +5,25 @@
 #   blender/ct_hammerhead/run_all.sh --default           いつもの置き場（work/、mesh/、docs/hammerhead_ct/、標本ページの glb）に上書きする
 #   FIGS=1 を付けると、確認の図（docs/hammerhead_ct/ の *.png の元）も作る。FROM=<スクリプト名> でその段から始める
 #
+# 案を作るとき（2026-10-17 プロデューサー「案ごとに残すのは「作り直す方法」と「小さい結果」だけにして、work/ は残しません」）:
+#   BASE=<作り直したフォルダ> を付けると、出力のフォルダに work/ mesh/ docs/ が無いとき、BASE の中身を APFS の複製（cp -c）で置いてから始める。
+#     複製はファイルの中身を共有するので、FROM= より前の段の中間ファイル（zyg.npy など）はディスクを使わない。書き直した段の分だけ増える
+#   blender/ct_hammerhead/ に未コミットの変更があると止まる（どの版で作ったかを残すため）。試しだけなら ALLOW_DIRTY=1
+#   出力のフォルダに run_info.txt を書く（日時、引数、FROM・BASE、git のコミット、未コミットの変更、HH_ の環境変数、終わったときの glb）
+#   うまく終わったら work/ をゴミ箱（~/.Trash）へ移す。残すときは KEEP_WORK=1。--default のときは移さない。ゴミ箱は空にするまでディスクを使う
+#   TAG=<名前>（例 hh-body-f1）で、うまく終わったときに git のタグを付ける
+#
 # 必要なもの: リポジトリ直下の .venv（CLAUDE.md）、Blender 5.2（/Applications/Blender.app）、元の zip（hh_paths.py の ZIP）
 # 時間とディスク: 2026-10-15 の Mac（M4、24 GB）で約 5 分（279 秒）、出力に約 4.6 GB
 set -e
+setopt pipefail   # 段の Python が失敗したら止める（tail に渡しても失敗が消えないように。work/ を片付ける前に、うまく終わったかを確かめるため）
 H=${0:A:h}
+R=${H:h:h}
+# どの版で作ったかを残すため、blender/ct_hammerhead/ に未コミットの変更があれば、何かを作る前に止める
+dirty=$(git -C $R status --porcelain -- blender/ct_hammerhead)
+if [[ -n $dirty && -z $ALLOW_DIRTY ]]; then
+  echo "blender/ct_hammerhead/ に未コミットの変更があります。コミットしてから実行してください（試しだけなら ALLOW_DIRTY=1）:"; echo "$dirty"; exit 3
+fi
 PY=$H/../../.venv/bin/python
 BL=/Applications/Blender.app/Contents/MacOS/Blender
 if [[ $1 == --default ]]; then
@@ -16,6 +31,10 @@ if [[ $1 == --default ]]; then
 elif [[ -n $1 ]]; then
   O=${1:A}
   export HH_WORK=$O/work HH_MESH=$O/mesh HH_DOCS=$O/docs HH_GLB=$O/specimen_hammerhead.glb
+  if [[ -n $BASE && ! -e $HH_WORK ]]; then
+    B=${BASE:A}; [[ -d $B/work ]] || { echo "BASE に work/ がありません: $B"; exit 2; }
+    mkdir -p $O && cp -c -R $B/work $B/mesh $B/docs $O/
+  fi
   mkdir -p $HH_WORK $HH_MESH $HH_DOCS
 else
   echo "使い方: run_all.sh <出力のフォルダ> | --default"; exit 2
@@ -23,6 +42,18 @@ fi
 export HH_SCRIPTS=$H
 started=${FROM:+no}
 t0=$(date +%s)
+# どの版・どの設定で作ったかを残す
+INFO=${O:-$H/mesh}/run_info.txt   # --default のときは mesh/ に置く（work/ には書き足さない）
+{
+  echo "日時: $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "コマンド: run_all.sh $*"
+  echo "FROM: ${FROM:-（最初から）}"
+  echo "BASE: ${BASE:-（なし）}"
+  echo "git: $(git -C $R rev-parse HEAD)（$(git -C $R log -1 --format=%s | cut -c1-60)）"
+  echo "未コミットの変更（blender/ct_hammerhead/）: ${dirty:-なし}"
+  echo "FIGS: ${FIGS:-} KEEP_WORK: ${KEEP_WORK:-} TAG: ${TAG:-}"
+  echo "始めるときに指定した環境変数:"; { env | grep '^HH_' | grep -v -E '^HH_(WORK|MESH|DOCS|GLB|SCRIPTS)=' | sort | sed 's/^/  /' } || echo "  （なし）"
+} > $INFO
 step() {   # step <py|blender|fig|figblender> <スクリプト> [引数 ...]
   local kind=$1 s=$2; shift 2
   if [[ $started == no ]]; then [[ $s == $FROM ]] && started=yes || return 0; fi
@@ -121,3 +152,14 @@ if [[ -n $FIGS && $started != no ]]; then
   $BL -b --factory-startup -P $H/a7e_render_head.py -P $H/a7i_mouth_options.py 2>&1 | grep -E "Error|Traceback|wrote" || true
 fi
 echo "=== 終わり: $(( $(date +%s) - t0 )) s。glb: ${HH_GLB:-既定の置き場}"
+G=${HH_GLB:-$R/水槽/scenes/specimen/assets/specimen_hammerhead.glb}
+{
+  echo "終わり: $(date '+%Y-%m-%d %H:%M:%S')（$(( $(date +%s) - t0 )) 秒）"
+  [[ -f $G ]] && echo "glb: $G $(stat -f %z $G) バイト md5 $(md5 -q $G)"
+  echo "終わったときの環境変数（このスクリプトの既定を含む）:"; { env | grep '^HH_' | grep -v -E '^HH_(WORK|MESH|DOCS|GLB|SCRIPTS)=' | sort | sed 's/^/  /' } || true
+} >> $INFO
+if [[ -n $O && -z $KEEP_WORK && -d $HH_WORK ]]; then
+  T=~/.Trash/${O:t}-work-$(date +%Y%m%d%H%M%S)
+  mv $HH_WORK $T && echo "work/ をゴミ箱へ移した: $T" | tee -a $INFO
+fi
+if [[ -n $TAG ]]; then git -C $R tag $TAG && echo "タグ: $TAG" | tee -a $INFO; fi

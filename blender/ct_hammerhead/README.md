@@ -13,6 +13,23 @@ blender/ct_hammerhead/run_all.sh --default          # いつもの置き場に�
 
 `FIGS=1` で確認の図も作る。`FROM=<スクリプト名>` でその段から始める。
 
+## 案の残し方（2026-10-17〜）
+
+案ごとに残すのは「作り直す方法」と「小さい結果」だけにする。中間ファイルの work/（1 案あたり 2 GB 前後）は残さない。
+
+- 作る前に、スクリプトの変更をコミットする。`blender/ct_hammerhead/` に未コミットの変更があると run_all.sh は止まる（試しだけなら `ALLOW_DIRTY=1`）
+- 作るときは `BASE=` で、もとにする作り直しのフォルダ（いまの既定は `rebuild/full2`）を指定する。出力のフォルダに work/ mesh/ docs/ が APFS の複製（`cp -c`）で置かれ、`FROM=` の段から作る。複製はファイルの中身を共有するので、変えない段の中間ファイル（`zyg.npy` など）はディスクを使わない
+
+  ```bash
+  BASE=rebuild/full2 HH_FIN_REF=1 FROM=a5a_shell.py TAG=hh-body-f1 blender/ct_hammerhead/run_all.sh blender/ct_hammerhead/rebuild/body/f1
+  ```
+
+- 出力のフォルダの `run_info.txt` に、日時・引数・`FROM`・`BASE`・git のコミット・未コミットの変更・指定した環境変数・終わったときの環境変数（スクリプトの既定を含む）・glb の md5 が残る。`TAG=` を付けると、うまく終わったときに git のタグを付ける
+- うまく終わったら work/ はゴミ箱（`~/.Trash`）へ移る。残すときは `KEEP_WORK=1`。`--default` のときは移さない。ゴミ箱は空にするまでディスクを使う
+- 残るのは `run_info.txt`、`mesh/`（約 80 MB、PLY）、`docs/`、`specimen_hammerhead.glb`（約 27 MB）。作り直すときは、`run_info.txt` のコミットを取り出し、同じ `BASE`・`FROM`・環境変数で run_all.sh を回す
+- 消してよいもの: 案のフォルダの work/（作り直せる）。消さないもの: `rebuild/full2`（既定の作り直し、案の BASE）と、いつもの置き場の `work/`
+- `du` は APFS の複製を 1 つずつ数えるので、本当の使用量より大きく出る（2026-10-17 の body/ は du で約 60 GB、書き直した分は約 18 GB）
+
 ## 段ごとの検算
 
 ```bash
