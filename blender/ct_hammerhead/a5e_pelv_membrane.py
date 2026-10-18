@@ -41,7 +41,7 @@ iz=np.r_[iz,cz+co[0]]; iv=np.r_[iv,cv+co[1]]; iu=np.r_[iu,cu+co[2]]
 lo=np.array([iz.min(),iv.min(),iu.min()])-4; hi=np.array([iz.max(),iv.max(),iu.max()])+5
 Mk=np.zeros(hi-lo,bool); Mk[iz-lo[0],iv-lo[1],iu-lo[2]]=True
 Mk=ndi.binary_fill_holes(ndi.binary_closing(Mk,iterations=1))
-cartm=np.zeros_like(Mk); cartm[cz+co[0]-lo[0],cv+co[1]-lo[1],cu+co[2]-lo[2]]=True; Mk|=ndi.binary_dilation(cartm)
+cartm=np.zeros_like(Mk); cartm[cz+co[0]-lo[0],cv+co[1]-lo[1],cu+co[2]-lo[2]]=True; Mk|=ndi.binary_dilation(cartm,iterations=3 if CT175 else 1)   # CT175: ひれの面から外れて曲がる軟骨も 2 mm 以上覆う（1 画素では 59 頂点が膜の外）
 Fd=ndi.gaussian_filter(Mk.astype(np.float32),0.6)
 v,f,_,_=marching_cubes(np.pad(Fd,1),0.5,allow_degenerate=False); v=v-1+lo
 write_ply(f'{OUT}/HH_pelvmem_R.ply',to_blender(v),f)
