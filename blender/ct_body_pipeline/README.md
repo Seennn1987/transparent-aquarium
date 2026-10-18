@@ -89,6 +89,13 @@
 | 60 | rib_roots.py socket 6（trunk_widen.py の後。2026-10-17、計画書 C の記録 22〜24） | `prop22/rib_A.npz` → `chameleon_body_ct_h23d.npz`（記録 26 からは舌骨 1.2 倍の骨で `chameleon_body_ct_h26.npz`。これを `chameleon_body_ct.npz` にする） | 肋骨の付け根を背側へ 1 mm 上げた点に最も近い椎骨の表面へ寄せ、0.3 mm 差し込む（付け根から 6 mm でつなぐ）。手足の向きは rig_chameleon_ct.py の POSE_JAR（記録 23）で、Blender の dump_pose.py で `pose_jar.npz` を出し直し、`eyes.json` の centre_model を頭の行列で置き直してから skinbody.py … pack_soft.py |
 | 61 | eyes_orbit.py（skinbody.py の前。2026-10-17、記録 25・26） | `eyes_h24.json`・`p25/orbit.json`（眼窩の穴の重心と面積の同じ円の半径。記録 25 で glb から測った） → `eyes.json` | 眼の中心を眼窩の穴の重心へ（左右は今のまま）、半径を左右の平均 5.02 mm に |
 | 62 | digits_open.py 35 --bones=fL_hand,fR_hand（rib_roots.py の後。2026-10-18、計画書 C の記録 28・29） | `chameleon_body_ct_h26.npz` → `chameleon_body_ct_h29.npz`（これを `chameleon_body_ct.npz` にする） | 手の指の 2 つの束（CT では指先でくっついて閉じた輪）を、分かれ目を軸に片側 35° ずつ開く。足は開かない |
+| 63 | foot_bundles.py → digits_open.py 35 --bones=hL_foot --labels=…（2026-10-18、記録 30・31） | `chameleon_body_ct_h29.npz` → `chameleon_body_ct_h31.npz`（これを `chameleon_body_ct.npz` にする） | 左足の指の 2 つの束を片側 35° 開く。束は foot_bundles.py（指を 5 本見つけて向きで 2 束に）で分ける（digits_open.py の分け方だと 1 本の指が両方の束に分かれて骨が伸びた）。右足は輪でないので動かない |
+| 64 | digit_labels.py | `chameleon_body_ct_h31.npz` → `digits_h31.npz` | 足の骨の頂点に、指（1〜5）・束・爪の骨（末節骨）・指先の離れた部分の印を付ける |
+| 65 | skinbody.py（LIMB_T_FOOT=0.73） … pack_soft.py | 体の膜（足は手と同じ 0.73 mm。このあと足を差し替える） | 臓器は記録 29 のものを使い、organs*.py は回さない（膜の箱が変わると臓器の形が変わるため。記録 29） |
+| 66 | feet_skin.py `digits_h31.npz` `feet_posed.npz` | 足だけの膜（0.05 mm の格子） | 指ごとの膜（指 0.5 mm、付け根 0.73 mm）、爪の骨は膜から除く、同じ束の指は水かきでつなぎ指先だけ分ける、場を 0.12 mm でぼかす |
+| 67 | Blender -b -P merge_feet.py -- `skin_posed.npz` `feet_posed.npz` `merged_posed.npz` | 体の膜と足の膜をつなぐ | 足首から 1 mm 上で体の膜を箱で切り、Boolean の和。展示の姿勢のまま 14.9 万面に減らす（書き出しが 15 万面を超えると静止の形で間引いて三角形が伸びるため） |
+| 68 | rig_merged.py `merged_posed.npz` `soft_rigged.npz` `skin_posed.npz`（65 の出力）→ pack_soft.py → claws_mesh.py | `soft_rigged.npz`、`skin_posed.npz`、`chameleon_body_soft.npz`（org_claw を足す） | 新しくできた頂点だけ足と下腿の重み。爪の鞘は爪の骨から 0.12 mm、先へ 0.5 mm（仮）、内向きで保存 |
+| 見る | Blender -b -P blender_look_feet.py -- <出力の頭>（LOOK_OPAQUE=1 で膜だけ不透明） | 足の骨・膜・爪の鞘を 4 方向から描く | 書き出しを待たずに形を確かめる道具（30 秒）。最終の確認はページで撮る |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |
 | 35 | visceramesh.py | → `viscera_rigged.npz` | 体腔の内臓の一塊。胴の肋骨の凸包の内側・体軸より腹側・肺（空気の空洞）と骨の外・軟部の密度 0.3 以上の、いちばん大きな塊 |
