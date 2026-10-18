@@ -13,6 +13,13 @@ exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 VX = 0.735
 FINS = {'anal': [4302], 'dfin2': [4513], 'pelv': [3064, 3149, 3077]}   # pelv: 右の腹びれの塊（a3e_pelvic_options.py と同じ。左は鏡映）
 name = sys.argv[1]; labs = FINS[name]
+# 2026-10-19 案 A（プロデューサー「臀びれの CT の軟骨を第 2 背びれの膜に合わせて縮める案 A を作り、写真・前の版と並べて見せてください」）:
+#  この CT の第 2 背びれには棒が写っていない（計画書「第 2 背びれの軟骨がまだまばらな理由」）。HH_DFIN2_FROM_ANAL=1 で、臀びれの CT の軟骨（塊 4302）を面にし、
+#  臀びれの立て直しで正中へ寄せてから、背腹を返して第 2 背びれの付け根へ置く。大きさは、臀びれの膜（軟骨に合わせた外形: 付け根 49.2 mm・高さ 29.2 mm）を
+#  第 2 背びれの参考の外形（hh_fins.py: 付け根 41.0 mm・高さ 20.5 mm）にする割合で、体軸と高さを別々に縮める（左右の厚さは変えない）
+FROM_ANAL = name == 'dfin2' and os.environ.get('HH_DFIN2_FROM_ANAL') == '1'
+SRC = 'anal' if FROM_ANAL else name
+if FROM_ANAL: labs = FINS['anal']
 TH = float(os.environ.get('HH_FINCT_TH', 175))
 C = np.load('zyg_clean.npy', mmap_mode='r'); L = np.load('skel_lab.npy', mmap_mode='r'); info = json.load(open('comps_info.json'))
 cxs, cys = np.load('spine_line.npy'); t = np.load('tilt_sym.npy')
@@ -47,10 +54,18 @@ if name == 'pelv':
     vol = _write(f'{OUT}/HH_pelv_R.ply', np.stack([R_[:, 1], R_[:, 0], -R_[:, 2]], 1) / 1000.0, f)
     _write(f'{OUT}/HH_pelv_L.ply', np.stack([L_[:, 1], L_[:, 0], -L_[:, 2]], 1) / 1000.0, f)
 else:
-    X = np.load(f'a4_{name}_xform.npz'); ub, vb, ang = float(X['ub']), float(X['vb']), float(X['ang'])
+    X = np.load(f'a4_{SRC}_xform.npz'); ub, vb, ang = float(X['ub']), float(X['vb']), float(X['ang'])
     du, dv = u - ub, vv - vb; ca, sa = np.cos(ang), np.sin(ang)
     u2 = du * ca - dv * sa; v2 = du * sa + dv * ca + vb
     u2 = u2 - np.interp(np.round(v2 / 2), X['band_keys'], X['band_med']) * np.clip(np.abs(v2 - vb) / 10, 0, 1)
+    if FROM_ANAL:
+        import hh_fins; fa, fd2 = hh_fins.FINS['anal'], hh_fins.FINS['dfin2']; TLm = hh_fins.TL_MM
+        LA, HA = float(os.environ.get('HH_ANAL_FIT_BASE', 49.2)), float(os.environ.get('HH_ANAL_FIT_H', 29.2))   # a6a の fin_membrane_fit_HH_anal（2026-10-18）
+        sx, sy = (fd2['i'] - fd2['o']) * TLm / LA, fd2['H'] * TLm / HA
+        Xd = np.load('a4_dfin2_xform.npz'); vbd = float(Xd['vb'])
+        z_a0 = zm.min(); zm = fd2['o'] * TLm + 2.0 + (zm - z_a0) * sx   # 前の端を第 2 背びれの付け根の前の端の 2 mm 後ろへ（膜合わせが前後 −20〜+10 mm を探す）
+        v2 = vbd - (v2 - vb) * sy                                     # 臀びれは +v（腹）へ、第 2 背びれは −v（背）へ出る
+        rep_from = {'from': 'anal', 'scale_len': round(sx, 3), 'scale_height': round(sy, 3)}
     vol = _write(f'{OUT}/HH_{name}.ply', np.stack([zm, u2, -v2], 1) / 1000.0, f)   # Blender（x = 体軸、y = 左右、z = 背）
-rep = {'name': name, 'labels': labs, 'threshold': TH, 'components': int(len(keep)), 'voxels': int(np.isin(cl, keep).sum()), 'volume_ml': round(vol * 1e6, 3), 'faces': int(len(f))}
+rep = {**(rep_from if FROM_ANAL else {}), 'name': name, 'labels': labs, 'threshold': TH, 'components': int(len(keep)), 'voxels': int(np.isin(cl, keep).sum()), 'volume_ml': round(vol * 1e6, 3), 'faces': int(len(f))}
 json.dump(rep, open(f'a4_{name}_ctmesh.json', 'w'), ensure_ascii=False); print(rep)
