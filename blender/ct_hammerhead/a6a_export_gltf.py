@@ -118,7 +118,14 @@ def _body_warp(o, n):
             out = lambda: -fd["side"] * (Z + _np.interp(X, _sf["z_mm"], _sf[key]))   # 体の線からひれの側へ（mm）。Blender の z = −v
             w = _np.clip(out() / 1.5, 0, 1)   # 5 mm では、体の線から 1〜6 mm の所が外形と板の外に残った（臀びれ 107 点・132 点）
             # B: ひねりを取る。体軸 3 mm × 高さ 3 mm の区画ごとに、左右の中央を正中へ。それでも ±1.4 mm を超える区画は、その区画の左右を縮める
-            if os.environ.get("HH_FIN_CART_FLAT") == "1":
+            WHOLE = n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1"   # 2026-10-18: CT の細かさで作った臀びれ（a4d3_fin_ct_mesh.py）は、ひれ全体を 1 枚として動かす（棒の並びを崩さない）
+            if os.environ.get("HH_FIN_CART_FLAT") == "1" and WHOLE:
+                mm_ = w > 0.99; A_ = _np.c_[_np.ones(mm_.sum()), X[mm_], out()[mm_]]; cf = _np.linalg.lstsq(A_, Y[mm_], rcond=None)[0]
+                Y0 = Y.copy(); Y = Y - w * (cf[0] + cf[1] * X + cf[2] * out())            # ひれの面（左右 = a + b × 体軸 + c × 高さ）を正中の面へ
+                p99 = float(_np.percentile(_np.abs(Y[mm_]), 99))
+                if p99 > 1.4: Y = Y * (1 - w + w * 1.4 / p99)                            # まだ板より厚ければ、ひれ全体を同じ割合で薄く
+                report[f"fin_cart_flat_{n}"] = {"plane": [round(float(v_), 4) for v_ in cf], "p99_mm": round(p99, 2), "after": [round(float(Y[mm_].min()), 1), round(float(Y[mm_].max()), 1)]}
+            elif os.environ.get("HH_FIN_CART_FLAT") == "1":
                 cell = _np.floor(X / 3).astype(int) * 100000 + _np.floor(out() / 3).astype(int); Y0 = Y.copy()
                 for c_ in _np.unique(cell[w > 0]):
                     m_ = cell == c_; Yc = Y0[m_] - _np.median(Y0[m_]); top = _np.abs(Yc).max()
@@ -134,6 +141,15 @@ def _body_warp(o, n):
                 if fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
                 ins = lambda xx, zz: _inside(poly, xx, zz)
+                if WHOLE:   # ひれ全体を付け根の中ほどを中心に縮めて、外形から出る頂点を 0.5% 以下に（形は変えない）
+                    px = (fd["o"] + fd["i"]) / 2 * TLm; pz = -_np.interp(px, _sf["z_mm"], _sf[key]); best = 1.0
+                    for sc in _np.arange(1.0, 0.59, -0.02):
+                        X2 = px + (X - px) * (1 - w + w * sc); Z2 = pz + (Z - pz) * (1 - w + w * sc)
+                        o_ = (w > 0.99) & ~(ins(X2, Z2) & ins(X2 - 1, Z2) & ins(X2 + 1, Z2))
+                        best = sc
+                        if o_.sum() <= 0.005 * (w > 0.99).sum(): break
+                    X = px + (X - px) * (1 - w + w * best); Z = pz + (Z - pz) * (1 - w + w * best); co[:, 2] = Z / 1000
+                    report[f"fin_cart_scale_{n}"] = round(float(best), 2)
                 bad = (w > 0) & ~(ins(X, Z) & ins(X - 1, Z) & ins(X + 1, Z)); moved = 0
                 offs = _np.r_[0, _np.ravel(_np.c_[_np.arange(0.5, 40.5, 0.5), -_np.arange(0.5, 40.5, 0.5)])]
                 for i_ in _np.nonzero(bad)[0]:
