@@ -147,7 +147,8 @@ def _body_warp(o, n):
                     # 背腹: CT の位置のままでは軟骨の大半が体の中に入り、膜が大きくならなかった（k 1.0）。付け根（体の線から測った深さの 10% の点）を体の線の 3 mm 内へ
                     sh_ = (-3.0 - float(_np.percentile(out(), 10))); Z = Z - fd["side"] * sh_; co[:, 2] = Z / 1000
                     w = _np.clip(out() / 1.5, 0, 1); report[f"fin_cart_base_shift_{n}_mm"] = round(sh_, 1)
-                    Y = _np.clip(Y, -1.5, 1.5) * w + Y * (1 - w)                                  # 膜の板（±1.6 mm）から横へ出さない
+                    wl_ = _np.clip((out() + 3.0) / 1.5, 0, 1)                                     # 体の線の 3 mm 内から外は、膜の板（±1.6 mm）から横へ出さない（腹の下は細いので、体の線のすぐ内も）
+                    Y = _np.clip(Y, -1.5, 1.5) * wl_ + Y * (1 - wl_)
                     sel_ = _np.nonzero(w > 0.99)[0][::3]; xs_, zs_ = X[sel_], Z[sel_]
                     def _poly(o_mm, k):
                         Lb_, Hm_ = (fd["i"] - fd["o"]) * TLm * k, fd["H"] * TLm * k
