@@ -248,6 +248,9 @@ void main() {
  * output pixel's centre, which averages the 2 × 2 signed paths before anything is clamped, so the
  * two cancel (measured on chameleon.html?stain=01, ct_body_pipeline/README.md).
  */
+/** The most pixels a fine pass buffer may have (4096 × 3072; 2048 × 1536 at supersample 2 drew). */
+const FINE_PIXELS = 4096 * 3072;
+
 export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06", supersample = 2 } = {}) {
   const k = stainOf(stain);
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
@@ -311,7 +314,11 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
     supersample,
     setSize(w, h) {
       this.size.width = w; this.size.height = h;
-      const W = Math.max(1, Math.round(w * supersample)), H = Math.max(1, Math.round(h * supersample));
+      // On a large screen the three 4×-multisampled float buffers at `supersample` times the size
+      // could not be made (Chrome on a 3420 × 1678 canvas: 6840 × 3356, GL_INVALID_OPERATION, the page
+      // stayed grey; 2026-10-18), so the fine buffers are held to FINE_PIXELS and the factor shrinks.
+      const s = Math.max(1, Math.min(supersample, Math.sqrt(FINE_PIXELS / Math.max(1, w * h))));
+      const W = Math.max(1, Math.round(w * s)), H = Math.max(1, Math.round(h * s));
       target.setSize(W, H); filmTarget.setSize(W, H); organTarget.setSize(W, H);
       // Four bilinear taps 0.75 fine texel either side of the output pixel's centre (a texel corner):
       // 4 × 4 fine texels, weights 1-3-3-1 along each axis.
