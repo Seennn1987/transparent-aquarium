@@ -154,9 +154,15 @@ export function createHammerheadLightbox(renderer, { linear = false, alphaScale 
     size: { width: 1, height: 1 }, supersample, material,
     setSize(w, h) {
       this.size.width = w; this.size.height = h;
-      const W = Math.max(1, Math.round(w * supersample)), H = Math.max(1, Math.round(h * supersample));
+      // 2026-10-18 プロデューサー「choromeで見えません」: 大きな画面（2000×980 の窓、画素の倍率 2 → 描く先 4000×1960）では、
+      //  さらに 2 倍の細かさ（supersample）で 8000×3920 の 32 bit・4 倍の重ね塗りの描く先を 4 枚作れず、標本が描かれなかった（3200×1600 では描けた）。
+      //  描く先の画素数を MAX_PIXELS まで、細かさを下げて抑える（1 より下げない）。テクスチャの大きさの上限も超えない
+      const MAX_PIXELS = 16e6, maxTex = renderer.capabilities.maxTextureSize || 8192;
+      const ss = Math.max(1, Math.min(supersample, Math.sqrt(MAX_PIXELS / Math.max(1, w * h)), maxTex / Math.max(w, h, 1)));
+      this.effectiveSupersample = ss;
+      const W = Math.max(1, Math.round(w * ss)), H = Math.max(1, Math.round(h * ss));
       for (const t of [target, target2, filmTarget, organTarget]) t.setSize(W, H);
-      if (supersample > 1) material.uniforms.tap.value.set(0.75 / W, 0.75 / H); else material.uniforms.tap.value.set(0, 0);
+      if (ss > 1) material.uniforms.tap.value.set(0.75 / W, 0.75 / H); else material.uniforms.tap.value.set(0, 0);
     },
     render(scene, camera, output = null) {
       material.uniforms.gainA.value.set(...A.map(g)); material.uniforms.gainB.value.set(...B.map(g));
