@@ -14,10 +14,11 @@ import numpy as np
 from scipy.spatial import cKDTree
 from skimage import measure
 import pyfqmr
+import scipy.ndimage as nd
 
 bones_p, lab_p, soft_in, soft_out = sys.argv[1:5]
 SHEATH_MM = float(os.environ.get('SHEATH_MM', '0.12')); TIP_MM = float(os.environ.get('TIP_MM', '0.5')); VOX = float(os.environ.get('CLAW_VOX', '0.06'))
-FACES = int(os.environ.get('CLAW_FACES', '0')); AGG = int(os.environ.get('CLAW_AGG', '7'))
+FACES = int(os.environ.get('CLAW_FACES', '0')); R_TIP_MAX = float(os.environ.get('CLAW_RTIP_MAX', '0.3')); CLAW_BLUR = float(os.environ.get('CLAW_BLUR_MM', '0.05')); AGG = int(os.environ.get('CLAW_AGG', '7'))
 d = np.load(bones_p); L = np.load(lab_p)
 bones = sorted({k.split('__')[0] for k in L.files})
 V, F, WI = [], [], []; nv = 0
@@ -30,6 +31,7 @@ for bi, b in enumerate(bones):
         tip_pt = P[np.argmin(tq)]; base = P[tq >= np.percentile(tq, 80)].mean(0)
         ax = tip_pt - base; ax /= np.linalg.norm(ax)
         r0 = np.median(np.linalg.norm(P[tq < np.percentile(tq, 10)] - P[tq < np.percentile(tq, 10)].mean(0), axis=1)) + SHEATH_MM
+        r0 = min(r0, R_TIP_MAX)                     # 右足の短い指で先の太さが 0.78 mm と出て、爪の鞘が玉になった
         s = np.linspace(0, TIP_MM, 12)
         C = tip_pt + s[:, None] * ax; R = r0 + (0.02 - r0) * s / TIP_MM
         pad = max(R.max(), SHEATH_MM) + 4 * VOX                       # 格子の端で面が切れない（閉じていない辺が 54 本出た）
@@ -39,11 +41,12 @@ for bi, b in enumerate(bones):
         f1 = cKDTree(P).query(G, workers=-1)[0] - SHEATH_MM
         f2 = (np.linalg.norm(G[:, None, :] - C[None], axis=2) - R[None]).min(1)
         fld = np.minimum(f1, f2).reshape(shape)
+        fld = nd.gaussian_filter(fld, CLAW_BLUR / VOX)                # 爪の骨の凸凹の写しをならす
         vv, ff, _, _ = measure.marching_cubes(fld, 0.0, spacing=(VOX, VOX, VOX)); vv = vv + lo
         if FACES > 0:
             simp = pyfqmr.Simplify(); simp.setMesh(vv, ff); simp.simplify_mesh(target_count=FACES, aggressiveness=AGG, preserve_border=True, verbose=False)
             vv, ff, _ = simp.getMesh()
-        # いちばん大きい塊だけ残し（離れた小さな面が浮いた）、面を外向きに（符号つき体積が正）
+        # いちばん大きい塊だけ残し（離れた小さな面が浮いた）、いったん面を外向きに（符号つき体積が正）
         from scipy.sparse import coo_matrix; from scipy.sparse.csgraph import connected_components
         e = np.r_[ff[:, [0, 1]], ff[:, [1, 2]], ff[:, [2, 0]]]
         nc, lb = connected_components(coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), (len(vv), len(vv))), directed=False)
@@ -57,6 +60,7 @@ for bi, b in enumerate(bones):
         print('%s 指%d: 爪の鞘 長さ %.2f mm（骨の先から %.2f mm）、先の半径 %.2f mm、%d 面' % (
             b, k, np.ptp((vv - base) @ ax), TIP_MM, r0, len(ff)))
 V = np.concatenate(V).astype(np.float32); F = np.concatenate(F).astype(np.int32); WI = np.concatenate(WI)
+F = F[:, ::-1]          # 膜・臓器と同じ内向きで保存する（書き出しが読むときに裏返す。外向きのままだとページで裏返って見えなかった）
 S = dict(np.load(soft_in))
 S['org_claw__v'] = V; S['org_claw__f'] = F
 S['org_claw__w_idx'] = np.stack([WI, WI], 1).astype(np.int16); S['org_claw__w_val'] = np.tile(np.array([1.0, 0.0], np.float32), (len(V), 1))

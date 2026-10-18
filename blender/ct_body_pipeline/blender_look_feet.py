@@ -41,18 +41,25 @@ if has_claw:
     mesh('claw', cp, So['org_claw__f'], (0.95, 0.8, 0.2, 1))
 sc.render.engine = 'BLENDER_WORKBENCH'
 sh = sc.display.shading
-sh.light = 'STUDIO'; sh.color_type = 'OBJECT'; sh.show_xray = True; sh.xray_alpha = 0.6
-sh.show_object_outline = True; sh.show_cavity = False
-sc.render.resolution_x = 900; sc.render.resolution_y = 900; sc.render.film_transparent = False
+import os
+OPAQUE = os.environ.get('LOOK_OPAQUE') == '1'                     # 1: 膜を不透明にして外形だけ見る（骨は隠す）
+sh.light = 'STUDIO'; sh.color_type = 'OBJECT'; sh.show_xray = not OPAQUE; sh.xray_alpha = 0.6
+if OPAQUE:
+    for ob in sc.objects:
+        if ob.name.startswith('bone_'): ob.hide_render = True
+        if ob.name == 'skin': ob.color = (0.45, 0.6, 0.9, 1)
+    sh.show_cavity = True
+sh.show_object_outline = True
+sc.render.resolution_x = int(os.environ.get('LOOK_RES', '900')); sc.render.resolution_y = sc.render.resolution_x; sc.render.film_transparent = False
 sc.world = bpy.data.worlds.new('w'); sc.world.color = (0.88, 0.88, 0.88)
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); sc.camera = cam
 cam.data.type = 'ORTHO'
 for n in BONES:
     x = posed(n, d[n + '__v']); c = x.mean(0); U = np.linalg.svd(x - c, full_matrices=False)[2]
-    size = np.ptp((x - c) @ U.T, 0).max() * 1.5
+    size = np.ptp((x - c) @ U.T, 0).max() * 1.5 * float(os.environ.get('LOOK_ZOOM', '1'))
     cam.data.ortho_scale = size; cam.data.clip_start = 0.001 * size; cam.data.clip_end = 100 * size
     for tag, dirv in (('a', U[2]), ('b', -U[2]), ('c', U[1]), ('d', -U[1])):
         cam.location = Vector(c + dirv * size * 3)
         cam.rotation_euler = (Vector(c) - cam.location).to_track_quat('-Z', 'Y').to_euler()
-        sc.render.filepath = f'{out}_{n}_{tag}.png'; bpy.ops.render.render(write_still=True)
+        sc.render.filepath = f'{out}{"_skin" if OPAQUE else ""}_{n}_{tag}.png'; bpy.ops.render.render(write_still=True)
         print('wrote', sc.render.filepath)
