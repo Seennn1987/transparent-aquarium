@@ -316,9 +316,47 @@ if os.environ.get('LIMB_CLEFT'):
             lab = np.concatenate([lab, lab[cKDTree(pb[:len(lab)]).query(pb[len(lab):])[1]]])
         CLEFT[n] = [cKDTree(pb[lab == i]) for i in (0, 1, 2)]
     print('cleft between digit bundles:', sorted(CLEFT), 'width %.2f mm' % CLEFT_MM, flush=True)
+# 指ごとの膜（記録 31 の案。2026-10-18）: LIMB_DIGITS は digit_labels.py の出力。
+#   ・爪の骨（末節骨）の点を膜の場から除く: 膜は最後の関節のまわりで終わり、爪の骨は外に出る（爪の鞘は claws_mesh.py）
+#   ・指（1〜5）は DIGIT_T_MM、付け根（0）は足の厚み（LIMB_T）
+#   ・最も近い 2 本の指のあいだ（両方から等しい距離のまわり、幅 CLEFT_MM）を膜の外にする。違う束どうしは付け根から 1 mm 先から、
+#     同じ束どうしは指先の離れた部分（free、指先から FREE_MM 以内）だけ。骨から CLEFT_KEEP_MM より内へは入れない
+DIGITS = {}
+DIGIT_T_MM = float(os.environ.get('DIGIT_T_MM', '0.5'))
+if os.environ.get('LIMB_DIGITS'):
+    DL = np.load(os.environ['LIMB_DIGITS'])
+    for n in limbs:
+        if n + '__label' not in DL.files: continue
+        pb = posed(n); nb = len(DL[n + '__label'])
+        _ext = lambda a: np.concatenate([a, a[cKDTree(pb[:nb]).query(pb[nb:])[1]]]) if len(pb) > nb else a
+        lab, claw, free = _ext(DL[n + "__label"]), _ext(DL[n + "__claw"]), _ext(DL[n + "__free"])
+        keep = ~claw
+        trees = [cKDTree(pb[keep & (lab == i)]) for i in range(6)]
+        frees = [free[keep & (lab == i)] for i in range(6)]
+        DIGITS[n] = (trees, frees, DL[n + '__bundle'])
+    print('digit-wise skin:', sorted(DIGITS), 'digit skin %.2f mm, cleft %.2f mm' % (DIGIT_T_MM, CLEFT_MM), flush=True)
+def digit_field(n, x, ub):
+    trees, frees, bundle = DIGITS[n]; tt = limbs[n][1]; cap = ub + 2 * MM
+    D = np.full((len(x), 6), cap); F = np.zeros((len(x), 6))
+    for i in range(6):
+        dd, j = trees[i].query(x, workers=-1, distance_upper_bound=cap)
+        ok = np.isfinite(dd); D[ok, i] = dd[ok]
+        if i > 0: F[ok, i] = frees[i][j[ok]]
+    dmin = D.min(1)
+    t_here = np.where(D[:, 0] <= D[:, 1:].min(1), tt, DIGIT_T_MM * MM)
+    base = dmin - t_here
+    o = np.argsort(D[:, 1:], axis=1)[:, :2] + 1; r = np.arange(len(x))
+    a, b = o[:, 0], o[:, 1]; da, db = D[r, a], D[r, b]
+    other = bundle[a] != bundle[b]
+    ramp = np.where(other, np.clip((D[:, 0] - da) / MM, 0, 1), np.minimum(F[r, a], F[r, b]))
+    cut = np.minimum((CLEFT_MM * MM - (db - da)) / 2 - (1 - ramp) * 10 * MM, da - CLEFT_KEEP_MM * MM)
+    out = np.maximum(base, cut)
+    out[dmin > ub] = np.inf
+    return out
 def limb_field(n, x, ub):
     """手足の骨 n の場の距離（膜の面で 0、外で正）。ub より遠い所は inf。"""
     kd, tt, _, _ = limbs[n]
+    if n in DIGITS: return digit_field(n, x, ub)
     if n not in CLEFT: return kd.query(x, workers=-1, distance_upper_bound=ub)[0] - tt
     dB, dU, dL = [np.minimum(t.query(x, workers=-1, distance_upper_bound=ub + 2 * MM)[0], ub + 2 * MM) for t in CLEFT[n]]
     dmin = np.minimum.reduce([dB, dU, dL])
@@ -460,6 +498,9 @@ if SKIN_SMOOTH:
     dAX = TRUNK.dist(v)[0]; dHD = HEAD.dist(v)[0]
     wsm = np.clip((dHD - dAX) / (1.0 * MM) + 0.5, 0, 1)
     for _ in range(4): wsm = Lap @ wsm
+    if DIGITS:   # 指ごとの膜（記録 31）: 指の骨から 1.5 mm 以内はならさない（指のあいだの切れ込みが埋まった）
+        dd = np.min([trees[i].query(v, workers=-1)[0] for n_ in DIGITS for trees in [DIGITS[n_][0]] for i in range(1, 6)], axis=0)
+        wsm = wsm * np.clip((dd - 1.5 * MM) / MM, 0, 1)
     XB = np.concatenate([posed(n)[::2] for n in bn if n in rest or n in rest_cart])
     TB = cKDTree(XB); d0 = TB.query(v, workers=-1)[0]; dmin = np.minimum(d0, SMOOTH_CLEAR_MM * MM)
     nback = 0
