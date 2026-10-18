@@ -45,8 +45,8 @@ info={'fin_len_mm':round(float(LX.max()),1),'faces':int(len(f)),'margin_mm':5,'s
 json.dump(info,open('a5_pelvmem.json','w'),indent=1); print(info)
 # 2026-10-18（プロデューサー「CTを原本にしない方が良いのでは？もっと良い事例を探してみて」→「その案で進めてください」）: HH_PELV_RODS=1 で、
 #  腹びれの軟骨を CT の代わりに図と写真から作る（hh_finrods.py の見本: ウチワシュモクザメの透明標本（© Adam Summers）、Reynolds 1897 Fig. 8）。
-#  ひれの板（e1・e2、付け根 B）の中に: 内側の縁から 2 mm 内に沿う基鰭軟骨（幅 2.4・厚さ 2.0 mm、膜の長さの 0.85 まで）、そこから外・後ろへ 60° で
-#  平行に並ぶ 17 本の 2 節の棒（幅 1.0・厚さ 1.6 mm、膜の縁の 1.2 mm 内まで、節の間 0.5 mm）、付け根から正中までの腰帯の横棒（幅 4・厚さ 3 mm）。
+#  ひれの板（e1・e2、付け根 B）の中に: 内側の縁から 2 mm 内に沿う基鰭軟骨（幅 2.4・厚さ 2.0 mm、膜の長さの 0.85 まで）、そこから体軸の後ろから外へ 45° で
+#  平行に並ぶ 17 本の 2 節の棒（幅 2.0・厚さ 1.6 mm、膜の縁の 1.2 mm 内まで、節の間 0.5 mm）、付け根から正中までの腰帯の横棒（幅 4・厚さ 3 mm）。
 #  CT の腹びれの軟骨（HH_pelv_R/L.ply）を置き換える（同じ名前で書くので、a6a_export_gltf.py・b1_rig.py の扱いは前と同じ）
 if _os.environ.get('HH_PELV_RODS') == '1':
     import hh_finrods as R
@@ -64,10 +64,14 @@ if _os.environ.get('HH_PELV_RODS') == '1':
     for (xa_, ya_), (xb_, yb_) in zip(cl[:-1], cl[1:]):
         d2 = np.array([xb_ - xa_, yb_ - ya_]); d2 /= np.linalg.norm(d2); w2 = np.array([-d2[1], d2[0]])
         parts.append(R.box(to3(xa_, ya_), to3(xb_, yb_), w2[0] * e1 + w2[1] * e2, 2.4, nrm, 2.0))
-    phi = np.radians(60); NR = 17; rod_info = []
+    # 棒の向き: 体軸（後ろ）から外へ 45°（Reynolds 1897 Fig. 8 で、腹びれの棒の多くは外・後ろへ向く）。60° を基鰭軟骨から測った版は、腹から見て真横を向いた
+    ax2 = np.array([e1[1], e2[1]]); ax2 /= np.linalg.norm(ax2); lat2 = np.array([-ax2[1], ax2[0]])
+    if np.sign(lat2[1]) == np.sign(smed): lat2 = -lat2                  # 内側（正中）と反対へ
+    dirR = np.cos(np.radians(45)) * ax2 + np.sin(np.radians(45)) * lat2
+    NR = 17; rod_info = []
     for k in range(NR):
         xk = Xa + 2 + (Xb - Xa - 4) * k / (NR - 1); yk = ymed(xk) - smed * 1.4
-        d = np.array([np.cos(phi), -smed * np.sin(phi)]); p = np.array([xk, yk])
+        d = dirR; p = np.array([xk, yk])
         s = np.arange(0, 80, 0.2); q = p[None] + s[:, None] * d[None]
         ok = insideP(*(q + 1.2 * d).T) & insideP(*q.T)
         bad = np.nonzero(~ok)[0]; L = float(s[bad[0] - 1]) if len(bad) and bad[0] > 0 else 0.0
@@ -75,7 +79,7 @@ if _os.environ.get('HH_PELV_RODS') == '1':
         Lm = 0.55 * L; w2 = np.array([-d[1], d[0]])
         for a_, b_ in [(0, Lm - 0.25), (Lm + 0.25, L)]:
             pa, pb = p + d * a_, p + d * b_
-            parts.append(R.box(to3(*pa), to3(*pb), w2[0] * e1 + w2[1] * e2, 1.0, nrm, 1.6))
+            parts.append(R.box(to3(*pa), to3(*pb), w2[0] * e1 + w2[1] * e2, 2.0, nrm, 1.6))   # 幅 2 mm（透明標本の写真で棒の幅 ≒ 棒の間）
         rod_info.append(round(L, 1))
     b0 = to3(0.0, ymed(Xa) if False else 0.0); bm_ = b0.copy(); bm_[0] = 0.0
     parts.append(R.box(b0, bm_, np.array([0.0, 1.0, 0.0]), 4.0, np.array([0.0, 0.0, 1.0]), 3.0))   # 腰帯: 付け根から正中（u = 0）へ、体軸の向きに幅 4、背腹に厚さ 3

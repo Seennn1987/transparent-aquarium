@@ -64,18 +64,18 @@ def median_fin(fd, line_of_x, TL_MM, rod_w=1.0, rod_t=1.6, plate_t=2.0):   # 棒
     x0 = fd["o"] * TL_MM
     poly = [(x0 + s * Lb, line_of_x(x0 + s * Lb) + out * (h * Hm if h > 0 else -4.0)) for s, h in fd["poly"]]
     parts = []
-    # 土台の板: 付け根の 0.05〜0.95、体の線の 3 mm 内から 1.5 mm 外まで
+    # 土台の板: 付け根の 0.05〜0.95、体の線の 2 mm 内から 0.5 mm 外まで
     for s0, s1 in [(0.05, 0.95)]:
         xa, xb = x0 + s0 * Lb, x0 + s1 * Lb
         za, zb = line_of_x(xa), line_of_x(xb)
-        zc = lambda z: z + out * (-0.75)
-        parts.append(box((xa, 0, zc(za)), (xb, 0, zc(zb)), (0, 0, 1), 4.5, (0, 1, 0), plate_t))
+        zc = lambda z: z + out * (-0.75)   # 幅 2.5 mm の中心
+        parts.append(box((xa, 0, zc(za)), (xb, 0, zc(zb)), (0, 0, 1), 2.5, (0, 1, 0), plate_t))   # 幅 4.5 mm では棒より目立った（見比べの図 cmp_fin_rods.jpg）
     # 棒: 板の外の縁（体の線 + 1.5 mm）から、体軸に 32° で後ろ・外へ。先は深さ ROD_REACH × H か、外形の内側 1 mm まで
     th = np.radians(ROD_ANGLE_DEG); d = np.array([np.cos(th), out * np.sin(th)])
     n = max(3, int(round(1 / ROD_SPACING_FRAC)))
     for k in range(n):
         xs = x0 + (0.04 + 0.9 * k / (n - 1)) * Lb
-        p = np.array([xs, line_of_x(xs) + out * 1.6])
+        p = np.array([xs, line_of_x(xs) + out * 0.6])   # 板の外の縁（体の線 + 0.5 mm）のすぐ外から
         L = min(ROD_REACH * Hm / np.sin(th), 3 * Hm)
         L = clip_ray(poly, p, d, L, 1.0)
         if L < 2: continue
