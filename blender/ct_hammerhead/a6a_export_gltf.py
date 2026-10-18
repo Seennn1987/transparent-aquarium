@@ -44,6 +44,8 @@ if FIN_PARTS:
     PARTS["PectSkin"] = (["HH_pectmem_L", "HH_pectmem_R"], 0.099)
 for _fin, _part in PLATE_FINS.items():
     if _part not in PARTS: PARTS[_part] = ([], 1.0)
+# 2026-10-18: CT の細かさで作った腹びれの軟骨（HH_PELV_CT175）は、膜を 6.5%（7700 面）まで減らすと薄い所で覆いが欠け、軟骨が膜の外に出た。膜は 30% まで
+if os.environ.get("HH_PELV_CT175") == "1": PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], 0.30)
 FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
@@ -242,7 +244,7 @@ def _body_warp(o, n):
             co[:, 1] = c0[1] + yy * math.cos(th) - zz * math.sin(th); co[:, 2] = c0[2] + yy * math.sin(th) + zz * math.cos(th)
         # 2026-10-18（プロデューサー「皮膚から飛び出さないようにしてね」）: CT の細かさで作った腹びれの軟骨（HH_PELV_CT175）は、左右の腹びれの間の正中（左右 5 mm 以内）で
         #  腹の線の下へ出た（108 頂点、腹の線から 0.5〜3 mm）。左右の膜はそこまで届かないので、その頂点を腹の線の 1.5 mm 内へ入れる（正中から離れるほど弱く）
-        if os.environ.get("HH_PELV_CT175") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):
+        if os.environ.get("HH_PELV_MIDTUCK") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):   # 試し（既定では働かない）: 形が 1853 頂点ぶん変わったのでやめ、膜の面を減らしすぎない方にした
             _sf2 = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
             belly = -_np.interp(co[:, 0] * 1000, _sf2["z_mm"], _sf2["bot_target_mm"]) / 1000 + 0.0015
             wm = _np.clip((0.009 - _np.abs(co[:, 1])) / 0.002, 0, 1); low = co[:, 2] < belly   # 正中から 7 mm まで、9 mm で 0（5 mm では 13 頂点が残った）
