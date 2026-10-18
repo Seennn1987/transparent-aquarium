@@ -278,7 +278,10 @@ for part, (names, target) in PARTS.items():
         f = bm.faces.new(vs); bmesh.ops.triangulate(bm, faces=[f], quad_method="BEAUTY", ngon_method="BEAUTY")
         bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
         bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.0032)
-        bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, -0.0016, 0))
+        # 2026-10-18 直し: 押し出す向きは面の回る向きで決まり、前は背びれの板が左右 −4.8〜−1.6 mm に寄り、臀びれの板は −4.8〜1.6 mm と厚くなっていた。
+        #  押し出した後の左右の端から、正中（左右 0）にそろえる
+        _ys = [v.co.y for v in bm.verts]; bmesh.ops.translate(bm, verts=bm.verts[:], vec=(0, -(min(_ys) + max(_ys)) / 2, 0))
+        report[f"plate_y_{_fin}_mm"] = [round((min(_ys) - (min(_ys) + max(_ys)) / 2) * 1000, 2), round((max(_ys) - (min(_ys) + max(_ys)) / 2) * 1000, 2)]
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])   # 外向きにそろえる（腹へ向けた板は、多角形の回る向きが背の板と逆になる）
         me = bpy.data.meshes.new(f"tmp_plate_{_fin}"); bm.to_mesh(me); bm.free()
         ob_ = bpy.data.objects.new(f"tmp_plate_{_fin}", me); coll.objects.link(ob_); objs.append(ob_)
