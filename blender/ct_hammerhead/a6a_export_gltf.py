@@ -44,6 +44,7 @@ if FIN_PARTS:
     PARTS["PectSkin"] = (["HH_pectmem_L", "HH_pectmem_R"], 0.099)
 for _fin, _part in PLATE_FINS.items():
     if _part not in PARTS: PARTS[_part] = ([], 1.0)
+FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)
@@ -93,7 +94,8 @@ def _body_warp(o, n):
         #  軟骨の先（体から最も離れた所）が、膜の高さ H のその割合に来るようにする。0.53 は第 1 背びれの CT: 軟骨の先が背の線から 63 mm、膜の高さ 119 mm。
         #  前は CT の体の線からの位置のままで、参考の膜の付け根の線（a5_side_fit.json）とずれ、臀びれの軟骨は膜の 2 割までしか届かず体の中に入っていた
         _reach = os.environ.get("HH_FIN_CART_REACH")
-        if _reach and n in ("HH_dfin2", "HH_anal") and os.environ.get("HH_FIN_REF") == "1":
+        _membfit = n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1" and os.environ.get("HH_FINCT_FIT") == "membrane"
+        if _reach and n in ("HH_dfin2", "HH_anal") and os.environ.get("HH_FIN_REF") == "1" and not _membfit:   # 膜を軟骨に合わせるときは、軟骨は CT の位置のまま
             import hh_fins
             fd = hh_fins.FINS["dfin2" if n == "HH_dfin2" else "anal"]; TLm = hh_fins.TL_MM
             _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
@@ -138,10 +140,34 @@ def _body_warp(o, n):
                 for s_, h_ in fd["poly"]:
                     xm = fd["o"] * TLm + s_ * Lb; hh = h_ * Hm if h_ > 0 else -4.0
                     poly.append((xm, -(_np.interp(xm, _sf["z_mm"], _sf[key]) + fd["side"] * hh)))
-                if fin == "anal":
+                if _membfit:
+                    # 2026-10-18（プロデューサー「軟骨って実際にそんなに短いのヒレ全体の３０％程度しかないのでしょうか？」→ 膜を軟骨に合わせる案に「皮膚から飛び出さないようにしてね。修正を承認します」）:
+                    #  軟骨は CT の大きさ・位置のまま。参考の外形（hh_fins.py の臀びれ）を同じ形のまま k 倍し、前後にずらして、体の線から 1.5 mm より外の軟骨の頂点が
+                    #  すべて外形の内側 1 mm に入る、いちばん小さい k を探す。膜の板（AnalSkin）はこの外形で作る（FIT_FD）
+                    Y = _np.clip(Y, -1.5, 1.5) * w + Y * (1 - w)                                  # 膜の板（±1.6 mm）から横へ出さない
+                    sel_ = _np.nonzero(w > 0.99)[0][::3]; xs_, zs_ = X[sel_], Z[sel_]
+                    def _poly(o_mm, k):
+                        Lb_, Hm_ = (fd["i"] - fd["o"]) * TLm * k, fd["H"] * TLm * k
+                        return [(o_mm + s_ * Lb_, -(_np.interp(o_mm + s_ * Lb_, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * Hm_ if h_ > 0 else -4.0))) for s_, h_ in fd["poly"]]
+                    x_lo = float(xs_.min()); found = None
+                    for k in _np.arange(1.0, 2.51, 0.02):
+                        for o_mm in _np.arange(x_lo - 25, x_lo + 0.01, 0.5):
+                            P_ = _poly(o_mm, k)
+                            if (_inside(P_, xs_, zs_) & _inside(P_, xs_ - 1, zs_) & _inside(P_, xs_ + 1, zs_)).all(): found = (k, o_mm); break
+                        if found: break
+                    k, o_mm = found if found else (2.5, x_lo - 10)
+                    FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * k)
+                    poly = _poly(o_mm, k)
+                    report[f"fin_membrane_fit_{n}"] = {"k": round(float(k), 2), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * k), 1)}
+                elif fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
                 ins = lambda xx, zz: _inside(poly, xx, zz)
-                if WHOLE:   # ひれ全体を付け根の中ほどを中心に縮めて、外形から出る頂点を 0.5% 以下に（形は変えない）
+                if _membfit:
+                    # 体の線のすぐ外（1.5 mm 以内）で外形から出る頂点（付け根の前で体の線に沿う所）は、体の中（体の線から 1.5 mm 内）へ入れる
+                    o_ = (out() > -1.5) & ~(ins(X, Z) & ins(X - 1, Z) & ins(X + 1, Z))
+                    Z = _np.where(o_, -_np.interp(X, _sf["z_mm"], _sf[key]) + fd["side"] * 1.5, Z); co[:, 2] = Z / 1000
+                    report[f"fin_cart_tuck_{n}"] = int(o_.sum())
+                elif WHOLE:   # ひれ全体を付け根の中ほどを中心に縮めて、外形から出る頂点を 0.5% 以下に（形は変えない）
                     px = (fd["o"] + fd["i"]) / 2 * TLm; pz = -_np.interp(px, _sf["z_mm"], _sf[key]); best = 1.0
                     for sc in _np.arange(1.0, 0.59, -0.02):
                         X2 = px + (X - px) * (1 - w + w * sc); Z2 = pz + (Z - pz) * (1 - w + w * sc)
@@ -229,7 +255,7 @@ for part, (names, target) in PARTS.items():
     for _fin, _part in PLATE_FINS.items():
         if part != _part: continue
         import hh_fins
-        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = hh_fins.FINS[_fin]; TLm = hh_fins.TL_MM
+        _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = FIT_FD.get(_fin, hh_fins.FINS[_fin]); TLm = hh_fins.TL_MM
         Lb = (fd["i"] - fd["o"]) * TLm; Hm = fd["H"] * TLm
         bm = bmesh.new(); vs = []
         for s_, h_ in fd["poly"]:
