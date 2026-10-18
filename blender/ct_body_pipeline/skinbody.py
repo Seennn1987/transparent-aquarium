@@ -306,6 +306,7 @@ def limb_dist(n, x):
 #   面のまわり、幅 CLEFT_MM）を膜の外にして、束ごとに膜を分ける。付け根（束が分かれる前）に近い所では 1 mm かけて切れ込みを 0 にする
 CLEFT = {}
 CLEFT_MM = float(os.environ.get('CLEFT_MM', '0.4'))
+CLEFT_KEEP_MM = float(os.environ.get('CLEFT_KEEP_MM', '0.5'))
 if os.environ.get('LIMB_CLEFT'):
     LB = np.load(os.environ['LIMB_CLEFT'])
     for n in limbs:
@@ -322,7 +323,11 @@ def limb_field(n, x, ub):
     dB, dU, dL = [np.minimum(t.query(x, workers=-1, distance_upper_bound=ub + 2 * MM)[0], ub + 2 * MM) for t in CLEFT[n]]
     dmin = np.minimum.reduce([dB, dU, dL])
     ramp = np.clip((dB - np.minimum(dU, dL)) / MM, 0, 1)
-    out = np.maximum(dmin - tt, (CLEFT_MM * MM - np.abs(dU - dL)) / 2 * ramp)
+    # 切れ込みは骨から CLEFT_KEEP_MM より内へは入れない（束の骨どうしが CLEFT_MM より近い所で骨を削り、骨の点が膜の外に出た。
+    #   0.25 mm でも、膜をならす段で骨の点が 0.3〜2.8% 外に出た）
+    #   付け根（ramp 0）では切れ込みを効かせない。ramp を掛けるだけだと付け根の骨で値が 0（膜の面）になり、骨が膜の外に出た
+    cut = np.minimum((CLEFT_MM * MM - np.abs(dU - dL)) / 2 - (1 - ramp) * 10 * MM, np.minimum(dU, dL) - CLEFT_KEEP_MM * MM)
+    out = np.maximum(dmin - tt, cut)
     out[dmin > ub] = np.inf
     return out
 
