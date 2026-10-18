@@ -63,7 +63,7 @@ else:
         LA, HA = float(os.environ.get('HH_ANAL_FIT_BASE', 49.2)), float(os.environ.get('HH_ANAL_FIT_H', 29.2))   # a6a の fin_membrane_fit_HH_anal（2026-10-18）
         sx, sy = (fd2['i'] - fd2['o']) * TLm / LA, fd2['H'] * TLm / HA
         Xd = np.load('a4_dfin2_xform.npz'); vbd = float(Xd['vb'])
-        z_a0 = zm.min(); zm = fd2['o'] * TLm + 2.0 + (zm - z_a0) * sx   # 前の端を第 2 背びれの付け根の前の端の 2 mm 後ろへ（膜合わせが前後 −20〜+10 mm を探す）
+        z_a0 = zm.min(); zm = float(os.environ.get('HH_DFIN2_O', fd2['o'] * TLm)) + 2.0 + (zm - z_a0) * sx   # 前の端を第 2 背びれの膜の前の端（HH_DFIN2_O、mm）の 2 mm 後ろへ
         v2 = vbd - (v2 - vb) * sy                                     # 臀びれは +v（腹）へ、第 2 背びれは −v（背）へ出る
         rep_from = {'from': 'anal', 'scale_len': round(sx, 3), 'scale_height': round(sy, 3)}
     vol = _write(f'{OUT}/HH_{name}.ply', np.stack([zm, u2, -v2], 1) / 1000.0, f)   # Blender（x = 体軸、y = 左右、z = 背）

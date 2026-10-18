@@ -171,6 +171,9 @@ def _body_warp(o, n):
                             if (_inside(P_, xs_, zs_) & _inside(P_, xs_ - 1, zs_) & _inside(P_, xs_ + 1, zs_)).all(): found = (k, o_mm); break
                         if found: break
                     k, o_mm = found if found else (2.5, fd["o"] * TLm)
+                    # 2026-10-19 案 A（臀びれの軟骨を第 2 背びれの膜に合わせて縮める）: HH_FINCT_MEMB_<ひれ>="k_len,k_height,o_mm" で、膜は前の版の大きさのまま（探さない）
+                    if os.environ.get(f"HH_FINCT_MEMB_{fin}"):
+                        k, kz, o_mm = [float(v_) for v_ in os.environ[f"HH_FINCT_MEMB_{fin}"].split(",")]
                     FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * kz)
                     poly = _poly(o_mm, k)
                     report[f"fin_membrane_fit_{n}"] = {"k_len": round(float(k), 2), "k_height": round(float(kz), 2), "tip_mm": round(tipd, 1), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * kz), 1)}
