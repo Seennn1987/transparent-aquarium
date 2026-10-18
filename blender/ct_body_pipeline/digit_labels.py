@@ -6,8 +6,8 @@
 ・指: s の 0.2 mm ごとに、それより遠い頂点の面のつながりを数え、大きい塊（3% 以上）が 5 つになった所の 5 つの塊。
   残りは付け根（0）。指の番号 1〜5 は塊の大きい順（解剖の番号ではない）
 ・束: 指の向きで 2 つにまとめる（foot_bundles.py と同じ。足は 2 本・3 本、Diaz & Trainor 2015 の (1,2)(3,4,5)）
-・爪の骨（末節骨）: 指の s に沿った骨の太さ（0.15 mm ごとの断面の半径の中央値）の、指先から 0.8 mm より手前で最後の山
-  （最後の関節のふくらみ）より CLAW_MM 先。足の指の骨の数は 2・3・4・4・3 で（同じ論文）、どの指もいちばん先が爪の骨
+・爪の骨（末節骨）: 指先（指の向きでいちばん先の頂点）から面に沿った距離で、骨の太さ（0.15 mm ごとの断面の半径の中央値）の
+  指先から 0.8 mm より先で最初の山（最後の関節のふくらみ）の CLAW_MM 手前まで。長さは 1.0〜2.2 mm に収める（記録 33）。足の指の骨の数は 2・3・4・4・3 で（同じ論文）、どの指もいちばん先が爪の骨
 ・指先の離れた部分（free）: 指先から FREE_MM 以内。同じ束の指は、ここだけ膜を分ける（本物は束の中の指が皮膚でつながり、
   指先だけ 1 本ずつ分かれる。Diaz & Trainor 2015 図 1 B。FREE_MM は仮）
 """
@@ -24,6 +24,7 @@ rest = [a for a in sys.argv[3:] if not a.startswith('--')]
 fig = rest[0] if rest else None
 BONES = tuple(opts.get('bones', 'hL_foot,hR_foot').split(','))
 FREE_MM = float(opts.get('free', '3.0')); CLAW_MM = float(opts.get('claw', '0.3'))
+CLAW_MIN, CLAW_MAX = float(opts.get('clawmin', '1.0')), float(opts.get('clawmax', '2.2'))
 d = np.load(src); names = [str(x) for x in d['rig__names']]
 out = {}; panels = []
 for b in BONES:
@@ -61,18 +62,24 @@ for b in BONES:
     claw = np.zeros(len(v), bool); free = np.zeros(len(v), np.float32); tip = np.zeros(len(v), np.float32)
     info = []
     for k, q in enumerate(digits, 1):
-        q = np.where(label == k)[0]; s = p[q]; smax = s.max()
-        bins = np.arange(s.min(), smax, 0.15); rad = []
+        q = np.where(label == k)[0]
+        # 指先: 指の向き（分かれ目 → 指の重心）でいちばん先の頂点。足首から面に沿って最も遠い点にすると、左手の 1 本で指の途中を
+        #   指先とし、爪の骨が指先から 5 mm 離れた（記録 33）
+        tv = q[np.argmax(v[q] @ dirs[k - 1])]
+        Aq = A[q][:, q]; dt = dijkstra(Aq, indices=int(np.where(q == tv)[0][0]))
+        dt[~np.isfinite(dt)] = dt[np.isfinite(dt)].max()
+        bins = np.arange(0, dt.max(), 0.15); rad = []
         for x0 in bins:
-            qq = q[(s >= x0) & (s < x0 + 0.15)]
+            qq = q[(dt >= x0) & (dt < x0 + 0.15)]
             rad.append(np.median(np.linalg.norm(v[qq] - v[qq].mean(0), axis=1)) if len(qq) >= 5 else np.nan)
-        rad = np.array(rad); ok = (bins < smax - 0.8) & ~np.isnan(rad)
+        rad = np.array(rad); ok = (bins > 0.8) & ~np.isnan(rad)
         pk = [i for i in range(1, len(bins) - 1) if ok[i] and rad[i] >= np.nanmax(rad[max(0, i - 3):i + 4])]
-        s_joint = bins[pk[-1]] if pk else smax - 2.0
-        claw[q[s > s_joint + CLAW_MM]] = True
-        tip[q] = smax - s
-        free[q] = np.clip((FREE_MM - (smax - s)) / 0.5, 0, 1)
-        info.append('指%d 束%d 長さ %.1f mm 爪の骨 %.1f mm' % (k, bundle[k], smax - s.min(), smax - s_joint - CLAW_MM))
+        d_joint = bins[pk[0]] if pk else 2.0
+        L_claw = float(np.clip(d_joint - CLAW_MM, CLAW_MIN, CLAW_MAX))   # 最後の関節の山が近すぎる・遠すぎる指（0.4 mm、5 mm）があった
+        claw[q[dt < L_claw]] = True
+        tip[q] = dt
+        free[q] = np.clip((FREE_MM - dt) / 0.5, 0, 1)
+        info.append('指%d 束%d 爪の骨 %.1f mm' % (k, bundle[k], L_claw))
     j = cKDTree(v[m]).query(v[~m])[1]
     for arr in (label, claw, free, tip): arr[~m] = arr[m][j]
     claw[~m] = False

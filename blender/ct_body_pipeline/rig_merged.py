@@ -21,13 +21,15 @@ R = np.load(rig_p); names = [str(x) for x in R['names']]; O = np.load(posed_p)
 dj, j = cKDTree(O['v']).query(v, workers=-1)
 new = dj > 1e-6 * MM                     # 足の膜として新しくできた頂点（元の膜の頂点はブール演算の後も同じ位置）
 top = R['w_idx'][j].astype(int); tw = R['w_val'][j].astype(float)
-for side in ('hL', 'hR'):
-    xf = posed(side + '_foot', d[side + '_foot__v']); xl = posed(side + '_lower', d[side + '_lower__v'])
+import os
+for limb in os.environ.get('LIMBS', 'hL_foot,hR_foot').split(','):          # 手は LIMBS=fL_hand,fR_hand（記録 33）
+    side = limb.split('_')[0]
+    xf = posed(limb, d[limb + '__v']); xl = posed(side + '_lower', d[side + '_lower__v'])
     df = cKDTree(xf).query(v, workers=-1)[0]; dl = cKDTree(xl).query(v, workers=-1)[0]
     m = new & (df < 4 * MM)               # 4 mm だけで選ぶと、右足に近い横腹の膜まで足の重みになり、書き出しで三角形が伸びた
     wf = 1.0 / (1.0 + np.exp(-(dl[m] - df[m]) / (0.4 * MM)))
     top[m] = 0; tw[m] = 0
-    top[m, 0] = names.index(side + '_foot'); tw[m, 0] = wf
+    top[m, 0] = names.index(limb); tw[m, 0] = wf
     top[m, 1] = names.index(side + '_lower'); tw[m, 1] = 1 - wf
     print(side, '足の膜の頂点', int(m.sum()))
 tw /= np.maximum(tw.sum(1, keepdims=True), 1e-9)

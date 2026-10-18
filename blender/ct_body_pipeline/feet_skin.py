@@ -17,8 +17,10 @@ import scipy.ndimage as nd
 
 lab_p, out_p = sys.argv[1:3]
 VOX = float(os.environ.get('FEET_VOX_MM', '0.05')); ANKLE = float(os.environ.get('ANKLE_MM', '3.0'))
-T_BASE = float(os.environ.get('LIMB_T_FOOT', '0.73')); T_DIG = float(os.environ.get('DIGIT_T_MM', '0.5'))
-T_LOW = (1.25 + 1.36) / 2                                                   # skinbody.py の LIMB_T['lower_h']
+T_BASE = float(os.environ.get('LIMB_T_FOOT', '0.73')); T_DIG = float(os.environ.get('DIGIT_T_MM', '0.5'))   # 手の付け根も 0.73 mm（skinbody.py の LIMB_T['hand']）
+LIMBS = os.environ.get('LIMBS', 'hL_foot,hR_foot').split(',')            # 手は LIMBS=fL_hand,fR_hand（記録 33）
+T_LOWS = {'h': (1.25 + 1.36) / 2, 'f': (0.68 + 1.25) / 2}                   # skinbody.py の LIMB_T['lower_h']・['lower_f']
+def lower_of(n): return n.split('_')[0] + '_lower'
 CW = float(os.environ.get('CLEFT_MM', '0.6')); KEEP = float(os.environ.get('CLEFT_KEEP_MM', '0.15'))
 R_WEB = float(os.environ.get('WEB_MM', '0.6')); R_JOIN = float(os.environ.get('JOIN_MM', '0.3')); BLUR = float(os.environ.get('BLUR_MM', '0.12'))
 P = np.load('pose_jar.npz'); bn = [str(x) for x in P['names']]; k = float(P['k']); MM = k
@@ -26,11 +28,12 @@ def ct2m(p): p = np.asarray(p, float); return np.stack([p[..., 1], -p[..., 2], -
 def posed(n, x): M = P['M'][bn.index(n)]; return ct2m(x) @ M[:3, :3].T + M[:3, 3]
 d = np.load('chameleon_body_ct.npz'); L = np.load(lab_p)
 V, F = [], []; nv = 0
-for n in ('hL_foot', 'hR_foot'):
+for n in LIMBS:
+    T_LOW = T_LOWS[n[0]]
     x = posed(n, d[n + '__v']); lab = L[n + '__label']; claw = L[n + '__claw']; free = L[n + '__free']; bundle = L[n + '__bundle']
     keep = ~claw
     trees = [cKDTree(x[keep & (lab == i)]) for i in range(6)]; frees = [free[keep & (lab == i)] for i in range(6)]
-    low = posed(n.replace('foot', 'lower'), d[n.replace('foot', 'lower') + '__v'])
+    low = posed(lower_of(n), d[lower_of(n) + '__v'])
     ankle = posed(n, d['rig__head'][[str(s) for s in d['rig__names']].index(n)][None])[0]
     low = low[np.linalg.norm(low - ankle, axis=1) < ANKLE * MM]; tl = cKDTree(low)
     pad = 1.5 * MM

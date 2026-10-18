@@ -42,9 +42,11 @@ B = np.load(body_p); body = mesh('body', B['v'], B['f']); outward(body); report(
 Fz = np.load(feet_p); feet = mesh('feet', Fz['v'], Fz['f']); outward(feet); report(feet, '足の膜（細かい）')
 dm = feet.modifiers.new('d', 'DECIMATE'); dm.ratio = min(1.0, 2 * FEET_FACES / len(feet.data.polygons))
 bpy.context.view_layer.objects.active = feet; bpy.ops.object.modifier_apply(modifier=dm.name); outward(feet); report(feet, '足の膜（減らした）')
-for n in ('hL_foot', 'hR_foot'):
+LIMBS = os.environ.get('LIMBS', 'hL_foot,hR_foot').split(',')            # 手は LIMBS=fL_hand,fR_hand（記録 33）
+for n in LIMBS:
     ankle = posed(n, d['rig__head'][rn.index(n)][None])[0]
-    knee = posed(n.replace('foot', 'lower'), d['rig__head'][rn.index(n.replace('foot', 'lower'))][None])[0]
+    lo_n = n.split('_')[0] + '_lower'
+    knee = posed(lo_n, d['rig__head'][rn.index(lo_n)][None])[0]
     ax = ankle - knee; ax /= np.linalg.norm(ax)
     plane = ankle - ax * CUT_MM * MM
     x = posed(n, d[n + '__v'])
