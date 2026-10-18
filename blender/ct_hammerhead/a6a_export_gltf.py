@@ -107,7 +107,11 @@ def _body_warp(o, n):
         #  膜は参考の外形の板（正中 ±1.6 mm、hh_fins.py）なので、軟骨をその中に収める。体の線より外（ひれの側）の頂点だけを動かし、体の線から 5 mm で効き目を 1 にする
         if os.environ.get("HH_FIN_PLATE") == "all" and (os.environ.get("HH_FIN_CART_FLAT") == "1" or os.environ.get("HH_FIN_CART_FIT") == "1"):
             import hh_fins
-            from matplotlib.path import Path as _Path
+            def _inside(poly, xx, zz):   # 多角形の中か（偶奇の規則。Blender の Python には matplotlib が無い）
+                P_ = _np.array(poly); x1, z1 = P_[:, 0], P_[:, 1]; x2, z2 = _np.roll(x1, -1), _np.roll(z1, -1); r = _np.zeros(len(xx), bool)
+                for a_, b_, c_, d_ in zip(x1, z1, x2, z2):
+                    cr = ((b_ > zz) != (d_ > zz)) & (xx < (c_ - a_) * (zz - b_) / ((d_ - b_) if d_ != b_ else 1e-12) + a_); r ^= cr
+                return r
             fin = {"HH_dfin1": "dfin1", "HH_dfin2": "dfin2", "HH_anal": "anal"}[n]; fd = hh_fins.FINS[fin]; TLm = hh_fins.TL_MM
             _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); key = "top_target_mm" if fd["side"] < 0 else "bot_target_mm"
             X = co[:, 0] * 1000; Y = co[:, 1] * 1000; Z = co[:, 2] * 1000
@@ -127,10 +131,9 @@ def _body_warp(o, n):
                 for s_, h_ in fd["poly"]:
                     xm = fd["o"] * TLm + s_ * Lb; hh = h_ * Hm if h_ > 0 else -4.0
                     poly.append((xm, -(_np.interp(xm, _sf["z_mm"], _sf[key]) + fd["side"] * hh)))
-                pth = _Path(poly + [poly[0]])
                 if fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
-                ins = lambda xx, zz: pth.contains_points(_np.c_[xx, zz])
+                ins = lambda xx, zz: _inside(poly, xx, zz)
                 bad = (w > 0) & ~(ins(X, Z) & ins(X - 1, Z) & ins(X + 1, Z)); moved = 0
                 offs = _np.r_[0, _np.ravel(_np.c_[_np.arange(0.5, 40.5, 0.5), -_np.arange(0.5, 40.5, 0.5)])]
                 for i_ in _np.nonzero(bad)[0]:
