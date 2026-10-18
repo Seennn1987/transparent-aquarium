@@ -27,6 +27,34 @@ P = np.load('pose_jar.npz'); bn = [str(x) for x in P['names']]; k = float(P['k']
 def ct2m(p): p = np.asarray(p, float); return np.stack([p[..., 1], -p[..., 2], -p[..., 0]], -1) * k
 def posed(n, x): M = P['M'][bn.index(n)]; return ct2m(x) @ M[:3, :3].T + M[:3, 3]
 d = np.load('chameleon_body_ct.npz'); L = np.load(lab_p)
+# 下腿の部分を元の体の膜に寄せる（記録 35、2026-10-19）: 骨から同じ厚みの下腿は、体の膜（ならしてある）と太さが合わず、切り口に縁と段が出た
+#   （切り口で元が 0.1〜0.2 mm 太く、その 1〜2 mm 上では新しい方が最大 0.5 mm 太い）。OLD_SKIN（体の skin_posed.npz）があれば、足首から
+#   ANKLE_MM 上では元の膜の符号つき距離、足首では骨からの厚みになるよう、その間をなめらかに混ぜる
+OLD = None
+if os.environ.get('OLD_SKIN'):
+    Oz = np.load(os.environ['OLD_SKIN']); ov = Oz['v'].astype(np.float64); of = Oz['f']
+    OLD = (cKDTree(ov), ov, of)
+def inside_grid(V, F, lo, shape, vox):
+    """閉じた面の内側を、z 向きの光線の偶奇で格子に求める（頂点の向きで符号を決めると、つないだ膜に穴が開いた。記録 35）。"""
+    T = V[F]; hi = lo + (np.array(shape) - 1) * vox
+    keep = np.all((T.max(1) >= lo - vox) & (T.min(1) <= hi + vox), axis=1); T = T[keep]
+    cnt = np.zeros(shape, np.int16)
+    for p0, p1, p2 in T:
+        mn = np.floor((np.minimum(np.minimum(p0, p1), p2) - lo) / vox).astype(int); mx = np.ceil((np.maximum(np.maximum(p0, p1), p2) - lo) / vox).astype(int)
+        ia = np.arange(max(mn[0], 0), min(mx[0], shape[0] - 1) + 1); ib = np.arange(max(mn[1], 0), min(mx[1], shape[1] - 1) + 1)
+        if len(ia) == 0 or len(ib) == 0: continue
+        A, B = np.meshgrid(lo[0] + ia * vox, lo[1] + ib * vox, indexing='ij'); A = A.ravel(); B = B.ravel()
+        dd = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1])
+        if abs(dd) < 1e-18: continue
+        l1 = ((A - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (B - p0[1])) / dd; l2 = ((p1[0] - p0[0]) * (B - p0[1]) - (A - p0[0]) * (p1[1] - p0[1])) / dd
+        m = (l1 >= 0) & (l2 >= 0) & (l1 + l2 <= 1)
+        if not m.any(): continue
+        z = p0[2] + l1[m] * (p1[2] - p0[2]) + l2[m] * (p2[2] - p0[2])
+        kz = np.clip(np.ceil((z - lo[2]) / vox).astype(int), 0, shape[2])
+        ii = np.repeat(ia, len(ib))[m]; jj = np.tile(ib, len(ia))[m]
+        for a_, b_, c_ in zip(ii, jj, kz):
+            if c_ < shape[2]: cnt[a_, b_, c_] += 1
+    return (np.cumsum(cnt, axis=2) % 2) == 1
 V, F = [], []; nv = 0
 for n in LIMBS:
     T_LOW = T_LOWS[n[0]]
@@ -35,12 +63,16 @@ for n in LIMBS:
     trees = [cKDTree(x[keep & (lab == i)]) for i in range(6)]; frees = [free[keep & (lab == i)] for i in range(6)]
     low = posed(lower_of(n), d[lower_of(n) + '__v'])
     ankle = posed(n, d['rig__head'][[str(s) for s in d['rig__names']].index(n)][None])[0]
+    knee = posed(lower_of(n), d['rig__head'][[str(s_) for s_ in d['rig__names']].index(lower_of(n))][None])[0]
+    lax = (ankle - knee) / np.linalg.norm(ankle - knee)
     low = low[np.linalg.norm(low - ankle, axis=1) < ANKLE * MM]; tl = cKDTree(low)
     pad = 1.5 * MM
     lo = np.minimum(x.min(0), low.min(0)) - pad; hi = np.maximum(x.max(0), low.max(0)) + pad
     shape = tuple(np.ceil((hi - lo) / (VOX * MM)).astype(int) + 1)
     print(n, 'grid', shape, '%.0f M' % (np.prod(shape) / 1e6), flush=True)
     fld = np.full(np.prod(shape), 1.0 * MM, np.float32)
+    if OLD is not None:
+        INS = inside_grid(OLD[1], OLD[2], lo, shape, VOX * MM); print(n, 'old skin inside voxels', int(INS.sum()), flush=True)
     gi = np.stack(np.meshgrid(*[np.arange(s) for s in shape], indexing='ij'), -1).reshape(-1, 3)
     cap = 2.5 * MM                                   # 1.2 mm だと下腿（厚み 1.3 mm）の距離の上限で場が飛び、足首の上に格子の段が出た
     def smin(a, b, r):
@@ -62,6 +94,16 @@ for n in LIMBS:
         cut = np.minimum((CW * MM - (db - da)) / 2 - (1 - ramp) * 10 * MM, da - KEEP * MM)
         fo = np.maximum(fall, cut)
         dl = tl.query(g, workers=-1, distance_upper_bound=cap)[0]; fl = np.where(np.isfinite(dl), dl, cap) - T_LOW * MM
+        if OLD is not None:
+            tt = (g - ankle) @ lax / MM                                    # 足首から（下腿の向きの逆が負）
+            u = np.clip((tt + ANKLE) / ANKLE, 0, 1); sw = u * u * (3 - 2 * u)  # 上端 0（元の膜）→ 足首 1（骨からの厚み）
+            near = (tt < 0) & (tt > -ANKLE - 1) & np.isfinite(dl)
+            if near.any():
+                dd, jj = OLD[0].query(g[near], workers=-1)
+                gi_n = gi[c0:c0 + 4_000_000][near]
+                sd = np.where(INS[tuple(gi_n.T)], -dd, dd)
+                fl[near] = (1 - sw[near]) * sd + sw[near] * fl[near]
+            fl = np.maximum(fl, (-(ANKLE + 0.3) - tt) * MM)   # 上端を平面で閉じる（元の膜の内側が格子の端まで続き、面が開いた）
         fld[c0:c0 + 4_000_000] = smin(fo, fl, R_JOIN * MM)
     # 表面の玉の連なり（骨のふくらみの写し）をならす
     fld = nd.gaussian_filter(fld.reshape(shape), BLUR / VOX).ravel()

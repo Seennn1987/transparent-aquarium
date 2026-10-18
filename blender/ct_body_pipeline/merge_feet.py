@@ -18,6 +18,7 @@ from mathutils import Vector, Matrix
 argv = sys.argv[sys.argv.index('--') + 1:]
 body_p, feet_p, out_p = argv[:3]; FEET_FACES = int(argv[3]) if len(argv) > 3 else 40000
 CUT_MM = float(os.environ.get('CUT_MM', '1.0')); TOTAL_FACES = int(os.environ.get('TOTAL_FACES', '149000'))
+SEAM_MM = float(os.environ.get('SEAM_MM', '0')); SEAM_ITER = int(os.environ.get('SEAM_ITER', '40'))
 P = np.load('pose_jar.npz'); bn = [str(x) for x in P['names']]; k = float(P['k']); MM = k
 def ct2m(p): p = np.asarray(p, float); return np.stack([p[..., 1], -p[..., 2], -p[..., 0]], -1) * k
 def posed(n, x): M = P['M'][bn.index(n)]; return ct2m(x) @ M[:3, :3].T + M[:3, 3]
@@ -43,6 +44,7 @@ Fz = np.load(feet_p); feet = mesh('feet', Fz['v'], Fz['f']); outward(feet); repo
 dm = feet.modifiers.new('d', 'DECIMATE'); dm.ratio = min(1.0, 2 * FEET_FACES / len(feet.data.polygons))
 bpy.context.view_layer.objects.active = feet; bpy.ops.object.modifier_apply(modifier=dm.name); outward(feet); report(feet, '足の膜（減らした）')
 LIMBS = os.environ.get('LIMBS', 'hL_foot,hR_foot').split(',')            # 手は LIMBS=fL_hand,fR_hand（記録 33）
+SEAMS = []
 for n in LIMBS:
     ankle = posed(n, d['rig__head'][rn.index(n)][None])[0]
     lo_n = n.split('_')[0] + '_lower'
@@ -56,10 +58,26 @@ for n in LIMBS:
     corners = np.array([[a, b, c] for a in (lo[0], hi[0]) for b in (lo[1], hi[1]) for c in (lo[2], hi[2])])
     cv = plane + corners @ R.T
     faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+    SEAMS.append((plane, ax))
     box = mesh('cut_' + n, cv, faces); outward(box)
     apply_bool(body, box, 'DIFFERENCE'); bpy.data.objects.remove(box)
     report(body, f'体の膜（{n} を切った）')
 apply_bool(body, feet, 'UNION'); outward(body); report(body, 'つないだ膜')
+# つなぎ目をならす（記録 35、2026-10-19）: 体の膜と足（手）の膜の下腿の太さが違い、切り口に 0.3〜0.8 mm の輪の段が出た。
+#   切り口の平面から前後 SEAM_MM の帯（下腿の軸から 4 mm 以内）だけを、重み（帯の中央 1 → 端 0）を掛けた Taubin でならす
+if SEAM_MM > 0:
+    me = body.data; V = np.array([p.co[:] for p in me.vertices]); E = np.array([e.vertices[:] for e in me.edges])
+    src = np.r_[E[:, 0], E[:, 1]]; dst = np.r_[E[:, 1], E[:, 0]]; deg = np.bincount(src, minlength=len(V)).astype(float)
+    def avg(X):                                                   # 隣の頂点の平均（Blender の Python に scipy が無いので numpy で）
+        out = np.zeros_like(X); np.add.at(out, src, X[dst]); return out / np.maximum(deg, 1)[:, None]
+    w = np.zeros(len(V))
+    for plane, ax in SEAMS:
+        t = (V - plane) @ ax / MM; rr = np.linalg.norm((V - plane) - np.outer((V - plane) @ ax, ax), axis=1) / MM
+        u = np.clip(1 - np.abs(t) / SEAM_MM, 0, 1); w = np.maximum(w, u * u * (3 - 2 * u) * (rr < 4.0))
+    for _ in range(SEAM_ITER):
+        V = V + (0.5 * w)[:, None] * (avg(V) - V)
+        V = V + (-0.53 * w)[:, None] * (avg(V) - V)
+    me.vertices.foreach_set('co', V.ravel()); me.update(); report(body, f'つなぎ目をならした膜（{int((w > 0).sum())} 頂点）')
 # 書き出し（generate_chameleon_ct_body.py）は膜が CH_SKIN_FACES（15 万）面を超えると静止の形で間引き、重みを近い頂点から写すので、
 #   静止の形で重なる手足と体の頂点が混ざって三角形が伸びた（記録 31）。展示の姿勢のここで 15 万面以下にしておく
 if len(body.data.polygons) > TOTAL_FACES:
