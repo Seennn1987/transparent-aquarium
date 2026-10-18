@@ -26,7 +26,9 @@ async function start() {
   const lightbox = createLightbox(renderer, { stain, supersample: ss });
   // ?skin=3: the skin (its path and its surface layer) this many times darker, to check the skin's shape by
   // eye (C record 30, 2026-10-18: the producer found the skin too pale to see). Not the photo's colour.
-  const skinView = Number(query.get("skin"));
+  // Pattern 01's blue skin is 3 times darker by default for now (the producer, 2026-10-18: 「一旦、青の濃さ3倍で」);
+  // ?skin=1 gives photo 01's colour.
+  const skinView = Number(query.get("skin")) || (stain === "01" ? 3 : 0);
   if (skinView > 0) { chameleonLook.skin.value = skinView; chameleonLook.film.value = skinView; }
   document.body.style.background = `rgb(${stainOf(stain).lightbox.map((v) => Math.round(v * 255)).join(",")})`;
 

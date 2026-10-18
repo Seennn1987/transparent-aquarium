@@ -293,6 +293,7 @@ def crest_dist(x):
 # ---- 手足（skinloft3 と同じ厚み）----
 LIMB_T = {'upper_f': (1.31 + 1.29) / 2, 'lower_f': (0.68 + 1.25) / 2, 'hand': (0.78 + 0.68) / 2,
           'upper_h': (1.39 + 1.79) / 2, 'lower_h': (1.25 + 1.36) / 2, 'foot': (1.45 + 0.78) / 2}
+if os.environ.get('LIMB_T_FOOT'): LIMB_T['foot'] = float(os.environ['LIMB_T_FOOT'])   # 記録 30 の案（足を手と同じ 0.73 mm など）
 def limb_t(n):
     seg = n.split('_')[1]; return LIMB_T[seg if seg in ('hand', 'foot') else seg + '_' + n[0]]
 limbs = {}
@@ -301,6 +302,29 @@ for n in bn:
         pb = posed(n); limbs[n] = (cKDTree(pb), limb_t(n) * MM, pb.min(0), pb.max(0))
 def limb_dist(n, x):
     kd, tt, _, _ = limbs[n]; return kd.query(x, workers=-1)[0] - tt
+# 束ごとの膜（記録 30 の案。2026-10-18）: LIMB_CLEFT は foot_bundles.py の出力。指の 2 つの束のあいだ（両方の束から等しい距離の
+#   面のまわり、幅 CLEFT_MM）を膜の外にして、束ごとに膜を分ける。付け根（束が分かれる前）に近い所では 1 mm かけて切れ込みを 0 にする
+CLEFT = {}
+CLEFT_MM = float(os.environ.get('CLEFT_MM', '0.4'))
+if os.environ.get('LIMB_CLEFT'):
+    LB = np.load(os.environ['LIMB_CLEFT'])
+    for n in limbs:
+        if n not in LB.files: continue
+        lab = LB[n]; pb = posed(n)
+        if len(pb) > len(lab):                                           # 軟骨の点は最も近い骨の頂点と同じ束
+            lab = np.concatenate([lab, lab[cKDTree(pb[:len(lab)]).query(pb[len(lab):])[1]]])
+        CLEFT[n] = [cKDTree(pb[lab == i]) for i in (0, 1, 2)]
+    print('cleft between digit bundles:', sorted(CLEFT), 'width %.2f mm' % CLEFT_MM, flush=True)
+def limb_field(n, x, ub):
+    """手足の骨 n の場の距離（膜の面で 0、外で正）。ub より遠い所は inf。"""
+    kd, tt, _, _ = limbs[n]
+    if n not in CLEFT: return kd.query(x, workers=-1, distance_upper_bound=ub)[0] - tt
+    dB, dU, dL = [np.minimum(t.query(x, workers=-1, distance_upper_bound=ub + 2 * MM)[0], ub + 2 * MM) for t in CLEFT[n]]
+    dmin = np.minimum.reduce([dB, dU, dL])
+    ramp = np.clip((dB - np.minimum(dU, dL)) / MM, 0, 1)
+    out = np.maximum(dmin - tt, (CLEFT_MM * MM - np.abs(dU - dL)) / 2 * ramp)
+    out[dmin > ub] = np.inf
+    return out
 
 # ---- 場: 胴（＋手足・背のとげ）と頭を別々に作り、継ぎ目は幅 JOIN_MM のなめらかな最小でつなぐ ----
 #   （同じ幅 SMOOTH_MM で混ぜると首に段ができ、一本の軸にするとトサカと背中が一枚になった。頭と頸は後頭部でだけ触れる）
@@ -333,8 +357,8 @@ for nme, (kd, tt, a, b) in limbs.items():
     g = grid_pts(a - tt - 3 * kS - MM, b + tt + 3 * kS + MM)
     for c0 in range(0, len(g), 2_000_000):
         gg = g[c0:c0 + 2_000_000]
-        dd = kd.query(gmin + gg * vox, workers=-1, distance_upper_bound=tt + 3 * kS + 0.5 * MM)[0]
-        ok = np.isfinite(dd); add(accT, dd[ok] - tt, gg[ok])
+        dd = limb_field(nme, gmin + gg * vox, tt + 3 * kS + 0.5 * MM)
+        ok = np.isfinite(dd); add(accT, dd[ok], gg[ok])
     del g
 g = grid_pts(cbase.min(0) - 2 * MM, cbase.max(0) + 2 * MM)
 for c0 in range(0, len(g), 4_000_000):
