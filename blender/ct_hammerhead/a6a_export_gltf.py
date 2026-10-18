@@ -240,6 +240,13 @@ def _body_warp(o, n):
             c0 = ref[_near].mean(0); th = math.radians(_deg) * (-1 if sgn > 0 else 1)
             yy, zz = co[:, 1] - c0[1], co[:, 2] - c0[2]
             co[:, 1] = c0[1] + yy * math.cos(th) - zz * math.sin(th); co[:, 2] = c0[2] + yy * math.sin(th) + zz * math.cos(th)
+        # 2026-10-18（プロデューサー「皮膚から飛び出さないようにしてね」）: CT の細かさで作った腹びれの軟骨（HH_PELV_CT175）は、左右の腹びれの間の正中（左右 5 mm 以内）で
+        #  腹の線の下へ出た（108 頂点、腹の線から 0.5〜3 mm）。左右の膜はそこまで届かないので、その頂点を腹の線の 1.5 mm 内へ入れる（正中から離れるほど弱く）
+        if os.environ.get("HH_PELV_CT175") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):
+            _sf2 = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
+            belly = -_np.interp(co[:, 0] * 1000, _sf2["z_mm"], _sf2["bot_target_mm"]) / 1000 + 0.0015
+            wm = _np.clip((0.005 - _np.abs(co[:, 1])) / 0.002, 0, 1); low = co[:, 2] < belly
+            co[:, 2] = _np.where(low, co[:, 2] + wm * (belly - co[:, 2]), co[:, 2]); report[f"pelv_mid_tuck_{n}"] = int((low & (wm > 0)).sum())
     else:
         co[:, 0] = hh_warp.warp_mm(x) / 1000
     me.vertices.foreach_set("co", co.ravel()); me.update()
