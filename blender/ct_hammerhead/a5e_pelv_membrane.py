@@ -7,6 +7,10 @@ from skimage.measure import marching_cubes
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 VX=0.735; U0,V0=-180.0,-150.0
 P=np.load('pelvic_posed.npz')['right'].astype(float)          # (u,z,v)
+# 2026-10-18（プロデューサー「この臀びれでよいので、同じ作り方を第 2 背びれと腹びれに広げて…」）: HH_PELV_CT175=1 で、膜の形と、膜に含める軟骨を、
+#  CT の細かさで作った腹びれの軟骨（a4d3_fin_ct_mesh.py pelv、閾値 175）の頂点から決める（閾値 250 の点より棒が多く写るので、膜が軟骨を含むように）
+CT175=_os.environ.get('HH_PELV_CT175')=='1'
+if CT175: P=np.load('a4_pelv175_pts.npz')['right'].astype(float)
 c=P.mean(0); w,Vv=np.linalg.eigh(np.cov((P-c).T)); e1,e2,nrm=Vv[:,2],Vv[:,1],Vv[:,0]
 B=np.array(json.load(open('pelvic_info.json'))['right_base_uzv'])
 if np.dot(c-B,e1)<0: e1=-e1
@@ -31,6 +35,8 @@ for wv in np.arange(-1.5,1.51,0.35):
 Q=np.concatenate(pts)
 iz=np.round(Q[:,1]/VX).astype(int); iv=np.round((Q[:,2]-V0)/VX).astype(int); iu=np.round((Q[:,0]-U0)/VX).astype(int)
 cart=np.load('a4_pelv_R.npz'); cm=cart['field']>0.5; co=cart['origin']; cz,cv,cu=np.nonzero(cm)
+if CT175:   # 軟骨の頂点を格子に置いたもの（膜はこれを 1 画素広げて含む）
+    cz=np.round(P[:,1]/VX).astype(int); cv=np.round((P[:,2]-V0)/VX).astype(int); cu=np.round((P[:,0]-U0)/VX).astype(int); co=np.zeros(3,int)
 iz=np.r_[iz,cz+co[0]]; iv=np.r_[iv,cv+co[1]]; iu=np.r_[iu,cu+co[2]]
 lo=np.array([iz.min(),iv.min(),iu.min()])-4; hi=np.array([iz.max(),iv.max(),iu.max()])+5
 Mk=np.zeros(hi-lo,bool); Mk[iz-lo[0],iv-lo[1],iu-lo[2]]=True

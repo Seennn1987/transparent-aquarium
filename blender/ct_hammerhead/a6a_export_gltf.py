@@ -94,7 +94,7 @@ def _body_warp(o, n):
         #  軟骨の先（体から最も離れた所）が、膜の高さ H のその割合に来るようにする。0.53 は第 1 背びれの CT: 軟骨の先が背の線から 63 mm、膜の高さ 119 mm。
         #  前は CT の体の線からの位置のままで、参考の膜の付け根の線（a5_side_fit.json）とずれ、臀びれの軟骨は膜の 2 割までしか届かず体の中に入っていた
         _reach = os.environ.get("HH_FIN_CART_REACH")
-        _membfit = n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1" and os.environ.get("HH_FINCT_FIT") == "membrane"
+        _membfit = ((n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1") or (n == "HH_dfin2" and os.environ.get("HH_FINCT_DFIN2") == "1")) and os.environ.get("HH_FINCT_FIT") == "membrane"
         if _reach and n in ("HH_dfin2", "HH_anal") and os.environ.get("HH_FIN_REF") == "1" and not _membfit:   # 膜を軟骨に合わせるときは、軟骨は CT の位置のまま
             import hh_fins
             fd = hh_fins.FINS["dfin2" if n == "HH_dfin2" else "anal"]; TLm = hh_fins.TL_MM
@@ -120,7 +120,7 @@ def _body_warp(o, n):
             out = lambda: -fd["side"] * (Z + _np.interp(X, _sf["z_mm"], _sf[key]))   # 体の線からひれの側へ（mm）。Blender の z = −v
             w = _np.clip(out() / 1.5, 0, 1)   # 5 mm では、体の線から 1〜6 mm の所が外形と板の外に残った（臀びれ 107 点・132 点）
             # B: ひねりを取る。体軸 3 mm × 高さ 3 mm の区画ごとに、左右の中央を正中へ。それでも ±1.4 mm を超える区画は、その区画の左右を縮める
-            WHOLE = n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1"   # 2026-10-18: CT の細かさで作った臀びれ（a4d3_fin_ct_mesh.py）は、ひれ全体を 1 枚として動かす（棒の並びを崩さない）
+            WHOLE = (n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1") or (n == "HH_dfin2" and os.environ.get("HH_FINCT_DFIN2") == "1")   # 2026-10-18: CT の細かさで作った臀びれ（a4d3_fin_ct_mesh.py）は、ひれ全体を 1 枚として動かす（棒の並びを崩さない）
             if os.environ.get("HH_FIN_CART_FLAT") == "1" and WHOLE and _membfit:
                 # 2026-10-18 直し（プロデューサー「なんでそんなにまだらなんですか？これじゃ組織が欠損していますよね？」）: 頂点ごとに左右を ±1.5 mm に切り詰めると、
                 #  正中から横にずれた棒は表と裏の面が同じ 1.5 mm に寄って厚さ 0 になり、ページでは消えていた（CT の軟骨は欠けていない）。
@@ -223,7 +223,7 @@ def _body_warp(o, n):
         # 2026-10-18: HH_PELV_RODS=1 の腹びれの軟骨（hh_finrods.py、腰帯の横棒が正中まで届く）は、付け根を膜（HH_pelvmem_*）の頂点から決める
         #  （軟骨の頂点から決めると横棒の端が付け根になり、下へ回す中心が膜とずれる）
         ref = co.copy()
-        if os.environ.get("HH_PELV_RODS") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):
+        if (os.environ.get("HH_PELV_RODS") == "1" or os.environ.get("HH_PELV_CT175") == "1") and n in ("HH_pelv_R", "HH_pelv_L"):
             bpy.ops.wm.ply_import(filepath=f"{MESH}/{n.replace('pelv_', 'pelvmem_')}.ply"); _m = bpy.context.selected_objects[0]
             ref = _np.empty(len(_m.data.vertices) * 3); _m.data.vertices.foreach_get("co", ref); ref = ref.reshape(-1, 3); _mm = _m.data
             bpy.data.objects.remove(_m, do_unlink=True); bpy.data.meshes.remove(_mm)
