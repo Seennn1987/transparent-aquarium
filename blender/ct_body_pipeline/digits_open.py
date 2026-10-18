@@ -1,6 +1,6 @@
 """手・足の指の 2 つの束をトングのように開く（計画書 C の記録 28 の案。2026-10-17）。
 
-  python digits_open.py <入力の骨.npz> <出力の骨.npz> <片側の角度 [度]> [図.png] [--bones=fL_hand,fR_hand]
+  python digits_open.py <入力の骨.npz> <出力の骨.npz> <片側の角度 [度]> [図.png] [--bones=fL_hand,fR_hand] [--labels=束.npz]
 
 --bones: 開く骨（既定は手・足の 4 本）。記録 29（2026-10-18）の本番は手だけ（--bones=fL_hand,fR_hand）
 
@@ -25,8 +25,10 @@ ANG = float(sys.argv[3])
 opts = [a for a in sys.argv[4:] if a.startswith('--')]; rest = [a for a in sys.argv[4:] if not a.startswith('--')]
 fig = rest[0] if rest else None
 BONES = ('fL_hand', 'fR_hand', 'hL_foot', 'hR_foot')
+LABELS = None
 for o in opts:
     if o.startswith('--bones='): BONES = tuple(o.split('=', 1)[1].split(','))
+    if o.startswith('--labels='): LABELS = np.load(o.split('=', 1)[1])          # foot_bundles.py の出力
 d = dict(np.load(src)); names = [str(x) for x in d['rig__names']]
 
 
@@ -61,6 +63,13 @@ for b in BONES:
     lab_u = m & (P[:, 0] > split) & (P[:, 1] > 0.6); lab_l = m & (P[:, 0] > split) & (P[:, 1] < -0.6)
     Du = dijkstra(A, indices=np.where(lab_u)[0], min_only=True); Dl = dijkstra(A, indices=np.where(lab_l)[0], min_only=True)
     side = np.where(Du < Dl, 1.0, -1.0)
+    if LABELS is not None and b in LABELS.files:
+        # foot_bundles.py の束（指 1 本ずつを向きで束にまとめたもの）を使う。左足は上の分け方だと 1 本の指の頂点が両方の束に分かれ、
+        # 反対向きに回って三角形が棒のように伸びた（記録 30、2026-10-18）。付け根（0）の頂点は最も近い束と同じ
+        L = LABELS[b]; lab_s = np.zeros(len(v))
+        for l in (1, 2): lab_s[L == l] = np.sign(P[L == l, 1].mean())
+        kd0 = cKDTree(v[L > 0]); lab_s[L == 0] = lab_s[L > 0][kd0.query(v[L == 0])[1]]
+        side = lab_s
     sU = np.where(lab_u)[0][0]; sL = np.where(lab_l)[0][0]
     hinge = c0 + split * ax0
     t = np.clip((P[:, 0] - (split - 1.5)) / 2.5, 0, 1); t = t * t * (3 - 2 * t)
