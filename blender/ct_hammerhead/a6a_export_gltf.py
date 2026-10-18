@@ -46,6 +46,8 @@ for _fin, _part in PLATE_FINS.items():
     if _part not in PARTS: PARTS[_part] = ([], 1.0)
 # 2026-10-18: CT の細かさで作った腹びれの軟骨（HH_PELV_CT175）は、膜を 6.5%（7700 面）まで減らすと薄い所で覆いが欠け、軟骨が膜の外に出た。膜は 30% まで
 if os.environ.get("HH_PELV_CT175") == "1": PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], 0.30)
+# 2026-10-19 案: 写真の形から作った腹びれ（a5f_pelv_photo.py、HH_PELV_PHOTO）は、0.25 mm の格子の面なので面が多い。軟骨は 6800 面では細い放射軟骨がつぶれるので 60000 面、膜は 40000 面まで
+if os.environ.get("HH_PELV_PHOTO") == "1": PARTS["PelvicCartilage"] = (PARTS["PelvicCartilage"][0], 60000); PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], int(os.environ.get("HH_PELV_PHOTO_SKINF", 40000)))
 FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
@@ -228,19 +230,20 @@ def _body_warp(o, n):
         # 2026-10-18: HH_PELV_RODS=1 の腹びれの軟骨（hh_finrods.py、腰帯の横棒が正中まで届く）は、付け根を膜（HH_pelvmem_*）の頂点から決める
         #  （軟骨の頂点から決めると横棒の端が付け根になり、下へ回す中心が膜とずれる）
         ref = co.copy()
-        if (os.environ.get("HH_PELV_RODS") == "1" or os.environ.get("HH_PELV_CT175") == "1") and n in ("HH_pelv_R", "HH_pelv_L"):
+        if (os.environ.get("HH_PELV_RODS") == "1" or os.environ.get("HH_PELV_CT175") == "1" or os.environ.get("HH_PELV_PHOTO") == "1") and n in ("HH_pelv_R", "HH_pelv_L"):   # HH_PELV_PHOTO: a5f_pelv_photo.py（2026-10-19）
             bpy.ops.wm.ply_import(filepath=f"{MESH}/{n.replace('pelv_', 'pelvmem_')}.ply"); _m = bpy.context.selected_objects[0]
             ref = _np.empty(len(_m.data.vertices) * 3); _m.data.vertices.foreach_get("co", ref); ref = ref.reshape(-1, 3); _mm = _m.data
             bpy.data.objects.remove(_m, do_unlink=True); bpy.data.meshes.remove(_mm)
         ay = _np.abs(ref[:, 1]); _near = ay < ay.min() + 0.010; bx = float(ref[_near, 0].mean() * 1000)   # 付け根（体の中心にいちばん近い所）
         sgn = _np.sign(ref[:, 1].mean())
         co[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000; ref[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000
-        if _TW is not None:
+        if _TW is not None and not (os.environ.get("HH_PELV_PHOTO") == "1" and "pelv" in n):   # 写真の腹びれは a5f_pelv_photo.py がもう動かしてある
             dy = (_np.interp(bx, _TW["z_mm"], _TW["width_new_mm"]) - _np.interp(bx, _TW["z_mm"], _TW["width_old_mm"])) / 2 / 1000
             co[:, 1] += sgn * dy; ref[:, 1] += sgn * dy
         # 2026-10-17 案: 胸びれ・腹びれを付け根のまわりに下へ回す（HH_PECT_DOWN・HH_PELV_DOWN、度。2026-10-14 に決めた姿勢に足す角）。
         #  体軸（Blender x）のまわりに、付け根（体の中心にいちばん近い頂点のまとまり）を中心に回す。右（+y）のひれは −、左は + の向き（先が下へ）
         _deg = float(os.environ.get("HH_PECT_DOWN" if "pect" in n else "HH_PELV_DOWN", 0) or 0)
+        if os.environ.get("HH_PELV_PHOTO") == "1" and "pelv" in n: _deg = 0.0   # a5f_pelv_photo.py が付け根 B を中心にもう回してある
         if _deg:
             c0 = ref[_near].mean(0); th = math.radians(_deg) * (-1 if sgn > 0 else 1)
             yy, zz = co[:, 1] - c0[1], co[:, 2] - c0[2]
