@@ -95,6 +95,7 @@
 | 66 | feet_skin.py `digits_h31.npz` `feet_posed.npz` | 足だけの膜（0.05 mm の格子） | 指ごとの膜（指 0.5 mm、付け根 0.73 mm）、爪の骨は膜から除く、同じ束の指は水かきでつなぎ指先だけ分ける、場を 0.12 mm でぼかす |
 | 67 | Blender -b -P merge_feet.py -- `skin_posed.npz` `feet_posed.npz` `merged_posed.npz` | 体の膜と足の膜をつなぐ | 足首から 1 mm 上で体の膜を箱で切り、Boolean の和。展示の姿勢のまま 14.9 万面に減らす（書き出しが 15 万面を超えると静止の形で間引いて三角形が伸びるため） |
 | 68 | rig_merged.py `merged_posed.npz` `soft_rigged.npz` `skin_posed.npz`（65 の出力）→ pack_soft.py → claws_mesh.py | `soft_rigged.npz`、`skin_posed.npz`、`chameleon_body_soft.npz`（org_claw を足す） | 新しくできた頂点だけ足と下腿の重み。爪の鞘は爪の骨から 0.12 mm、先へ 0.5 mm（仮）、内向きで保存 |
+| 69 | digit_labels.py --bones=fL_hand,fR_hand → LIMBS=fL_hand,fR_hand で feet_skin.py・merge_feet.py・rig_merged.py → pack_soft.py → claws_mesh.py（足と手の印をまとめた `digits_h33.npz`）（2026-10-19、記録 33・34） | 68 の膜 → `soft_rigged.npz`、`skin_posed.npz`、`chameleon_body_soft.npz` | 手も足と同じ作り方（手の付け根 0.73 mm、指 0.5 mm、前腕 0.965 mm）。指先は指の向きでいちばん先の頂点、爪の骨は 1.0〜2.2 mm |
 | 見る | Blender -b -P blender_look_feet.py -- <出力の頭>（LOOK_OPAQUE=1 で膜だけ不透明） | 足の骨・膜・爪の鞘を 4 方向から描く | 書き出しを待たずに形を確かめる道具（30 秒）。最終の確認はページで撮る |
 | 33 | softvol2.py | → `soft2_vol.npz` | 軟部の体積を、肋骨を戻した空間へ移す（近い骨の動きの重み付き平均）。持ち主 = 戻した空間でいちばん近い骨 |
 | 34 | softmesh2.py（SOFT_WEIGHT_SIGMA_MM=2.0） | → `soft_rigged.npz` | 閉じた膜。つながってはいけない持ち主の間を体積のうちに削り（胴と手足は手足の側を 0.8 mm、同じ肢の隣の骨は関節から 2.5 mm より遠い所、尾は隣の椎骨とだけ）、ならして面にし、15 万面に減らしてから重みを付ける。面は外さない |

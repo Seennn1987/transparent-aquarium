@@ -53,7 +53,8 @@ export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // After the hyoid was made 1.2 times instead of 1.45 and the eyes fill the orbits (C record 26): 0.796, so
 // 0.592 × 0.630 / 0.796 = 0.469. After the hands were opened (C record 29, 2026-10-18): 0.802, so 0.465.
 // After the hind feet were remade toe by toe with claws (C record 31, 2026-10-18): 0.801, so 0.466.
-export const SKIN_GAIN = 0.466;
+// After the hands too (C record 34, 2026-10-19): 0.796, so 0.469.
+export const SKIN_GAIN = 0.469;
 
 // The viscera, one brown mass in the body cavity (ct_body_pipeline/visceramesh.py). Provisional: the
 // only measure is the user's jar photo 01 (447 px a side, divided by the liquid 217): 0.50 / 0.42 / 0.38,
@@ -70,8 +71,8 @@ export const VISCERA_GAIN = 4.8;
 // After the head was made 1.45 times (C record 21, 2026-10-17) the median hyoid path there went 0.0344 → 0.0485 on the
 // Mac's screen, so × 0.709 (was 11.98 / 4.11 / 1.65). After C records 23–24: 0.0344 → 0.0480, × 0.717.
 // After C record 26 (the hyoid 1.2 times): 0.0344 → 0.0421, × 0.817. After C record 29: 0.0344 → 0.0398, × 0.864.
-// After C record 31: 0.0344 → 0.0397, × 0.866.
-export const HYOID_CARTILAGE = [10.38, 3.56, 1.43];
+// After C record 31: 0.0344 → 0.0397, × 0.866. After C record 34: 0.0344 → 0.0410, × 0.839.
+export const HYOID_CARTILAGE = [10.05, 3.45, 1.38];
 
 /** The claws' keratin sheaths (blender/ct_body_pipeline/claws_mesh.py, C record 31, 2026-10-18): not in the CT, and not
  * measured on any photo. A pale amber that shows on screen over a sheath about 0.3 mm thick; provisional. */
@@ -145,20 +146,23 @@ export const STAINS = {
   //   film 0.1166 / 0.0833 / 0.0468, skin 0 / 0.0253 / 0.0789, bone 14.62 / 30.15 / 24.08
   // And after the hind feet were remade toe by toe with claws (C record 31, 2026-10-18): the glb after gives film
   // 0.1137 / 0.0783 / 0.0436, skin 0 / 0.0310 / 0.0860, bone 14.8 / 30.2 / 24.1; times after / C record 29's:
-  //   film 0.1162 / 0.0827 / 0.0448, skin 0 / 0.0260 / 0.0841, bone 14.65 / 30.16 / 24.07 (used below)
+  //   film 0.1162 / 0.0827 / 0.0448, skin 0 / 0.0260 / 0.0841, bone 14.65 / 30.16 / 24.07
+  // And after the hands too (C record 34, 2026-10-19): film 0.1138 / 0.0803 / 0.0443, skin 0 / 0.0260 / 0.0840, bone
+  // 14.8 / 30.2 / 24.1; times after / C record 31's:
+  //   film 0.1163 / 0.0847 / 0.0455, skin 0 / 0.0218 / 0.0821, bone 14.64 / 30.16 / 24.08 (used below)
   // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
   // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.
   "01": {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
-    bone: { spectrum: [0.486, 1, 0.798], gain: 30.16 },
+    bone: { spectrum: [0.485, 1, 0.798], gain: 30.16 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
     cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
-    skin: { spectrum: [0, 0.310, 1], gain: 0.0841 },
+    skin: { spectrum: [0, 0.266, 1], gain: 0.0821 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
     viscera: { spectrum: [0.571, 0.861, 1], gain: 0 },
-    film: { spectrum: [1, 0.712, 0.386], gain: 0.1162 },
+    film: { spectrum: [1, 0.728, 0.391], gain: 0.1163 },
     // The organs of the body cavity (blender/ct_body_pipeline/organs.py). Order head → tail and the sizes of heart,
     // liver, gallbladder, fat bodies and kidneys after Melero et al. 2023 (Open Vet J 13:1071, the CT of 17 living
     // veiled chameleons). The living animals' lungs fill > 2/3 of the dorsal coelom (ibid.); in preserved chameleons
@@ -197,18 +201,19 @@ export const STAINS = {
     // skin's box, so a change anywhere in the skin (here the hands) reshapes the gut (to be fixed, C record 29).
     // After C record 31 (hind feet, the organs kept from C record 29): liver 0.2928 → 0.3088 (× 0.948), gut 0.1580 → 0.1595,
     // eye 0.1706 → 0.2942: the values below are unchanged at this rounding.
+    // After C record 34 (hands): liver 0.2928 → 0.3084 (× 0.949), gut 0.1580 → 0.1596 (× 0.990), eye 0.1706 → 0.2938.
     // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
     // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
     // gut in 01, so they add nothing beyond it (provisional).
     // The organs 01 shows nothing of (heart, gallbladder, fat bodies, kidneys) are given the cleared tissue's own
-    // absorbance (the skin's volume above, 0 / 0.0260 / 0.0841) once more: faint, provisional.
+    // absorbance (the skin's volume above, 0 / 0.0218 / 0.0821) once more: faint, provisional.
     organs: {
-      liver_r: [0.63, 0.97, 1.74], liver_l: [0.63, 0.97, 1.74],
+      liver_r: [0.63, 0.97, 1.75], liver_l: [0.63, 0.97, 1.75],
       contents: [0, 0, 0],
-      heart: [0, 0.0260, 0.0841], gallbladder: [0, 0.0260, 0.0841], fat_r: [0, 0.0260, 0.0841], fat_l: [0, 0.0260, 0.0841],
-      kidney_r: [0, 0.0260, 0.0841], kidney_l: [0, 0.0260, 0.0841],
-      stomach: [3.13, 3.80, 4.75], intestine: [3.13, 3.80, 4.75], colon: [3.13, 3.80, 4.75],
+      heart: [0, 0.0218, 0.0821], gallbladder: [0, 0.0218, 0.0821], fat_r: [0, 0.0218, 0.0821], fat_l: [0, 0.0218, 0.0821],
+      kidney_r: [0, 0.0218, 0.0821], kidney_l: [0, 0.0218, 0.0821],
+      stomach: [3.13, 3.80, 4.74], intestine: [3.13, 3.80, 4.74], colon: [3.13, 3.80, 4.74],
       eye_r: [1.18, 1.34, 1.64], eye_l: [1.18, 1.34, 1.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
       // Not measured on 01 (its throat is under the blue film): kept as "06", like the rib-gap cartilage.
       hyoid_cartilage: HYOID_CARTILAGE,
