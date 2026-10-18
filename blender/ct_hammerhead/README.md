@@ -73,6 +73,7 @@ blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
 | 26 | a4c_final_volume.py | A3 の直しをすべて逆にたどり、最終の座標の骨の体積（0.735 mm）を作る → a4_skel_field.npy |
 | 27 | a4d_fins_volume.py ／ a4d2_median_fins.py | 決定後の胸びれ・肩帯・腹びれ、立て直した背びれ・臀びれの体積 |
 | 28 | a4e_mesh.py | マーチングキューブで面を作る → mesh/HH_*.ply（git に入れない） |
+| 28b | a4d3_fin_ct_mesh.py anal ／ dfin2 ／ pelv | 第 2 背びれ・臀びれ・腹びれの軟骨を元の CT の細かさ（閾値 175）で面にし、a4e の面を書き直す（2026-10-19 から既定） |
 | 29 | a4f_render_outline.py | Blender（別シーン HH_A4）で白い光の静止画 → docs/hammerhead_ct/a4_*.png |
 | 30 | a4g_overlay_top.py | 背中の静止画に写真の外形を重ねる → a4_top_photo.png |
 | 31 | a4h_headwidth_options.py ／ a4i_bodywidth_options.py | 頭の幅・胴の幅の案の絵 |

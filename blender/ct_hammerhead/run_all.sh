@@ -104,6 +104,13 @@ step py a4d2_median_fins.py
 step py a4e_mesh.py skel
 step py a4e_mesh.py spine
 step py a4e_mesh.py fins
+# 2026-10-19 決定（プロデューサー「この臀びれでよいので、同じ作り方を第 2 背びれと腹びれに広げて…」→「今の変更を既定にした後…」）: 第 2 背びれ・臀びれ・腹びれの軟骨を、
+#  元の CT の細かさ（閾値 175、σ 0.5 画素）で面にしてから動かす（a4d3_fin_ct_mesh.py）。膜は軟骨に合わせて大きさを決める（HH_FINCT_FIT=membrane）。
+#  前の形は HH_FINCT_ANAL= HH_FINCT_DFIN2= HH_FINCT_FIT= HH_PELV_CT175=
+export HH_FINCT_ANAL=${HH_FINCT_ANAL-1} HH_FINCT_DFIN2=${HH_FINCT_DFIN2-1} HH_FINCT_FIT=${HH_FINCT_FIT-membrane} HH_PELV_CT175=${HH_PELV_CT175-1}
+[[ $HH_FINCT_ANAL == 1 ]] && step py a4d3_fin_ct_mesh.py anal
+[[ $HH_FINCT_DFIN2 == 1 ]] && step py a4d3_fin_ct_mesh.py dfin2
+[[ $HH_PELV_CT175 == 1 ]] && step py a4d3_fin_ct_mesh.py pelv
 step fig a4h_headwidth_options.py
 step fig a4i_bodywidth_options.py
 # A5 体の膜とひれの膜
@@ -127,7 +134,7 @@ export HH_FIN_PARTS=${HH_FIN_PARTS-1}
 #  背びれ・臀びれの軟骨のひねりを取って膜の板の厚さに収め（HH_FIN_CART_FLAT）、膜の外形の内側へ寄せる（HH_FIN_CART_FIT）。前の形は 3 つとも空に
 export HH_ORGAN_UNION=${HH_ORGAN_UNION-1} HH_FIN_CART_FLAT=${HH_FIN_CART_FLAT-1} HH_FIN_CART_FIT=${HH_FIN_CART_FIT-1}
 # 2026-10-18（プロデューサー「CTを原本にしない方が良いのでは？もっと良い事例を探してみて」→「その案で進めてください」）の案: 第 2 背びれ・臀びれ（HH_FIN_RODS）と
-#  腹びれ（HH_PELV_RODS）の軟骨を、CT の代わりに図と写真から棒と板で作る（hh_finrods.py）。既定ではまだ働かない
+#  腹びれ（HH_PELV_RODS）の軟骨を、CT の代わりに図と写真から棒と板で作る（hh_finrods.py）。プロデューサー「そんな直線的で太さも感覚も均一な棒みたいなのを置くのでいいわけないじゃん。」で使わない
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3
