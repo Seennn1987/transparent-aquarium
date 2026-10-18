@@ -121,7 +121,15 @@ def _body_warp(o, n):
             w = _np.clip(out() / 1.5, 0, 1)   # 5 mm では、体の線から 1〜6 mm の所が外形と板の外に残った（臀びれ 107 点・132 点）
             # B: ひねりを取る。体軸 3 mm × 高さ 3 mm の区画ごとに、左右の中央を正中へ。それでも ±1.4 mm を超える区画は、その区画の左右を縮める
             WHOLE = n == "HH_anal" and os.environ.get("HH_FINCT_ANAL") == "1"   # 2026-10-18: CT の細かさで作った臀びれ（a4d3_fin_ct_mesh.py）は、ひれ全体を 1 枚として動かす（棒の並びを崩さない）
-            if os.environ.get("HH_FIN_CART_FLAT") == "1" and WHOLE:
+            if os.environ.get("HH_FIN_CART_FLAT") == "1" and WHOLE and _membfit:
+                # 2026-10-18 直し（プロデューサー「なんでそんなにまだらなんですか？これじゃ組織が欠損していますよね？」）: 頂点ごとに左右を ±1.5 mm に切り詰めると、
+                #  正中から横にずれた棒は表と裏の面が同じ 1.5 mm に寄って厚さ 0 になり、ページでは消えていた（CT の軟骨は欠けていない）。
+                #  ひれ全体（体の中の部分も）の左右の中心を、体軸と高さの 2 次の面で正中へそろえ、それでも板より厚ければ全体を同じ割合で薄くする（どこも厚さ 0 にしない）
+                A_ = _np.c_[_np.ones(len(X)), X, out(), X * X, X * out(), out() ** 2]; cf = _np.linalg.lstsq(A_, Y, rcond=None)[0]
+                Y = Y - A_ @ cf
+                p99 = float(_np.percentile(_np.abs(Y), 99.5)); sc_ = min(1.0, 1.5 / p99); Y = Y * sc_
+                report[f"fin_cart_flat_{n}"] = {"surface": [round(float(v_), 5) for v_ in cf], "p99_5_mm": round(p99, 2), "scale": round(sc_, 3)}
+            elif os.environ.get("HH_FIN_CART_FLAT") == "1" and WHOLE:
                 mm_ = w > 0.99; A_ = _np.c_[_np.ones(mm_.sum()), X[mm_], out()[mm_]]; cf = _np.linalg.lstsq(A_, Y[mm_], rcond=None)[0]
                 Y0 = Y.copy(); Y = Y - w * (cf[0] + cf[1] * X + cf[2] * out())            # ひれの面（左右 = a + b × 体軸 + c × 高さ）を正中の面へ
                 p99 = float(_np.percentile(_np.abs(Y[mm_]), 99))
@@ -147,8 +155,7 @@ def _body_warp(o, n):
                     # 背腹: CT の位置のままでは軟骨の大半が体の中に入り、膜が大きくならなかった（k 1.0）。付け根（体の線から測った深さの 10% の点）を体の線の 3 mm 内へ
                     sh_ = (-3.0 - float(_np.percentile(out(), 10))); Z = Z - fd["side"] * sh_; co[:, 2] = Z / 1000
                     w = _np.clip(out() / 1.5, 0, 1); report[f"fin_cart_base_shift_{n}_mm"] = round(sh_, 1)
-                    wl_ = _np.clip((out() + 3.0) / 1.5, 0, 1)                                     # 体の線の 3 mm 内から外は、膜の板（±1.6 mm）から横へ出さない（腹の下は細いので、体の線のすぐ内も）
-                    Y = _np.clip(Y, -1.5, 1.5) * wl_ + Y * (1 - wl_)
+                    # 左右は上の 2 次の面で正中へそろえ、全体を同じ割合で ±1.5 mm に収めてある（頂点ごとに切り詰めると棒が消えた）
                     sel_ = _np.nonzero(w > 0.99)[0][::3]; xs_, zs_ = X[sel_], Z[sel_]
                     # 高さ: 軟骨の先がひれの深さの 0.55 になる高さ（ピサの骨格標本の臀びれで測った割合）。長さ: 軟骨がすべて収まるいちばん小さい倍率（形は参考の外形のまま、縦と横で倍率を変える）
                     REACH_ = 0.55; tipd = float(out().max()); kz = tipd / REACH_ / (fd["H"] * TLm)
