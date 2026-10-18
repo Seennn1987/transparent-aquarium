@@ -144,6 +144,9 @@ def _body_warp(o, n):
                     # 2026-10-18（プロデューサー「軟骨って実際にそんなに短いのヒレ全体の３０％程度しかないのでしょうか？」→ 膜を軟骨に合わせる案に「皮膚から飛び出さないようにしてね。修正を承認します」）:
                     #  軟骨は CT の大きさ・位置のまま。参考の外形（hh_fins.py の臀びれ）を同じ形のまま k 倍し、前後にずらして、体の線から 1.5 mm より外の軟骨の頂点が
                     #  すべて外形の内側 1 mm に入る、いちばん小さい k を探す。膜の板（AnalSkin）はこの外形で作る（FIT_FD）
+                    # 背腹: CT の位置のままでは軟骨の大半が体の中に入り、膜が大きくならなかった（k 1.0）。付け根（体の線から測った深さの 10% の点）を体の線の 3 mm 内へ
+                    sh_ = (-3.0 - float(_np.percentile(out(), 10))); Z = Z - fd["side"] * sh_; co[:, 2] = Z / 1000
+                    w = _np.clip(out() / 1.5, 0, 1); report[f"fin_cart_base_shift_{n}_mm"] = round(sh_, 1)
                     Y = _np.clip(Y, -1.5, 1.5) * w + Y * (1 - w)                                  # 膜の板（±1.6 mm）から横へ出さない
                     sel_ = _np.nonzero(w > 0.99)[0][::3]; xs_, zs_ = X[sel_], Z[sel_]
                     def _poly(o_mm, k):
@@ -151,11 +154,11 @@ def _body_warp(o, n):
                         return [(o_mm + s_ * Lb_, -(_np.interp(o_mm + s_ * Lb_, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * Hm_ if h_ > 0 else -4.0))) for s_, h_ in fd["poly"]]
                     x_lo = float(xs_.min()); found = None
                     for k in _np.arange(1.0, 2.51, 0.02):
-                        for o_mm in _np.arange(x_lo - 25, x_lo + 0.01, 0.5):
+                        for o_mm in _np.arange(fd["o"] * TLm - 10, fd["o"] * TLm + 10.01, 0.5):   # 付け根の前の端は、参考の位置から ±10 mm まで
                             P_ = _poly(o_mm, k)
                             if (_inside(P_, xs_, zs_) & _inside(P_, xs_ - 1, zs_) & _inside(P_, xs_ + 1, zs_)).all(): found = (k, o_mm); break
                         if found: break
-                    k, o_mm = found if found else (2.5, x_lo - 10)
+                    k, o_mm = found if found else (2.5, fd["o"] * TLm)
                     FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * k)
                     poly = _poly(o_mm, k)
                     report[f"fin_membrane_fit_{n}"] = {"k": round(float(k), 2), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * k), 1)}
