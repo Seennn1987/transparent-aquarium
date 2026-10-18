@@ -110,17 +110,27 @@ np.save('a8_organs_lab.npy', OUTL)
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 GROUPS = {'HH_liver': ['liver_L', 'liver_R', 'liver_M'], 'HH_gut': ['stomach', 'pylorus', 'duodenum', 'intestine', 'rectum', 'spleen'], 'HH_spiral': ['spiral']}
 Vs = []; Fs = []; n = 0; info = {'source': 'BIODIDAC Squalus acanthias digestive system (I. Livingstone, CC BY-NC 4.0) https://omeka.uottawa.ca/biodidac/items/show/4272; positions from CT', 'organs': {}}
-for li, name in enumerate(names, start=1):
-    zz, yy, xx = np.nonzero(OUTL == li)
+# 2026-10-18 直し（プロデューサー「内臓に色が全くない箇所と真っ黒な箇所があります」→ 直し A）: HH_ORGAN_UNION=1 で、同じ部品の仲間
+#  （肝臓の左・右・中の葉、消化管の胃・幽門・十二指腸・腸・直腸・脾臓）を 1 つの塊にしてから面を作る。前は仲間ごとに面を作ったので、接する壁で
+#  2 つの面の頂点がぴったり重なり、書き出し（a6a_export_gltf.py の頂点の結合と面の減らし）で 1 本の辺を 3 枚以上の面が使う所・裏返った面ができ、
+#  通り道が足し過ぎ（真っ黒）や引き過ぎ（色が無い）になっていた（肝臓 323 本・吻端から 0.18〜0.22、消化管 388 本・0.28〜0.36 と 0.46〜0.48）
+UNION = os.environ.get('HH_ORGAN_UNION') == '1'
+_GROUPS0 = {'HH_liver': ['liver_L', 'liver_R', 'liver_M'], 'HH_gut': ['stomach', 'pylorus', 'duodenum', 'intestine', 'rectum', 'spleen'], 'HH_spiral': ['spiral']}
+_jobs = ([(g, [names.index(m) + 1 for m in ms if m in names]) for g, ms in _GROUPS0.items()] if UNION else [(name, [li]) for li, name in enumerate(names, start=1)])
+for name, lis in _jobs:
+    for li in lis: info['organs'][names[li - 1]] = round(float((OUTL == li).sum() * VX ** 3 / 1000), 1)
+    li = lis[0] if len(lis) == 1 else None
+    zz, yy, xx = np.nonzero(np.isin(OUTL, lis))
     if len(zz) == 0: info['organs'][name] = 0; continue
     lo = np.array([zz.min(), yy.min(), xx.min()]) - 3; hi = np.array([zz.max(), yy.max(), xx.max()]) + 4
-    sub = nd.gaussian_filter((OUTL[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]] == li).astype(np.float32), (1.1 if SPIRAL.get('shape') == 'bowl' else 0.8) if name == 'spiral' else 1.2)
+    sub = nd.gaussian_filter(np.isin(OUTL[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]], lis).astype(np.float32), (1.1 if SPIRAL.get('shape') == 'bowl' else 0.8) if name in ('spiral', 'HH_spiral') else 1.2)
     if sub.max() < 0.5: continue
     v, f, _, _ = marching_cubes(np.pad(sub, 1), 0.5, allow_degenerate=False); v = v - 1 + lo + np.array([k0, 0, 0])
-    Vs.append((name, v, f)); info['organs'][name] = round(float(len(zz) * VX ** 3 / 1000), 1)
+    Vs.append((name, v, f))
+    if not UNION: info['organs'][name] = round(float(len(zz) * VX ** 3 / 1000), 1)
 info['faces'] = 0
 for g, members in GROUPS.items():           # 肝臓・消化管・らせん弁の仕切りを別々の部品に（色を分けるため）
-    parts = [(v, f) for nm, v, f in Vs if nm in members]
+    parts = [(v, f) for nm, v, f in Vs if nm in members or nm == g]
     if not parts: continue
     vv = []; ff = []; m = 0
     for v, f in parts: vv.append(v); ff.append(f + m); m += len(v)

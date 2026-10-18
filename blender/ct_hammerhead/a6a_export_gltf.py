@@ -103,6 +103,41 @@ def _body_warp(o, n):
             want = line_z - fd["side"] * float(_reach) * fd["H"] * TLm / 1000
             co[:, 2] += want - tip
             report[f"fin_cart_shift_{n}_mm"] = round(float(want - tip) * 1000, 1)
+        # 2026-10-18 直し（プロデューサー「ヒレの色の染まり方が変です。特に背鰭に色をつけると、皮膚からはみ出ています。」→ 直し B・C）。
+        #  膜は参考の外形の板（正中 ±1.6 mm、hh_fins.py）なので、軟骨をその中に収める。体の線より外（ひれの側）の頂点だけを動かし、体の線から 5 mm で効き目を 1 にする
+        if os.environ.get("HH_FIN_PLATE") == "all" and (os.environ.get("HH_FIN_CART_FLAT") == "1" or os.environ.get("HH_FIN_CART_FIT") == "1"):
+            import hh_fins
+            from matplotlib.path import Path as _Path
+            fin = {"HH_dfin1": "dfin1", "HH_dfin2": "dfin2", "HH_anal": "anal"}[n]; fd = hh_fins.FINS[fin]; TLm = hh_fins.TL_MM
+            _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); key = "top_target_mm" if fd["side"] < 0 else "bot_target_mm"
+            X = co[:, 0] * 1000; Y = co[:, 1] * 1000; Z = co[:, 2] * 1000
+            out = lambda: -fd["side"] * (Z + _np.interp(X, _sf["z_mm"], _sf[key]))   # 体の線からひれの側へ（mm）。Blender の z = −v
+            w = _np.clip(out() / 5.0, 0, 1)
+            # B: ひねりを取る。体軸 3 mm × 高さ 3 mm の区画ごとに、左右の中央を正中へ。それでも ±1.4 mm を超える区画は、その区画の左右を縮める
+            if os.environ.get("HH_FIN_CART_FLAT") == "1":
+                cell = _np.floor(X / 3).astype(int) * 100000 + _np.floor(out() / 3).astype(int); Y0 = Y.copy()
+                for c_ in _np.unique(cell[w > 0]):
+                    m_ = cell == c_; Yc = Y0[m_] - _np.median(Y0[m_]); top = _np.abs(Yc).max()
+                    if top > 1.4: Yc = Yc * 1.4 / top
+                    Y[m_] = (1 - w[m_]) * Y0[m_] + w[m_] * Yc
+                report[f"fin_cart_flat_{n}_mm"] = [round(float(Y0[w > 0.99].min()), 1), round(float(Y0[w > 0.99].max()), 1), round(float(Y[w > 0.99].min()), 1), round(float(Y[w > 0.99].max()), 1)]
+            # C: 膜の外形（横から）の内側へ。臀びれは前の端がひれの付け根の前の端 + 2 mm に来るよう後ろへずらす。残って外形から出る頂点は、同じ高さで外形の内側 1 mm の所へ前後に寄せる
+            if os.environ.get("HH_FIN_CART_FIT") == "1":
+                Lb = (fd["i"] - fd["o"]) * TLm; Hm = fd["H"] * TLm; poly = []
+                for s_, h_ in fd["poly"]:
+                    xm = fd["o"] * TLm + s_ * Lb; hh = h_ * Hm if h_ > 0 else -4.0
+                    poly.append((xm, -(_np.interp(xm, _sf["z_mm"], _sf[key]) + fd["side"] * hh)))
+                pth = _Path(poly + [poly[0]])
+                if fin == "anal":
+                    dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
+                ins = lambda xx, zz: pth.contains_points(_np.c_[xx, zz])
+                bad = (w > 0) & ~(ins(X, Z) & ins(X - 1, Z) & ins(X + 1, Z)); moved = 0
+                offs = _np.r_[0, _np.ravel(_np.c_[_np.arange(0.5, 40.5, 0.5), -_np.arange(0.5, 40.5, 0.5)])]
+                for i_ in _np.nonzero(bad)[0]:
+                    cand = X[i_] + offs; ok = ins(cand, _np.full(len(cand), Z[i_])) & ins(cand - 1, _np.full(len(cand), Z[i_])) & ins(cand + 1, _np.full(len(cand), Z[i_]))
+                    if ok.any(): X[i_] = X[i_] + (cand[_np.argmax(ok)] - X[i_]) * w[i_]; moved += 1
+                report[f"fin_cart_fit_{n}"] = [int(bad.sum()), moved]
+            co[:, 0] = X / 1000; co[:, 1] = Y / 1000
         co[:, 0] = hh_warp.warp_mm(co[:, 0] * 1000) / 1000
         me.vertices.foreach_set("co", co.ravel()); me.update(); return
     # 同じ直し: HH_LOBE_CART=1 で、尾びれの下の葉の軟骨（HH_skel_rest の、背骨の中心より腹側で 690〜860 mm）を、

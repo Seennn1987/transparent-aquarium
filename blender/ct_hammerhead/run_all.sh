@@ -123,6 +123,9 @@ export HH_FIN_CART_REACH=${HH_FIN_CART_REACH-0.53} HH_LOBE_CART=${HH_LOBE_CART-1
 #  背びれ 2 つと臀びれの膜は、体の膜の体積に足さず板の面にする（HH_FIN_PLATE=all）。前の形は HH_FIN_PARTS= HH_FIN_PLATE=1
 export HH_FIN_PARTS=${HH_FIN_PARTS-1}
 [[ $HH_FIN_PARTS == 1 && $HH_FIN_PLATE == 1 ]] && export HH_FIN_PLATE=all
+# 2026-10-18（プロデューサー「内臓（直し A）とひれ（直し B・C）の両方を、その案で直してください」）: 内臓は部品ごとに 1 つの塊にしてから面を作る（HH_ORGAN_UNION）、
+#  背びれ・臀びれの軟骨のひねりを取って膜の板の厚さに収め（HH_FIN_CART_FLAT）、膜の外形の内側へ寄せる（HH_FIN_CART_FIT）。前の形は 3 つとも空に
+export HH_ORGAN_UNION=${HH_ORGAN_UNION-1} HH_FIN_CART_FLAT=${HH_FIN_CART_FLAT-1} HH_FIN_CART_FIT=${HH_FIN_CART_FIT-1}
 step py a5a_shell.py 1
 step py a5a_shell.py 2
 step py a5a_shell.py 3
