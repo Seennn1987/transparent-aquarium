@@ -104,7 +104,7 @@ def _body_warp(o, n):
             co[:, 2] += want - tip
             report[f"fin_cart_shift_{n}_mm"] = round(float(want - tip) * 1000, 1)
         # 2026-10-18 直し（プロデューサー「ヒレの色の染まり方が変です。特に背鰭に色をつけると、皮膚からはみ出ています。」→ 直し B・C）。
-        #  膜は参考の外形の板（正中 ±1.6 mm、hh_fins.py）なので、軟骨をその中に収める。体の線より外（ひれの側）の頂点だけを動かし、体の線から 5 mm で効き目を 1 にする
+        #  膜は参考の外形の板（正中 ±1.6 mm、hh_fins.py）なので、軟骨をその中に収める。体の線より外（ひれの側）の頂点だけを動かし、体の線から 1.5 mm で効き目を 1 にする
         if os.environ.get("HH_FIN_PLATE") == "all" and (os.environ.get("HH_FIN_CART_FLAT") == "1" or os.environ.get("HH_FIN_CART_FIT") == "1"):
             import hh_fins
             def _inside(poly, xx, zz):   # 多角形の中か（偶奇の規則。Blender の Python には matplotlib が無い）
@@ -116,7 +116,7 @@ def _body_warp(o, n):
             _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); key = "top_target_mm" if fd["side"] < 0 else "bot_target_mm"
             X = co[:, 0] * 1000; Y = co[:, 1] * 1000; Z = co[:, 2] * 1000
             out = lambda: -fd["side"] * (Z + _np.interp(X, _sf["z_mm"], _sf[key]))   # 体の線からひれの側へ（mm）。Blender の z = −v
-            w = _np.clip(out() / 5.0, 0, 1)
+            w = _np.clip(out() / 1.5, 0, 1)   # 5 mm では、体の線から 1〜6 mm の所が外形と板の外に残った（臀びれ 107 点・132 点）
             # B: ひねりを取る。体軸 3 mm × 高さ 3 mm の区画ごとに、左右の中央を正中へ。それでも ±1.4 mm を超える区画は、その区画の左右を縮める
             if os.environ.get("HH_FIN_CART_FLAT") == "1":
                 cell = _np.floor(X / 3).astype(int) * 100000 + _np.floor(out() / 3).astype(int); Y0 = Y.copy()
