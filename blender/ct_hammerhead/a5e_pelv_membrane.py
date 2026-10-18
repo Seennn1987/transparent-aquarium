@@ -67,11 +67,13 @@ if _os.environ.get('HH_PELV_RODS') == '1':
     # 棒の向き: 体軸（後ろ）から外へ 45°（Reynolds 1897 Fig. 8 で、腹びれの棒の多くは外・後ろへ向く）。60° を基鰭軟骨から測った版は、腹から見て真横を向いた
     ax2 = np.array([e1[1], e2[1]]); ax2 /= np.linalg.norm(ax2); lat2 = np.array([-ax2[1], ax2[0]])
     if np.sign(lat2[1]) == np.sign(smed): lat2 = -lat2                  # 内側（正中）と反対へ
-    dirR = np.cos(np.radians(45)) * ax2 + np.sin(np.radians(45)) * lat2
+    #  2026-10-18 直し: 45° でそろえると横から見て棒がひれの長さの向きに束になった。Reynolds 1897 Fig. 8 では棒は扇に開き、前の棒ほど真横、
+    #  後ろの棒ほど後ろを向く。前の棒 75° から後ろの棒 30° へ（体軸の後ろから外へ測る）
+    dirk = lambda k: np.cos(np.radians(75 - 45 * k / (NR - 1))) * ax2 + np.sin(np.radians(75 - 45 * k / (NR - 1))) * lat2
     NR = 17; rod_info = []
     for k in range(NR):
         xk = Xa + 2 + (Xb - Xa - 4) * k / (NR - 1); yk = ymed(xk) - smed * 1.4
-        d = dirR; p = np.array([xk, yk])
+        d = dirk(k); p = np.array([xk, yk])
         s = np.arange(0, 80, 0.2); q = p[None] + s[:, None] * d[None]
         ok = insideP(*(q + 1.2 * d).T) & insideP(*q.T)
         bad = np.nonzero(~ok)[0]; L = float(s[bad[0] - 1]) if len(bad) and bad[0] > 0 else 0.0
