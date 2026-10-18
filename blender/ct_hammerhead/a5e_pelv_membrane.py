@@ -43,3 +43,46 @@ vL=v.copy(); vL[:,2]=(-(U0+vL[:,2]*VX)-U0)/VX
 write_ply(f'{OUT}/HH_pelvmem_L.ply',to_blender(vL),f[:,::-1])
 info={'fin_len_mm':round(float(LX.max()),1),'faces':int(len(f)),'margin_mm':5,'scale':_ps}
 json.dump(info,open('a5_pelvmem.json','w'),indent=1); print(info)
+# 2026-10-18（プロデューサー「CTを原本にしない方が良いのでは？もっと良い事例を探してみて」→「その案で進めてください」）: HH_PELV_RODS=1 で、
+#  腹びれの軟骨を CT の代わりに図と写真から作る（hh_finrods.py の見本: ウチワシュモクザメの透明標本（© Adam Summers）、Reynolds 1897 Fig. 8）。
+#  ひれの板（e1・e2、付け根 B）の中に: 内側の縁から 2 mm 内に沿う基鰭軟骨（幅 2.4・厚さ 2.0 mm、膜の長さの 0.85 まで）、そこから外・後ろへ 60° で
+#  平行に並ぶ 17 本の 2 節の棒（幅 1.0・厚さ 1.6 mm、膜の縁の 1.2 mm 内まで、節の間 0.5 mm）、付け根から正中までの腰帯の横棒（幅 4・厚さ 3 mm）。
+#  CT の腹びれの軟骨（HH_pelv_R/L.ply）を置き換える（同じ名前で書くので、a6a_export_gltf.py・b1_rig.py の扱いは前と同じ）
+if _os.environ.get('HH_PELV_RODS') == '1':
+    import hh_finrods as R
+    insideP = lambda X_, Y_: (lambda ix, iy: np.where((ix >= 0) & (ix < P2.shape[0]) & (iy >= 0) & (iy < P2.shape[1]), P2[np.clip(ix, 0, P2.shape[0] - 1), np.clip(iy, 0, P2.shape[1] - 1)], False))(np.round(np.atleast_1d(X_) / G).astype(int) - x0, np.round(np.atleast_1d(Y_) / G).astype(int) - y0)
+    gx, gy = np.nonzero(P2); SX = (gx + x0) * G; SY = (gy + y0) * G
+    U3 = B[0] + SX * e1[0] + SY * e2[0]
+    smed = 1.0 if np.mean(SY[np.abs(U3) < np.median(np.abs(U3))]) > np.mean(SY) else -1.0   # 内側（正中に近い）縁の Y の向き
+    Xmax = SX.max(); Xa, Xb = 2.0, 0.85 * Xmax
+    def ymed(X_):
+        m = np.abs(SX - X_) < G * 1.5
+        return (SY[m].max() if smed > 0 else SY[m].min()) - smed * 2.0 if m.any() else 0.0
+    to3 = lambda X_, Y_, W_=0.0: B + X_ * e1 + Y_ * e2 + W_ * nrm
+    parts = []
+    xs = np.arange(Xa, Xb + 0.01, 4.0); cl = [(x_, ymed(x_)) for x_ in xs]
+    for (xa_, ya_), (xb_, yb_) in zip(cl[:-1], cl[1:]):
+        d2 = np.array([xb_ - xa_, yb_ - ya_]); d2 /= np.linalg.norm(d2); w2 = np.array([-d2[1], d2[0]])
+        parts.append(R.box(to3(xa_, ya_), to3(xb_, yb_), w2[0] * e1 + w2[1] * e2, 2.4, nrm, 2.0))
+    phi = np.radians(60); NR = 17; rod_info = []
+    for k in range(NR):
+        xk = Xa + 2 + (Xb - Xa - 4) * k / (NR - 1); yk = ymed(xk) - smed * 1.4
+        d = np.array([np.cos(phi), -smed * np.sin(phi)]); p = np.array([xk, yk])
+        s = np.arange(0, 80, 0.2); q = p[None] + s[:, None] * d[None]
+        ok = insideP(*(q + 1.2 * d).T) & insideP(*q.T)
+        bad = np.nonzero(~ok)[0]; L = float(s[bad[0] - 1]) if len(bad) and bad[0] > 0 else 0.0
+        if L < 3: continue
+        Lm = 0.55 * L; w2 = np.array([-d[1], d[0]])
+        for a_, b_ in [(0, Lm - 0.25), (Lm + 0.25, L)]:
+            pa, pb = p + d * a_, p + d * b_
+            parts.append(R.box(to3(*pa), to3(*pb), w2[0] * e1 + w2[1] * e2, 1.0, nrm, 1.6))
+        rod_info.append(round(L, 1))
+    b0 = to3(0.0, ymed(Xa) if False else 0.0); bm_ = b0.copy(); bm_[0] = 0.0
+    parts.append(R.box(b0, bm_, np.array([0.0, 1.0, 0.0]), 4.0, np.array([0.0, 0.0, 1.0]), 3.0))   # 腰帯: 付け根から正中（u = 0）へ、体軸の向きに幅 4、背腹に厚さ 3
+    Vr, Fr = R.merge(parts)                                   # (u, z, v) の mm、外向き
+    Vb = np.stack([Vr[:, 1], Vr[:, 0], -Vr[:, 2]], 1) / 1000.0   # Blender（x = z、y = u、z = −v）、向きは変わらない
+    write_ply(f'{OUT}/HH_pelv_R.ply', Vb, Fr[:, ::-1])         # write_ply は面を裏返して書く（マーチングキューブの内向きの面のため）
+    VbL = Vb.copy(); VbL[:, 1] = -VbL[:, 1]
+    write_ply(f'{OUT}/HH_pelv_L.ply', VbL, Fr)                # 鏡映で回りが逆になる
+    info['rods'] = {'radials': len(rod_info), 'radial_len_mm': rod_info, 'medial_sign': smed, 'basipterygium_mm': [Xa, round(Xb, 1)]}
+    json.dump(info, open('a5_pelvmem.json', 'w'), indent=1); print('pelvic rods', info['rods'])

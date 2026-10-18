@@ -165,16 +165,24 @@ def _body_warp(o, n):
     me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
     x = co[:, 0] * 1000
     if n in _RIGID:
-        ay = _np.abs(co[:, 1]); bx = float(x[ay < ay.min() + 0.010].mean())   # 付け根（体の中心にいちばん近い所）
-        co[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000
+        # 2026-10-18: HH_PELV_RODS=1 の腹びれの軟骨（hh_finrods.py、腰帯の横棒が正中まで届く）は、付け根を膜（HH_pelvmem_*）の頂点から決める
+        #  （軟骨の頂点から決めると横棒の端が付け根になり、下へ回す中心が膜とずれる）
+        ref = co.copy()
+        if os.environ.get("HH_PELV_RODS") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):
+            bpy.ops.wm.ply_import(filepath=f"{MESH}/{n.replace('pelv_', 'pelvmem_')}.ply"); _m = bpy.context.selected_objects[0]
+            ref = _np.empty(len(_m.data.vertices) * 3); _m.data.vertices.foreach_get("co", ref); ref = ref.reshape(-1, 3); _mm = _m.data
+            bpy.data.objects.remove(_m, do_unlink=True); bpy.data.meshes.remove(_mm)
+        ay = _np.abs(ref[:, 1]); _near = ay < ay.min() + 0.010; bx = float(ref[_near, 0].mean() * 1000)   # 付け根（体の中心にいちばん近い所）
+        sgn = _np.sign(ref[:, 1].mean())
+        co[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000; ref[:, 0] += (float(hh_warp.warp_mm(bx)) - bx) / 1000
         if _TW is not None:
             dy = (_np.interp(bx, _TW["z_mm"], _TW["width_new_mm"]) - _np.interp(bx, _TW["z_mm"], _TW["width_old_mm"])) / 2 / 1000
-            co[:, 1] += _np.sign(co[:, 1].mean()) * dy
+            co[:, 1] += sgn * dy; ref[:, 1] += sgn * dy
         # 2026-10-17 案: 胸びれ・腹びれを付け根のまわりに下へ回す（HH_PECT_DOWN・HH_PELV_DOWN、度。2026-10-14 に決めた姿勢に足す角）。
         #  体軸（Blender x）のまわりに、付け根（体の中心にいちばん近い頂点のまとまり）を中心に回す。右（+y）のひれは −、左は + の向き（先が下へ）
         _deg = float(os.environ.get("HH_PECT_DOWN" if "pect" in n else "HH_PELV_DOWN", 0) or 0)
         if _deg:
-            _near = ay < ay.min() + 0.010; c0 = co[_near].mean(0); th = math.radians(_deg) * (-1 if co[:, 1].mean() > 0 else 1)
+            c0 = ref[_near].mean(0); th = math.radians(_deg) * (-1 if sgn > 0 else 1)
             yy, zz = co[:, 1] - c0[1], co[:, 2] - c0[2]
             co[:, 1] = c0[1] + yy * math.cos(th) - zz * math.sin(th); co[:, 2] = c0[2] + yy * math.sin(th) + zz * math.cos(th)
     else:
@@ -183,6 +191,17 @@ def _body_warp(o, n):
 for part, (names, target) in PARTS.items():
     objs = []
     for n in names:
+        # 2026-10-18: HH_FIN_RODS=1 で、第 2 背びれ・臀びれの軟骨を CT の代わりに図と写真から作る（hh_finrods.py。外形と体の線は膜の板と同じ）
+        if os.environ.get("HH_FIN_RODS") == "1" and n in ("HH_dfin2", "HH_anal"):
+            import hh_fins, hh_finrods
+            fd = hh_fins.FINS["dfin2" if n == "HH_dfin2" else "anal"]
+            _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); _key = "top_target_mm" if fd["side"] < 0 else "bot_target_mm"
+            (Vr, Fr), _poly = hh_finrods.median_fin(fd, lambda xm: -float(_np.interp(xm, _sf["z_mm"], _sf[_key])), hh_fins.TL_MM)
+            Vr = Vr.copy(); Vr[:, 0] = hh_warp.warp_mm(Vr[:, 0])
+            me_ = bpy.data.meshes.new(f"tmp_{n}"); me_.from_pydata((Vr / 1000).tolist(), [], Fr.tolist()); me_.update()
+            o = bpy.data.objects.new(f"tmp_{n}", me_); coll.objects.link(o); objs.append(o)
+            report[f"fin_rods_{n}"] = [int(len(Vr) // 8), round(float(_np.einsum("ij,ij->i", Vr[Fr[:, 0]], _np.cross(Vr[Fr[:, 1]], Vr[Fr[:, 2]])).sum() / 6 / 1000), 3)]
+            continue
         bpy.ops.wm.ply_import(filepath=f"{MESH}/{n}.ply")
         o = bpy.context.selected_objects[0]; o.name = f"tmp_{n}"; objs.append(o)
         _body_warp(o, n)
