@@ -150,19 +150,21 @@ def _body_warp(o, n):
                     wl_ = _np.clip((out() + 3.0) / 1.5, 0, 1)                                     # 体の線の 3 mm 内から外は、膜の板（±1.6 mm）から横へ出さない（腹の下は細いので、体の線のすぐ内も）
                     Y = _np.clip(Y, -1.5, 1.5) * wl_ + Y * (1 - wl_)
                     sel_ = _np.nonzero(w > 0.99)[0][::3]; xs_, zs_ = X[sel_], Z[sel_]
+                    # 高さ: 軟骨の先がひれの深さの 0.55 になる高さ（ピサの骨格標本の臀びれで測った割合）。長さ: 軟骨がすべて収まるいちばん小さい倍率（形は参考の外形のまま、縦と横で倍率を変える）
+                    REACH_ = 0.55; tipd = float(out().max()); kz = tipd / REACH_ / (fd["H"] * TLm)
                     def _poly(o_mm, k):
-                        Lb_, Hm_ = (fd["i"] - fd["o"]) * TLm * k, fd["H"] * TLm * k
+                        Lb_, Hm_ = (fd["i"] - fd["o"]) * TLm * k, fd["H"] * TLm * kz
                         return [(o_mm + s_ * Lb_, -(_np.interp(o_mm + s_ * Lb_, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * Hm_ if h_ > 0 else -4.0))) for s_, h_ in fd["poly"]]
                     x_lo = float(xs_.min()); found = None
-                    for k in _np.arange(1.0, 2.51, 0.02):
+                    for k in _np.arange(0.8, 2.51, 0.02):
                         for o_mm in _np.arange(fd["o"] * TLm - 20, fd["o"] * TLm + 10.01, 0.5):   # 付け根の前の端は、参考の位置から前へ 20 mm・後ろへ 10 mm まで（CT の軟骨は参考より 12 mm 前から始まる）
                             P_ = _poly(o_mm, k)
                             if (_inside(P_, xs_, zs_) & _inside(P_, xs_ - 1, zs_) & _inside(P_, xs_ + 1, zs_)).all(): found = (k, o_mm); break
                         if found: break
                     k, o_mm = found if found else (2.5, fd["o"] * TLm)
-                    FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * k)
+                    FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * kz)
                     poly = _poly(o_mm, k)
-                    report[f"fin_membrane_fit_{n}"] = {"k": round(float(k), 2), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * k), 1)}
+                    report[f"fin_membrane_fit_{n}"] = {"k_len": round(float(k), 2), "k_height": round(float(kz), 2), "tip_mm": round(tipd, 1), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * kz), 1)}
                 elif fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
                 ins = lambda xx, zz: _inside(poly, xx, zz)
