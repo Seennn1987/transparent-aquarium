@@ -26,7 +26,7 @@ if name == 'pelv':
     # 腹びれ: 正中から 6 mm 以内（付け根の正中の小片）は使わない。ひれと一緒に後ろ・下へ回すと、腹の下で体の外へ出た（2026-10-18、50 頂点）
     zr_ = np.arange(len(t)); zz_ = np.arange(z0, z1)[:, None, None]; yy_ = np.arange(y0, y1)[None, :, None]; xx_ = np.arange(x0, x1)[None, None, :]
     tt_ = np.radians(np.interp(zz_, zr_, t)); uu_ = (np.cos(tt_) * (xx_ - np.interp(zz_, zr_, cxs)) + np.sin(tt_) * (yy_ - np.interp(zz_, zr_, cys))) * VX
-    M &= np.abs(uu_) > 6.0
+    M &= np.abs(uu_) > float(os.environ.get("HH_PELV_MIDCUT", 10.0))   # 6 mm ではまだ 59 頂点が腹の下で外へ出た
 F = np.where(M, sub, TH - 200.0)                           # 残す塊のまわりだけの値（ほかは閾値より低く）
 v, f, _, _ = marching_cubes(np.pad(F, 1, constant_values=TH - 200), TH, allow_degenerate=False); v = v - 1
 zi, yi, xi = v[:, 0] + z0, v[:, 1] + y0, v[:, 2] + x0   # 元の CT の画素（小数）
