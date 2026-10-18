@@ -245,7 +245,7 @@ def _body_warp(o, n):
         if os.environ.get("HH_PELV_CT175") == "1" and n in ("HH_pelv_R", "HH_pelv_L"):
             _sf2 = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json")))
             belly = -_np.interp(co[:, 0] * 1000, _sf2["z_mm"], _sf2["bot_target_mm"]) / 1000 + 0.0015
-            wm = _np.clip((0.005 - _np.abs(co[:, 1])) / 0.002, 0, 1); low = co[:, 2] < belly
+            wm = _np.clip((0.009 - _np.abs(co[:, 1])) / 0.002, 0, 1); low = co[:, 2] < belly   # 正中から 7 mm まで、9 mm で 0（5 mm では 13 頂点が残った）
             co[:, 2] = _np.where(low, co[:, 2] + wm * (belly - co[:, 2]), co[:, 2]); report[f"pelv_mid_tuck_{n}"] = int((low & (wm > 0)).sum())
     else:
         co[:, 0] = hh_warp.warp_mm(x) / 1000
