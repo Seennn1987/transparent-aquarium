@@ -80,7 +80,7 @@ blender/ct_hammerhead/check_stage.sh <スクリプト> [引数]
 | 32 | a5a_shell.py（段 1〜4）／ a5a_mesh.py ／ a5a_check.py | 体の膜の体積（半径の表、胴の幅、正中のひれの膜）→ a5_S.npy、面 mesh/HH_body.ply、確かめの図 |
 | 33 | a5b_render_body.py | 膜と骨を重ねた静止画 → docs/hammerhead_ct/a5_*.png（a4f の後に同じシーンで） |
 | 34 | a5c_photo_pect.py ／ a5d_pect_membrane.py ／ a5e_pelv_membrane.py | 胸びれの膜（写真の外形）、腹びれの膜（仮、骨を広げた形）→ mesh/HH_pectmem_*.ply・HH_pelvmem_*.ply |
-| 32b | a5f_pelv_photo.py | 案（HH_PELV_PHOTO=1）: 腹びれの軟骨（腰帯・基鰭軟骨・放射軟骨）と膜を、ウチワシュモクザメの透明標本の写真の形から作り、a5e の面を書き直す（2026-10-19） |
+| 34b | a5f_pelv_photo.py | 案（HH_PELV_PHOTO=1）: 腹びれの軟骨（腰帯・基鰭軟骨・放射軟骨）と膜を、ウチワシュモクザメの透明標本の写真の形から作り、a5e の面を書き直す（2026-10-19） |
 | 35 | a6b_split_head.py ／ a6a_export_gltf.py | 骨格を頭の軟骨とそれ以外に分け、組織ごとに減らして glb に書き出す（Blender の別シーン HH_EXPORT）→ 水槽/scenes/specimen/assets/specimen_hammerhead.glb。A7 の後は 40 のあとにやり直す |
 | 36 | a4c_final_volume.py（直し）| 頭の幅の縮めを翼だけにする（正中から 45 mm まで縮めない）。`python3 a4c_final_volume.py 0 226 keep` で頭の断面だけ作り直し、a5a_shell.py 1〜4 をやり直す。いまの a4c はこの直しを含むので、通して作るときは 26 の 1 回でよい |
 | 37 | a7_probe.py ／ a7a_jaw_fine.py | 逆写像の共通部分。顎のまわりを 0.35 mm の格子で作る → a7_jaw_fine.npz |
