@@ -154,7 +154,7 @@ def _body_warp(o, n):
                         return [(o_mm + s_ * Lb_, -(_np.interp(o_mm + s_ * Lb_, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * Hm_ if h_ > 0 else -4.0))) for s_, h_ in fd["poly"]]
                     x_lo = float(xs_.min()); found = None
                     for k in _np.arange(1.0, 2.51, 0.02):
-                        for o_mm in _np.arange(fd["o"] * TLm - 10, fd["o"] * TLm + 10.01, 0.5):   # 付け根の前の端は、参考の位置から ±10 mm まで
+                        for o_mm in _np.arange(fd["o"] * TLm - 20, fd["o"] * TLm + 10.01, 0.5):   # 付け根の前の端は、参考の位置から前へ 20 mm・後ろへ 10 mm まで（CT の軟骨は参考より 12 mm 前から始まる）
                             P_ = _poly(o_mm, k)
                             if (_inside(P_, xs_, zs_) & _inside(P_, xs_ - 1, zs_) & _inside(P_, xs_ + 1, zs_)).all(): found = (k, o_mm); break
                         if found: break
