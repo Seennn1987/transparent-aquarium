@@ -11,7 +11,8 @@ import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 //  色は自由に選ばず、染料の量（赤紫 = アリザリンレッド S、青 = アルシアンブルー、無色 = 染まらない組織の濁り、黄ばみ = 2026-10-17 足した組織の淡い黄。hammerhead-lightbox.js の HH_STAIN_T）を
 //  動かして決める。色見本（四角）はその種別のふつうの厚みを通った光の色で、見るだけ。内臓も同じ 3 つの量（色見本の厚み 40 mm）
 const STORE = "hh-tune-v4";
-const organMix = Object.fromEntries(Object.keys(hhOrganColor).map((k) => [k, HH_ORGAN_MIX?.[k] ? [...HH_ORGAN_MIX[k]] : null]));
+// 2026-10-18: 内臓の色（hhOrganColor）は glb を読んでから作られるので、ここでは HH_ORGAN_MIX の部品で作る（前は空になり、内臓の量のつまみが値を覚えなかった）
+const organMix = Object.fromEntries(Object.keys(HH_ORGAN_MIX ?? {}).map((k) => [k, [...HH_ORGAN_MIX[k]]]));
 const setMix = (c, m) => { hhStainMix[c.key] = [...m]; const r = stainToChannel(c, m), L = hhColorLook[c.key]; L.spectrum.value.set(...r.spectrum); L.gain.value = r.gain; L.density.value = 1; };
 const setOrganMix = (k, m) => { organMix[k] = [...m]; hhOrganColor[k]?.value.set(...organMixToColor(m, visceraLook.amount.value)); };
 const T0 = chameleonLook.boneT0;
