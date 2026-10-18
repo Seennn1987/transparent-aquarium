@@ -1,6 +1,8 @@
 """手・足の指の 2 つの束をトングのように開く（計画書 C の記録 28 の案。2026-10-17）。
 
-  python digits_open.py <入力の骨.npz> <出力の骨.npz> <片側の角度 [度]> [図.png]
+  python digits_open.py <入力の骨.npz> <出力の骨.npz> <片側の角度 [度]> [図.png] [--bones=fL_hand,fR_hand]
+
+--bones: 開く骨（既定は手・足の 4 本）。記録 29（2026-10-18）の本番は手だけ（--bones=fL_hand,fR_hand）
 
 CT の個体の手・足は、指の 2 つの束（カメレオンの指は 2 束に分かれて向かい合う）が手首の先で分かれ、指先どうしで再びくっついて閉じた輪に
 なっている（つかんだまま保存された形。記録 27）。写真 06 の手・足は束が開いている。
@@ -20,7 +22,11 @@ from scipy.spatial import cKDTree
 
 src, dst = sys.argv[1], sys.argv[2]
 ANG = float(sys.argv[3])
-fig = sys.argv[4] if len(sys.argv) > 4 else None
+opts = [a for a in sys.argv[4:] if a.startswith('--')]; rest = [a for a in sys.argv[4:] if not a.startswith('--')]
+fig = rest[0] if rest else None
+BONES = ('fL_hand', 'fR_hand', 'hL_foot', 'hR_foot')
+for o in opts:
+    if o.startswith('--bones='): BONES = tuple(o.split('=', 1)[1].split(','))
 d = dict(np.load(src)); names = [str(x) for x in d['rig__names']]
 
 
@@ -30,7 +36,7 @@ def rot(axis, deg):
 
 
 panels = []
-for b in ('fL_hand', 'fR_hand', 'hL_foot', 'hR_foot'):
+for b in BONES:
     v = d[b + '__v'].astype(np.float64); f = d[b + '__f']
     e = np.r_[f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]]; w = np.linalg.norm(v[e[:, 0]] - v[e[:, 1]], axis=1)
     A = sparse.coo_matrix((w, (e[:, 0], e[:, 1])), (len(v), len(v))).tocsr(); A = A.maximum(A.T)
@@ -76,7 +82,7 @@ for b in ('fL_hand', 'fR_hand', 'hL_foot', 'hR_foot'):
 np.savez_compressed(dst, **d)
 if fig:
     import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt
-    fg, axs = plt.subplots(2, 4, figsize=(16, 7))
+    fg, axs = plt.subplots(2, max(len(panels), 1), figsize=(16, 7), squeeze=False)
     for k, (b, P, Pn, m, side, split) in enumerate(panels):
         for r, Q in enumerate((P, Pn)):
             ax = axs[r, k]; ax.scatter(Q[m, 0], Q[m, 1], c=side[m], s=0.2, cmap='coolwarm'); ax.axvline(split, color='k', lw=0.5)
