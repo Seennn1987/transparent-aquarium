@@ -143,8 +143,10 @@ step fig a5a_check.py
 step py a5c_photo_pect.py
 step py a5d_pect_membrane.py
 step py a5e_pelv_membrane.py
-# 2026-10-19 案（プロデューサー「腹びれの軟骨と膜を、腰帯・基鰭軟骨・放射軟骨のつくりに合わせて直す案を…」）: HH_PELV_PHOTO=1 で、腹びれの軟骨と膜を
-#  ウチワシュモクザメの透明標本の写真の形から作り直す（a5f_pelv_photo.py。写真は git に入れていないので、手元に無ければ止まる）。既定ではまだ働かない
+# 2026-10-20 決定（プロデューサー「腹びれの軟骨と膜を、腰帯・基鰭軟骨・放射軟骨のつくりに合わせて直す案を…」→「ヒレそのものの形はこれまでのものの方が実態に近いのでは？…」→
+#  「腹びれはこの案を既定にしてください」）: 腹びれの膜は前の版の外形の縁を直線にならし、軟骨はウチワシュモクザメの透明標本の写真の形（腰帯・基鰭軟骨・放射軟骨）を
+#  その中に割り振る（a5f_pelv_photo.py。写真は git に入れていないので、手元に無ければ止まる）。前の形は HH_PELV_PHOTO=
+export HH_PELV_PHOTO=${HH_PELV_PHOTO-1}
 [[ $HH_PELV_PHOTO == 1 ]] && step py a5f_pelv_photo.py
 # A7 顎・歯・舌の弓（口は 25° 開く。2026-10-15 プロデューサー決定）、エラの骨
 step py a7a_jaw_fine.py
