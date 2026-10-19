@@ -6,9 +6,9 @@
 #   写真 2100 × 1400 px の x 800〜1020・y 520〜730 を 4 倍にし、体軸が横になるよう 20.4° 回して、赤の値 < 140 を軟骨とする。
 #   腰帯は正中（回した絵の y 565）まで、交尾器（クラスパー、x < 470 かつ y < 580 の後ろへ伸びる 2 本の棒）は、この CT の標本の性が分からないので入れない
 #  形の移し方: 写真は腹から見た絵なので、ひれの板（a5e と同じ e1・e2、付け根 B）の中の点を、腹から見たときに写真の点と同じ所に来るように置く。
-#   写真の腰帯と基鰭軟骨のつなぎ目（回した絵の x 740・y 640）を付け根 B に。大きさは、膜の付け根から先までの長さを前の版の膜（a5_pelvmem.json）と同じにする
+#   写真の腰帯と基鰭軟骨のつなぎ目（回した絵の x 740・y 640）を付け根 B に。大きさと向きは、膜の外形に収まるように決める
 #  厚さ: 軟骨は、写真の形の中で縁からの距離（mm）を厚さの半分にする（細い放射軟骨は薄く、腰帯・基鰭軟骨は厚く。上限 1.5 mm、片側）。
-#   膜は付け根 3 mm → 先 1.5 mm（a5e と同じ）で、軟骨のある所は軟骨より 1 mm 厚く。膜の外形は軟骨の扇を閉じて、縁の外へ HH_PELV_FRINGE（付け根から先までの長さの割合、既定 0.10）広げる
+#   膜は付け根 3 mm → 先 1.5 mm（a5e と同じ）で、軟骨のある所は軟骨より片側 0.5 mm 以上厚く。膜の外形は前の版の外形の凸包（下の 2026-10-19 直し）
 import hh_paths; hh_paths.cd_work()
 import numpy as np, json, os
 from scipy import ndimage as nd
@@ -17,7 +17,6 @@ from PIL import Image
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
 PHOTO = os.path.join(hh_paths.ROOT, 'docs', 'references', 'hammerhead', 'ref_summers_bonnethead_cleared_stained.jpg')
 if not os.path.exists(PHOTO): raise SystemExit(f'見本の写真がありません（git に入れていない）: {PHOTO}')
-FRINGE = float(os.environ.get('HH_PELV_FRINGE', 0.10))
 # 正中のすき間（片側、mm）: a6a で付け根を体の幅に合わせて動かし下へ回すと、0.3 mm では左右の膜が正中で重なった（重なる所は道のりを 2 回数える）
 MIDGAP = float(os.environ.get('HH_PELV_MIDGAP', 0.6))   # 下へ回して横へ動かした後の、正中から膜の内側の縁まで
 # 1. 写真の腹びれの形（回した絵の画素）
@@ -27,10 +26,6 @@ Rch = np.asarray(im)[..., 0].astype(float); H, W = Rch.shape; yy, xx = np.mgrid[
 m = (Rch < 140) & (yy >= 565) & ~((xx < 470) & (yy < 580))
 cl, n = nd.label(m); sz = nd.sum(m, cl, range(1, n + 1)); m = np.isin(cl, 1 + np.nonzero(sz >= 40)[0])
 XJ, YJ, YAX = 740.0, 640.0, 565.0
-# 輪の内側（左右の基鰭軟骨にはさまれた所）は体で、ひれの膜ではない。両側の軟骨を閉じて埋めた中で、軟骨の無い所を輪の内側とする（回した絵の x 600・y 560 を含む塊）
-_all = (Rch < 140); _all = np.isin(nd.label(_all)[0], [nd.label(_all)[0][560, 640]]) | _all
-_fill = nd.binary_fill_holes(nd.binary_closing(_all, iterations=4)); _hl, _ = nd.label(_fill & ~nd.binary_dilation(_all, iterations=2))
-HOLE = (_hl == _hl[560, 600]) if _hl[560, 600] > 0 else np.zeros_like(_all)
 py_, px_ = np.nonzero(m); A = (px_ - XJ); Lt = (py_ - YJ)          # A: 前（頭）へ +、Lt: 外（正中から離れる）へ +（画素）
 # 2. ひれの板（a5e と同じ）
 P = np.load('a4_pelv175_pts.npz')['right'].astype(float) if os.environ.get('HH_PELV_CT175') == '1' else np.load('pelvic_posed.npz')['right'].astype(float)
@@ -49,41 +44,54 @@ def rot(Q):   # (u, z, v) の mm。v は腹へ +。右のひれの先（u が大
 Mp = np.array([[-e1[1], -e2[1]], [e1[0], e2[0]]])                   # (X, Y) → (前, 外) の mm
 Minv = np.linalg.inv(Mp)
 L_old = float(json.load(open('a5_pelvmem.json'))['fin_len_mm'])
-# 膜の外形（画素）: 腰帯（つなぎ目より前）を除いた軟骨を閉じて穴を埋める
-fin_px = m & (xx < XJ - 5)
-memb_px = nd.binary_fill_holes(nd.binary_closing(fin_px, iterations=10)) & ~HOLE
 GIRD_px = m & (xx >= XJ - 5)                                          # 腰帯（基鰭軟骨とのつなぎ目より前）
-my_, mx_ = np.nonzero(memb_px)
-XYm = (Minv @ np.stack([mx_ - XJ, my_ - YJ])).T                     # 1 画素 = 1 mm としたときの板の中の点
-# 大きさ: 膜の板の中の面積を前の版の膜（a5e の外形: CT の軟骨を 5 mm 広げて HH_PELV_SCALE 倍）と同じにする。
-#  長さ（付け根から先）をそろえると、写真のひれは体軸の向きに長いので 130 mm になった（前の版の 1.6 倍）
+# 2026-10-19 直し（プロデューサー「ヒレそのものの形はこれまでのものの方が実態に近いのでは？軟骨の形、ヒレの形それぞれ実態に即した形状にする必要があります」）:
+#  ひれの外形は写真から作らない（写真のウチワシュモクザメの幼魚の割合では、体軸の向きに長い刃になった）。前の版の膜の外形（a5e と同じ式: CT の腹びれを閉じて 5 mm 広げ、
+#  付け根 B を中心に HH_PELV_SCALE 倍。大きさは横からの参考の図 2 枚に合わせたもの）を、凸包にしてぎざぎざを取る。シロシュモクザメの腹びれは鎌形でなく、
+#  後ろの縁はまっすぐか少しへこむ（Naturalis のサメの検索、ノースカロライナの魚の図鑑、Wikipedia）ので、縁を直線でつなぐ凸包はそれに合う
 _X = (P - B) @ e1; _Y = (P - B) @ e2; _G = 0.4; _ps = float(os.environ.get('HH_PELV_SCALE', '1') or 1)
 _xi = np.round(_X / _G).astype(int); _yi = np.round(_Y / _G).astype(int); _P2 = np.zeros((_xi.max() - _xi.min() + 41, _yi.max() - _yi.min() + 41), bool); _P2[_xi - _xi.min() + 20, _yi - _yi.min() + 20] = True
-_P2 = nd.binary_dilation(nd.binary_fill_holes(nd.binary_closing(_P2, iterations=6)), iterations=int(5 / _G)); AREA_OLD = _P2.sum() * _G * _G * _ps * _ps
-# 3. 板の中の格子（0.25 mm）に写真の形を写す。大きさ s（mm / 画素）は、膜の面積が AREA_OLD になるまで 3 回直す
+_P2 = nd.binary_dilation(nd.binary_fill_holes(nd.binary_closing(_P2, iterations=6)), iterations=int(5 / _G))
+from scipy.spatial import ConvexHull
+from matplotlib.path import Path as _Path
+_pi, _pj = np.nonzero(_P2); _O = np.c_[(_pi + _xi.min() - 20) * _G * _ps, (_pj + _yi.min() - 20) * _G * _ps]
+HP = _O[ConvexHull(_O).vertices]; AREA_OLD = len(_O) * (_G * _ps) ** 2
 G = 0.25
-def build(s):
-    global to_px, x0, y0, GX, GY
-    def to_px(X, Y):   # 板の中の mm → 回した絵の画素
-        fa = Mp @ np.stack([X, Y]) / s; return fa[0] + XJ, fa[1] + YJ
-    XYc = (Minv @ np.stack([A, Lt])).T * s
-    pad = L_old * FRINGE + 6
-    x0, x1 = XYc[:, 0].min() - pad, XYc[:, 0].max() + pad; y0, y1 = XYc[:, 1].min() - pad, XYc[:, 1].max() + pad
-    gx = np.arange(x0, x1, G); gy = np.arange(y0, y1, G); GX, GY = np.meshgrid(gx, gy, indexing='ij')
-    qx, qy = to_px(GX.ravel(), GY.ravel())
-    sample = lambda mask: nd.map_coordinates(mask.astype(np.float32), [qy, qx], order=1, cval=0).reshape(GX.shape) > 0.5
-    cart2 = sample(m & ~GIRD_px); memb2 = sample(memb_px)
-    U = rot(B[None, None] + GX[..., None] * e1 + GY[..., None] * e2)[..., 0]   # 回した後の正中からの距離（右が +）
-    cart2 &= U > MIDGAP + 1.2   # 膜の縁より 1.2 mm 内まで（後ろで寄り合う基鰭軟骨の先が膜の縁の外に出ないように）
-    # 膜の縁を広げてならす（ぎざぎざにしない）。縁の幅は付け根から先までの長さ（前の版）の FRINGE
-    memb2 = nd.binary_dilation(memb2 & (U > MIDGAP), iterations=int(round(L_old * FRINGE / G)))
-    memb2 = (nd.gaussian_filter(memb2.astype(np.float32), 1.0 / G) > 0.5)
-    memb2 = (memb2 | nd.binary_dilation(cart2, iterations=int(1.0 / G))) & (U > MIDGAP)   # 基鰭軟骨の内側の縁も 1 mm 以上覆う（輪の内側を除いたとき、縁の頂点が膜の外に出た）
-    return cart2, memb2
-s = 0.25
-for _ in range(3):
-    cart2, memb2 = build(s); s *= np.sqrt(AREA_OLD / (memb2.sum() * G * G))
-cart2, memb2 = build(s)
+x0, y0 = HP[:, 0].min() - 8, HP[:, 1].min() - 8; x1, y1 = HP[:, 0].max() + 8, HP[:, 1].max() + 8
+GX, GY = np.meshgrid(np.arange(x0, x1, G), np.arange(y0, y1, G), indexing='ij')
+U = rot(B[None, None] + GX[..., None] * e1 + GY[..., None] * e2)[..., 0]   # 下へ回して横へ動かした後の正中からの距離（右が +）
+OUTL = _Path(HP).contains_points(np.c_[GX.ravel(), GY.ravel()]).reshape(GX.shape)
+OUTL = nd.gaussian_filter(OUTL.astype(np.float32), 0.75 / G) > 0.5      # 角を 1 mm ほど丸める
+memb2 = OUTL & (U > MIDGAP)
+# 3. 軟骨: 写真の腰帯より後ろ（基鰭軟骨と放射軟骨）を外形に合わせる。体軸の向き（前後）は写真のつなぎ目〜ひれの後ろの端を、外形の付け根 B〜後ろの端へ。
+#  前後の各位置で、写真の内側の縁（基鰭軟骨の内側）〜放射軟骨の先を、外形の内側の縁（正中の側）〜外の縁の EDGE mm 内へ割り振る。
+#  同じ倍率で縮めるだけでは、写真のひれ（体軸の向きに長く細い）と外形（幅が広く短い）の形が違い、軟骨が膜の 12% しか占めなかった。
+#  付け根のまわりの角度で割り振る版は、放射軟骨が付け根の 1 点から日の光のように開き、基鰭軟骨に沿って並ぶ実物（Summers の写真、Reynolds 1897）と違った。
+#  放射軟骨の並び・太さのむら・2 節の区切りは写真のまま残る
+EDGE = float(os.environ.get('HH_PELV_EDGE', 1.5))
+FP = m & ~GIRD_px
+cols = np.arange(W); has = FP.any(0)
+_ymin = np.where(has, np.argmax(FP, 0), 0).astype(float); _ymax = np.where(has, H - 1 - np.argmax(FP[::-1], 0), 0).astype(float)
+XL = float(cols[has].min()); XR = XJ                                    # 写真のひれの後ろの端〜つなぎ目
+keep_c = has & (cols >= XL) & (cols <= XR)
+# 内側の縁と先の線は 3 次の式でならす（列ごとの値のままでは、基鰭軟骨の後ろの端で線が折れ、そこで放射軟骨の向きが切り替わる継ぎ目が出た）
+_cf1 = np.polyfit(cols[keep_c], _ymin[keep_c], 3); _cf2 = np.polyfit(cols[keep_c], _ymax[keep_c], 3)
+ymed = np.polyval(_cf1, cols.astype(float)); ytip = np.polyval(_cf2, cols.astype(float))
+VA, VL = np.tensordot(Mp, np.stack([GX, GY]), 1)                       # 格子の点の、腹から見た (前, 外) の mm（B から）
+abin = np.round(VA / G).astype(int); a_lo = float(VA[memb2].min())
+ka = abin[memb2]; kmin = ka.min(); nb = ka.max() - kmin + 1
+lmin = np.full(nb, np.inf); lmax = np.full(nb, -np.inf); np.minimum.at(lmin, ka - kmin, VL[memb2]); np.maximum.at(lmax, ka - kmin, VL[memb2])
+okb = np.isfinite(lmin); bc = (np.arange(nb) + kmin) * G
+lmed_m = nd.median_filter(np.interp(bc, bc[okb], lmin[okb]), 9); ltip_m = nd.median_filter(np.interp(bc, bc[okb], lmax[okb]), 9) - EDGE
+la_med = np.interp(VA, bc, lmed_m); la_tip = np.interp(VA, bc, ltip_m)
+xsrc = XR - (0.0 - VA) * (XR - XL) / (0.0 - a_lo)                      # 前後: B（a = 0）→ つなぎ目、外形の後ろの端 → 写真のひれの後ろの端
+tau = (VL - la_med) / np.maximum(la_tip - la_med, 0.5)
+ysrc = np.interp(xsrc, cols, ymed) + tau * (np.interp(xsrc, cols, ytip) - np.interp(xsrc, cols, ymed))
+qx, qy = xsrc.ravel(), ysrc.ravel()
+cart2 = (nd.map_coordinates(FP.astype(np.float32), [qy, qx], order=1, cval=0).reshape(GX.shape) > 0.5) & (VA <= 0) & (tau >= 0) & (tau <= 1) & memb2 & (U > MIDGAP + 1.2)
+cart2 &= nd.binary_erosion(memb2, iterations=int(round(EDGE / G)))
+s = float((0.0 - a_lo) / (XR - XL))                                    # 記録用: 前後の倍率（mm / 画素）
+TH = 0.0
 # 4. 厚さ（片側、mm）
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.5); hc[~cart2] = 0
 Xr = np.clip(GX, 0, None) / max(GX[memb2].max(), 1)
@@ -124,7 +132,7 @@ def write_g(name, F, side):
     v, f, _, _ = marching_cubes(np.pad(F, 1, constant_values=-1), 0.0, allow_degenerate=False); v = v - 1
     Q = np.stack([gu0 + v[:, 1] * G + DY, gz0 + v[:, 0] * G, B[2] + v[:, 2] * G - NW * G], 1)
     return np.stack([Q[:, 1], side * Q[:, 0], -Q[:, 2]], 1) / 1000.0, f
-rep = {'scale_mm_per_px': round(float(s), 4), 'fin_len_mm': round(L_old, 1), 'fringe': FRINGE,
+rep = {'scale_len_mm_per_px': round(float(s), 4), 'edge_mm': EDGE, 'fin_len_mm': round(L_old, 1),
        'cart_area_mm2': round(float(cart2.sum() * G * G), 1), 'memb_area_mm2': round(float(memb2.sum() * G * G), 1),
        'cart_in_memb': round(float((cart2 & memb2).sum() / memb2.sum()), 3), 'area_old_mm2': round(float(AREA_OLD), 1)}
 for side, sfx in ((1, 'R'), (-1, 'L')):
