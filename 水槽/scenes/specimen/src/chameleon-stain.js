@@ -150,6 +150,8 @@ export const STAINS = {
   // And after the hands too (C record 34, 2026-10-19): film 0.1138 / 0.0803 / 0.0443, skin 0 / 0.0260 / 0.0840, bone
   // 14.8 / 30.2 / 24.1; times after / C record 31's:
   //   film 0.1163 / 0.0847 / 0.0455, skin 0 / 0.0218 / 0.0821, bone 14.64 / 30.16 / 24.08 (used below)
+  // After the skin's joins at the wrists and ankles were smoothed (C record 37, 2026-10-20): every fitted value within 0.1 %
+  // of C record 34's, so the values are unchanged at this rounding (as are SKIN_GAIN, the hyoid and the organs).
   // Green and blue meet all three. Red cannot: the blue class comes out 0.347 against 0.477 (paler than
   // the photo's outline) and the pale class 0.249 against 0.213; bone and viscera are met. The shares matched between photo and screen stand in for
   // matching the same places (01's trunk bends unlike the model's), so these are fitted, provisional.

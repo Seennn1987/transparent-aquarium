@@ -28,7 +28,7 @@ near(transmitted({}), [1, 1, 1], 1e-9, "空");
 // ribcage and the smoothed skin, the limbs' stance, the rib heads, the hyoid 1.2 times, the eyes and the opened hands (C records 21–29, 2026-10-18).
 const ab = (t) => t.map((v) => -Math.log(v));
 const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
-nearA(transmitted({ film: 2.6707, skin: 0.6797 }, { stain: "01" }), [0.315, 0.241, 0.175], 0.02, "01 の青（輪郭）");
+nearA(transmitted({ film: 2.6709, skin: 0.6797 }, { stain: "01" }), [0.315, 0.241, 0.175], 0.02, "01 の青（輪郭）");
 nearA(transmitted({ film: 2.1888, skin: 0.9178 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
 nearA(transmitted({ bone: 0.1366, film: 2.2298, skin: 0.9005 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
 // "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the gut).
