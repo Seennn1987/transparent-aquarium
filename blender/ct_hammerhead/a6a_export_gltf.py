@@ -230,8 +230,9 @@ def _body_warp(o, n):
         # 2026-10-18: HH_PELV_RODS=1 の腹びれの軟骨（hh_finrods.py、腰帯の横棒が正中まで届く）は、付け根を膜（HH_pelvmem_*）の頂点から決める
         #  （軟骨の頂点から決めると横棒の端が付け根になり、下へ回す中心が膜とずれる）
         ref = co.copy()
-        if (os.environ.get("HH_PELV_RODS") == "1" or os.environ.get("HH_PELV_CT175") == "1" or os.environ.get("HH_PELV_PHOTO") == "1") and n in ("HH_pelv_R", "HH_pelv_L"):   # HH_PELV_PHOTO: a5f_pelv_photo.py（2026-10-19）
-            bpy.ops.wm.ply_import(filepath=f"{MESH}/{n.replace('pelv_', 'pelvmem_')}.ply"); _m = bpy.context.selected_objects[0]
+        _pect_ph = os.environ.get("HH_PECT_PHOTO") == "1" and n in ("HH_pect_R", "HH_pect_L")   # 2026-10-20: a5g_pect_photo.py の胸びれも、膜と同じ中心で回す
+        if ((os.environ.get("HH_PELV_RODS") == "1" or os.environ.get("HH_PELV_CT175") == "1" or os.environ.get("HH_PELV_PHOTO") == "1") and n in ("HH_pelv_R", "HH_pelv_L")) or _pect_ph:   # HH_PELV_PHOTO: a5f_pelv_photo.py（2026-10-19）
+            bpy.ops.wm.ply_import(filepath=f"{MESH}/{n.replace('pelv_', 'pelvmem_').replace('pect_', 'pectmem_')}.ply"); _m = bpy.context.selected_objects[0]
             ref = _np.empty(len(_m.data.vertices) * 3); _m.data.vertices.foreach_get("co", ref); ref = ref.reshape(-1, 3); _mm = _m.data
             bpy.data.objects.remove(_m, do_unlink=True); bpy.data.meshes.remove(_mm)
         ay = _np.abs(ref[:, 1]); _near = ay < ay.min() + 0.010; bx = float(ref[_near, 0].mean() * 1000)   # 付け根（体の中心にいちばん近い所）
