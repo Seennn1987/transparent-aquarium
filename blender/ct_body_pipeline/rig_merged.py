@@ -22,7 +22,7 @@ dj, j = cKDTree(O['v']).query(v, workers=-1)
 new = dj > 1e-6 * MM                     # 足の膜として新しくできた頂点（元の膜の頂点はブール演算の後も同じ位置）
 top = R['w_idx'][j].astype(int); tw = R['w_val'][j].astype(float)
 import os
-for limb in os.environ.get('LIMBS', 'hL_foot,hR_foot').split(','):          # 手は LIMBS=fL_hand,fR_hand（記録 33）
+for limb in [x for x in os.environ.get('LIMBS', 'hL_foot,hR_foot').split(',') if x]:   # LIMBS= で付け直さない（記録 36）          # 手は LIMBS=fL_hand,fR_hand（記録 33）
     side = limb.split('_')[0]
     xf = posed(limb, d[limb + '__v']); xl = posed(side + '_lower', d[side + '_lower__v'])
     df = cKDTree(xf).query(v, workers=-1)[0]; dl = cKDTree(xl).query(v, workers=-1)[0]
