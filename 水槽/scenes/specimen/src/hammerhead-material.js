@@ -27,7 +27,7 @@ for (const h of HEARTS) CHANNEL[h] = [0, 0, 0, 0];   // 内臓の通り道で描
 CHANNEL.Rib = [0, Number(new URLSearchParams(location.search).get("rib") ?? 1), 0, 0];
 CHANNEL.CaudalRay = [0, Number(new URLSearchParams(location.search).get("ray") ?? 1), 0, 0];
 const FIN_CART = ["PectCartilage", "Dorsal1Cartilage", "Dorsal2Cartilage", "AnalCartilage"], FIN_SKIN = ["PectSkin", "Dorsal1Skin", "Dorsal2Skin", "AnalSkin"];
-const OPTIONAL = new Set([...FIN_CART, ...FIN_SKIN, "Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", "Rib", "CaudalRay", ...HEARTS]);   // 2026-10-15 前の glb には無い
+const OPTIONAL = new Set([...FIN_CART, ...FIN_SKIN, "Dorsal1Ray", "Viscera", "Liver", "Gut", "Spiral", "Centrum", "Arch", "PelvicCartilage", "PelvicSkin", "Rib", "CaudalRay", ...HEARTS]);   // 2026-10-15 前の glb には無い
 // 歯は 1 本が 2〜4 mm と小さく、椎骨と同じ吸い方では色が出ないので、道のりを WEIGHT 倍に数える（実物の透明標本では歯は濃く赤く染まる）
 const WEIGHT = { Teeth: Number(new URLSearchParams(location.search).get("teeth") ?? 3) };
 // 2026-10-15 色の層を 8 つにした（hammerhead-lightbox.js）。部品ごとの、層 A（背骨・ひれの軟骨・肉・頭骨）と層 B（顎・エラの骨・腹びれの軟骨・歯）への重み。
@@ -38,6 +38,13 @@ CHANNEL.PelvicCartilage = 1; CHANNEL.PelvicSkin = 2;
 for (const k of FIN_CART) CHANNEL[k] = 1;
 for (const k of FIN_SKIN) CHANNEL[k] = 2;
 export const HH_SKIN_PARTS = ["Skin", "PelvicSkin", ...FIN_SKIN];
+// 2026-10-20 プロデューサー「強で規定にした上で後で色を調整できるように編集パネルに機能追加して」: 第 1 背びれの鰭条（ceratotrichia、a5h_dfin1_photo.py の
+//  HH_DFIN1_RAYS。膜の板の中の細い帯）を別の部品にする。色は 膜の色（肉の層）と 軟骨の青（ひれの軟骨の層）を、調整の欄の「鰭条の色」（?rayblue=、既定 0 = 膜の色）で混ぜる。
+//  透明標本で鰭条が青く染まるかは文献で確かめられていない（計画書「ひれの先の鰭条を薄く描く案」）
+CHANNEL.Dorsal1Ray = 2;
+export const hhRayLook = { blue: { value: Number(new URLSearchParams(location.search).get("rayblue") ?? 0) } };
+const _rayVec = new THREE.Vector4();
+const rayChannel = { get value() { const k = Math.min(1, Math.max(0, hhRayLook.blue.value)); return _rayVec.set(0, k, 1 - k, 0); } };   // three.js は描くたびに value を読む
 const LAYERS = {
   Bone: { a: [1, 0, 0, 0] }, Centrum: { a: CHANNEL.Centrum }, Arch: { a: [CHANNEL.Arch[0], 0, 0, 0], b: [CHANNEL.Arch[1], 0, 0, 0] },
   Rib: { b: [CHANNEL.Rib[1], 0, 0, 0] }, CaudalRay: { b: [CHANNEL.CaudalRay[1], 0, 0, 0] }, Cartilage: { a: [0, 1, 0, 0] },
@@ -46,6 +53,7 @@ const LAYERS = {
   //  弓の骨の色の混ぜ（?archbone=）は層 A の背骨へ、軟骨の分（?arch=、既定 0.5）は石灰化していない軟骨の層へ
   Jaw: { a: [0, 0, 0, 1] }, Gill: { b: [0, 1, 0, 0] }, PelvicCartilage: { b: [0, 0, 1, 0] }, Teeth: { b: [0, 0, 0, WEIGHT.Teeth] },
   ...Object.fromEntries(FIN_CART.map((k) => [k, { a: [0, 1, 0, 0] }])), ...Object.fromEntries(FIN_SKIN.map((k) => [k, { a: [0, 0, 1, 0] }])),
+  Dorsal1Ray: { a: [0, 0, 1, 0] },   // 実際の重みは rayChannel（鰭条の色）
 };
 /** 部品ごとの濃さの倍率（調整の欄。既定 1）。 */
 //  既定（2026-10-17 プロデューサーが調整の欄で決めた値（「一旦、以下を規定値にして下さい」））: 顎 0.227（hammerhead-lightbox.js の tuned）、弓 1.32、肋骨 1.36、尾びれの鰭条 0、腹びれの膜 8.39、らせん弁 1.98、心臓 2.02。
@@ -53,7 +61,8 @@ const LAYERS = {
 // 2026-10-18 プロデューサー「一旦これを規定値にして。」（調整の欄の「値をコピー」）。前の既定（2026-10-17）は 顎 0.227、弓 1.32、肋骨 1.36、尾びれの鰭条 0、膜 8.39、らせん弁 1.98、心臓 2.02
 const PART_DEFAULT = { Bone: 2.31, Centrum: 1.39, Arch: 4.08, Rib: 1.36, CaudalRay: 1.34, Cartilage: 2.32, Skin: 2.92, PelvicSkin: 17.94, HeadCartilage: 2.38, Jaw: 1.29, Gill: 3.57,
   PelvicCartilage: 0.98, Teeth: 4.06, PectCartilage: 1.27, Dorsal1Cartilage: 1.93, Dorsal2Cartilage: 2.54, AnalCartilage: 2.22, PectSkin: 19.76, Dorsal1Skin: 21.87, Dorsal2Skin: 20.26, AnalSkin: 21.11,
-  Liver: 1, Gut: 1.52, Spiral: 1.09, Heart: 3.07 };
+  Liver: 1, Gut: 1.52, Spiral: 1.09, Heart: 3.07,
+  Dorsal1Ray: 13.1 };   // 2026-10-20: 膜を鰭条に沿って左右 0.6 mm 厚くした版（「強」）と同じ見え方: 膜の濃さ 21.87 × 足した厚さ 1.2 mm ÷ 鰭条の帯の厚さ 2 mm
 export const hhPartLook = Object.fromEntries([...Object.keys(LAYERS), "Liver", "Gut", "Spiral", "Heart", "HeartLarge", "HeartSmall", "Viscera"].map((k) => [k, { value: PART_DEFAULT[k] ?? 1 }]));
 /** 部品ごとのにごり度（調整の欄。既定 0）。2026-10-17 プロデューサー「各パーツごとににごり度を調整できるようにして」:
  *  その部品の通り道を、体の組織（肉の層、hammerhead-lightbox.js の skin）と同じ吸い方で、にごり度 × 通り道だけ足す。1 で体の組織と同じ濁り */
@@ -319,8 +328,8 @@ export function applyHammerheadTissue(model, reference) {
     o.frustumCulled = false;
     const layer = LAYERS[part] ?? {};
     const partGain = hhPartLook[part] ?? { value: 1 };
-    const pathMat = (w, haze = { value: 0 }) => new THREE.ShaderMaterial({ uniforms: { channel: { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, haze, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
-    o.material = pathMat(layer.a, hhPartHaze[part]);
+    const pathMat = (w, haze = { value: 0 }, chan = null) => new THREE.ShaderMaterial({ uniforms: { channel: chan ?? { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, haze, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
+    o.material = pathMat(layer.a, hhPartHaze[part], part === "Dorsal1Ray" ? rayChannel : null);
     o.userData.pathMaterial = o.material;
     o.userData.path2Material = layer.b ? pathMat(layer.b) : null;
     if (HH_SKIN_PARTS.includes(part)) { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }

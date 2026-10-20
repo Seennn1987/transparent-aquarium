@@ -1,6 +1,6 @@
 import { chameleonLook } from "./chameleon-material.js";
 import { HH_CHANNELS, hhColorLook, hhStainMix, stainToChannel } from "./hammerhead-lightbox.js";
-import { hhPartLook, hhPartHaze, hhOrganColor, mottleLook, gillRayLook, visceraLook, HH_ORGAN_MIX, organMixToColor } from "./hammerhead-material.js";
+import { hhPartLook, hhPartHaze, hhOrganColor, mottleLook, gillRayLook, visceraLook, HH_ORGAN_MIX, organMixToColor, hhRayLook } from "./hammerhead-material.js";
 import { HH_LIGHTBOX } from "./hammerhead-stain.js";
 
 // シロシュモクザメの調整の欄（2026-10-15、プロデューサー「骨、内臓、軟骨、肉など、パーツ種別ごとに色や濃さを調整できるようにしたいです。調整パネルを作成して下さい」）。
@@ -54,10 +54,12 @@ const GROUPS = [
       ["HeadCartilage", "頭骨"], ["Jaw", "顎"], ["Teeth", "歯"], ["Gill", "エラの骨"],
       ["Cartilage", "肩帯・腰帯・尾の軟骨"], ["PectCartilage", "胸びれの軟骨"], ["Dorsal1Cartilage", "第 1 背びれの軟骨"], ["Dorsal2Cartilage", "第 2 背びれの軟骨"],
       ["AnalCartilage", "臀びれの軟骨"], ["PelvicCartilage", "腹びれの軟骨"]].map(([k, label]) => ({ partrow: k, label, max: 5 })),
-    ...[["Skin", "体の膜"], ["PectSkin", "胸びれの膜"], ["Dorsal1Skin", "第 1 背びれの膜"], ["Dorsal2Skin", "第 2 背びれの膜"], ["AnalSkin", "臀びれの膜"], ["PelvicSkin", "腹びれの膜"]]
+    ...[["Skin", "体の膜"], ["PectSkin", "胸びれの膜"], ["Dorsal1Skin", "第 1 背びれの膜"], ["Dorsal1Ray", "第 1 背びれの鰭条"], ["Dorsal2Skin", "第 2 背びれの膜"], ["AnalSkin", "臀びれの膜"], ["PelvicSkin", "腹びれの膜"]]
       .map(([k, label]) => ({ partrow: k, label, max: 30 })),   // 膜は数 mm と薄く、肉の色（80 mm の胴に合わせた）では 3 倍でもほとんど見えない
     ...[["Liver", "肝臓"], ["Gut", "消化管"], ["Spiral", "らせん弁"], ["Heart", "心臓"]].map(([k, label]) => ({ partrow: k, label, max: 5 })),
   ]],
+  // 2026-10-20 プロデューサー「強で規定にした上で後で色を調整できるように編集パネルに機能追加して」: 第 1 背びれの鰭条の色（膜の色 ↔ 軟骨の青）。濃さ・にごり度は上の「部品ごと」
+  ["ひれの鰭条", [{ look: hhRayLook.blue, key: "rayblue", label: "鰭条の色（0 膜・1 軟骨の青）", max: 1 }]],
   ["表面の模様", [
     { look: chameleonLook.film, key: "dent", label: "皮歯", max: 3 }, { look: mottleLook.amount, key: "mottle", label: "まだら", max: 2 },
     { look: gillRayLook.amount, key: "rays", label: "鰓条", max: 5 }, { look: visceraLook.amount, key: "visc", label: "内臓ぜんぶ", max: 5 },

@@ -147,6 +147,11 @@ step py a5d_pect_membrane.py
 #  前の形は HH_PECT_PHOTO=
 export HH_PECT_PHOTO=${HH_PECT_PHOTO-1}
 [[ $HH_PECT_PHOTO == 1 ]] && step py a5g_pect_photo.py
+# 2026-10-20 決定（プロデューサー「体の背から上はピサの写真の放射軟骨の帯にし、写真の付け根を列ごとに外形の付け根へ合わせ、体の中は CT の軟骨をつなげる案を…」→
+#  「既定にする前に、ひれの先の鰭条を薄く描く案も作って…」→「強で規定にした上で後で色を調整できるように編集パネルに機能追加して」）: 第 1 背びれの軟骨を
+#  ピサの骨格標本の放射軟骨の帯＋体の中の CT にし（a5h_dfin1_photo.py）、鰭条を別の部品（Dorsal1Ray、左右 ±1.0 mm の細い帯）にする。前の形は HH_DFIN1_PHOTO= HH_DFIN1_RAYS=
+export HH_DFIN1_PHOTO=${HH_DFIN1_PHOTO-1} HH_DFIN1_RAYS=${HH_DFIN1_RAYS-1.0}
+[[ $HH_DFIN1_PHOTO == 1 ]] && step py a5h_dfin1_photo.py
 step py a5e_pelv_membrane.py
 # 2026-10-20 決定（プロデューサー「腹びれの軟骨と膜を、腰帯・基鰭軟骨・放射軟骨のつくりに合わせて直す案を…」→「ヒレそのものの形はこれまでのものの方が実態に近いのでは？…」→
 #  「腹びれはこの案を既定にしてください」）: 腹びれの膜は前の版の外形の縁を直線にならし、軟骨はウチワシュモクザメの透明標本の写真の形（腰帯・基鰭軟骨・放射軟骨）を

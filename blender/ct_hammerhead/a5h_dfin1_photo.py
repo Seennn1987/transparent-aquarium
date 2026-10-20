@@ -78,28 +78,27 @@ rep = {'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_
        'cart_area_mm2': round(float((cart2 & (GZ > 0)).sum() * G * G), 1), 'memb_area_mm2': round(float(memb.sum() * G * G), 1), 'cart_in_memb': round(float((cart2 & memb).sum() / memb.sum()), 3),
        'ct_below_line_mm': round(float(-GZ[ctin].min()), 1) if ctin.any() else None, 'volume_ml': round(abs(vol) * 1e6, 3), 'faces': int(len(f))}
 json.dump(rep, open('a5_dfin1photo.json', 'w'), ensure_ascii=False, indent=1); print(rep)
-# 2026-10-20 案（プロデューサー「既定にする前に、ひれの先の鰭条を薄く描く案も作って、見本と並べて見せてください」）: HH_DFIN1_RAYS=<mm> で、膜の板（a6a の Dorsal1Skin）を
-#  この段で作り、写真の膜に見える鰭条（ceratotrichia、コラーゲンに近い糸で軟骨ではない）に沿って、膜を左右それぞれその mm だけ厚くする。透明標本で鰭条が青く染まるかは
-#  文献で確かめられなかったので、色は足さず、膜の色のまま通り道が少し長い筋として見せる。鰭条 = 帯の上の境より 4 px 以上上の膜で、周り（3 px ぼかし）より 4 以上明るい所（8 px 以上の塊）。
-#  膜の板は前と同じ外形（hh_fins.py の dfin1）で、体の線の 4 mm 下から、厚さ 3.2 mm（左右 ±1.6 mm）
+# 2026-10-20 鰭条（プロデューサー「既定にする前に、ひれの先の鰭条を薄く描く案も作って、見本と並べて見せてください」→「強で規定にした上で後で色を調整できるように
+#  編集パネルに機能追加して」）: HH_DFIN1_RAYS=<mm> で、鰭条（ceratotrichia、コラーゲンに近い糸で軟骨ではない）を別の部品 HH_dfin1ray（ページの Dorsal1Ray）にする。
+#  ピサの写真の膜に見える鰭条（帯の上の境より 4 px 以上上の膜で、周り（3 px ぼかし）より 4 以上明るい所、8 px 以上の塊）に沿う細い帯で、左右の厚さは片側 <mm>
+#  （膜の板 ±1.6 mm の中）。色と濃さはページの調整の欄で変える（既定は、膜を鰭条に沿って左右 0.6 mm 厚くした版と同じ見え方）。
+#  前の試し（膜そのものを鰭条に沿って厚くする）は、色を膜と別に変えられなかった
 RAYS = float(os.environ.get('HH_DFIN1_RAYS', 0) or 0)
 if RAYS > 0:
     membp = fin & (yy < np.interp(xx, SEAM[:, 0], SEAM[:, 1]) - 4); membp = nd.binary_erosion(membp, iterations=3)
     fib = membp & (mn > nd.gaussian_filter(mn, 3) + 4)
     cl, n = nd.label(fib); sz = nd.sum(fib, cl, range(1, n + 1)); fib = np.isin(cl, 1 + np.nonzero(sz >= 8)[0])
     fib2 = nd.map_coordinates(nd.gaussian_filter(fib.astype(np.float32), 0.7), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) * (GZ > 0)
-    fib2 = np.clip(fib2 / 0.5, 0, 1)
-    PLATE = OUT2 & (GZ >= -4.0)
-    hmem = np.where(PLATE, 1.6 + RAYS * fib2, 0)
-    hmem = np.maximum(hmem, np.where(cart2, hc + 0.3, 0))                     # 帯の棒より膜が薄くならないように
-    gy2 = np.arange(-1.6 - RAYS - G, 1.6 + RAYS + G * 1.5, G)
-    Fm = hmem[..., None] - np.abs(gy2)[None, None, :]; Fm[~PLATE] = -1
-    Fm = nd.gaussian_filter(Fm.astype(np.float32), [0.5, 0.5, 0.0])
-    v, f, _, _ = marching_cubes(np.pad(Fm, 1, constant_values=-1), 0.0, allow_degenerate=False); v = v - 1
+    fib2 = np.clip(fib2 / 0.5, 0, 1) * nd.binary_erosion(OUT2, iterations=int(0.5 / G))
+    hr = RAYS * fib2
+    gy2 = np.arange(-RAYS - G, RAYS + G * 1.5, G)
+    Fr = hr[..., None] - np.abs(gy2)[None, None, :]; Fr[fib2 < 0.15] = -1
+    Fr = nd.gaussian_filter(Fr.astype(np.float32), [0.4, 0.4, 0.0])
+    v, f, _, _ = marching_cubes(np.pad(Fr, 1, constant_values=-1), 0.0, allow_degenerate=False); v = v - 1
     Xv = X0 + v[:, 0] * G; Zv = Z0 + v[:, 1] * G; Yv = gy2[0] + v[:, 2] * G
-    Vm = np.stack([Xv, Yv, -top(Xv) + Zv], 1) / 1000.0
-    volm = np.einsum('ij,ij->i', Vm[f[:, 0]], np.cross(Vm[f[:, 1]], Vm[f[:, 2]])).sum() / 6
-    if volm > 0: f = f[:, ::-1]
-    write_ply(f'{OUT}/HH_dfin1mem.ply', Vm, f)
-    rep['rays'] = {'amp_mm': RAYS, 'fiber_area_mm2': round(float((fib2 > 0.5).sum() * G * G), 1), 'faces': int(len(f))}
+    Vr = np.stack([Xv, Yv, -top(Xv) + Zv], 1) / 1000.0
+    volr = np.einsum('ij,ij->i', Vr[f[:, 0]], np.cross(Vr[f[:, 1]], Vr[f[:, 2]])).sum() / 6
+    if volr > 0: f = f[:, ::-1]
+    write_ply(f'{OUT}/HH_dfin1ray.ply', Vr, f)
+    rep['rays'] = {'half_thickness_mm': RAYS, 'fiber_area_mm2': round(float((fib2 > 0.5).sum() * G * G), 1), 'volume_ml': round(abs(volr) * 1e6, 3), 'faces': int(len(f))}
     json.dump(rep, open('a5_dfin1photo.json', 'w'), ensure_ascii=False, indent=1); print('rays', rep['rays'])
