@@ -16,8 +16,14 @@ const SLIDERS = [
     ["奥のぼけ", chameleonLook.blur, 0, 30],
     ["曇りの明るさ", hazeBrightness, 0.8, 1.08],
   ]],
-  ["臓器（全体）", [
-    ["濃さ", chameleonLook.organs, 0, 3],
+  // The strengths together at the top, as the panel had them (C record 47, the producer: 「なんでさっきのパネルを消したの？
+  // 全部を１つのパネルに統合してよ」). Colours are below, every section open in the one panel.
+  ["濃さ", [
+    ["体の組織（膜の中）", chameleonLook.skin, 0, 6],
+    ["膜の表面の層", chameleonLook.film, 0, 6],
+    ["骨", chameleonLook.bone, 0, 3],
+    ["軟骨（肋骨の先）", chameleonLook.cartilage, 0, 2],
+    ["臓器（全体）", chameleonLook.organs, 0, 3],
   ]],
 ];
 // Each tissue (C record 46, the producer: 「パネルについて骨や全ての組織について色や濃さを編集できるようにして」): its strength
@@ -33,22 +39,22 @@ function tissueRows() {
   return TISSUES.map(([label, strength, maxStrength, spectrum]) => {
     const top = Math.max(1.5, 2 * Math.max(...spectrum.value.toArray()));
     const comp = (i) => ({ get value() { return spectrum.value.getComponent(i); }, set value(v) { spectrum.value.setComponent(i, v); } });
-    return [label, [["濃さ", strength, 0, maxStrength], ["赤を吸う割合", comp(0), 0, top], ["緑を吸う割合", comp(1), 0, top], ["青を吸う割合", comp(2), 0, top]]];
+    return [label, [["赤を吸う割合", comp(0), 0, top], ["緑を吸う割合", comp(1), 0, top], ["青を吸う割合", comp(2), 0, top]]];
   });
 }
 
 const CSS = `
 #ch-tune, #ch-tune-open { position: fixed; z-index: 3; top: 12px; right: 12px; font: 12px/1.4 system-ui, sans-serif; color: #222; }
-#ch-tune { width: min(280px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 10px 12px;
+#ch-tune { width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 10px 12px;
   background: rgba(250, 250, 250, 0.92); border: 1px solid #bbb; border-radius: 6px; }
 #ch-tune[hidden], #ch-tune-open[hidden] { display: none; }
 #ch-tune .head { display: flex; justify-content: space-between; align-items: center; }
 #ch-tune h2, #ch-tune h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
 #ch-tune h3 { margin-top: 10px; color: #666; }
 #ch-tune p { margin: 0 0 4px; color: #666; }
-#ch-tune label { display: grid; grid-template-columns: 7em 1fr 2.8em; gap: 6px; align-items: center; margin: 3px 0; }
+#ch-tune label { display: grid; grid-template-columns: 9.5em 1fr 2.8em; gap: 6px; align-items: center; margin: 3px 0; }
 #ch-tune input[type="range"] { width: 100%; }
-#ch-tune details { margin: 2px 0 2px 4px; } #ch-tune summary { cursor: pointer; padding: 2px 0; }
+#ch-tune .group { margin: 4px 0 6px 6px; } #ch-tune h4 { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: #333; }
 #ch-tune .value { text-align: right; font-variant-numeric: tabular-nums; }
 #ch-tune button, #ch-tune-open { min-height: 28px; padding: 0 10px; border: 1px solid #aaa; border-radius: 4px; background: #fff; color: #222; cursor: pointer; }
 #ch-tune .wide { display: block; width: 100%; margin-top: 8px; }
@@ -99,7 +105,7 @@ export function installChameleonTune() {
   const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
   const organs = organRows();
   const tissues = tissueRows();
-  const rows = [...SLIDERS, ...tissues.map(([t, list]) => ["組織 " + t, list]), ...organs.map(([t, list]) => ["臓器 " + t, list])]
+  const rows = [...SLIDERS, ...tissues.map(([t, list]) => ["色 " + t, list]), ...organs.map(([t, list]) => ["臓器 " + t, list])]
     .flatMap(([title, list]) => list.map(([label, holder, min, max]) => ({ title, label, holder, min, max })));
   const defaults = rows.map((r) => r.holder.value);
 
@@ -117,17 +123,17 @@ export function installChameleonTune() {
     for (const [label, holder, min, max] of list) refreshers.push(addSlider(block, label, holder, min, max));
     panel.append(block);
   }
-  const tissueHead = document.createElement("h3"); tissueHead.textContent = "組織ごと（開いて調整）"; panel.append(tissueHead);
+  const tissueHead = document.createElement("h3"); tissueHead.textContent = "組織の色"; panel.append(tissueHead);
   for (const [title, list] of tissues) {
-    const box = document.createElement("details");
-    const sum = document.createElement("summary"); sum.textContent = title; box.append(sum);
+    const box = document.createElement("div"); box.className = "group";
+    const sum = document.createElement("h4"); sum.textContent = title; box.append(sum);
     for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
     panel.append(box);
   }
-  const organHead = document.createElement("h3"); organHead.textContent = "臓器ごと（開いて調整）"; panel.append(organHead);
+  const organHead = document.createElement("h3"); organHead.textContent = "臓器ごとの濃さと色"; panel.append(organHead);
   for (const [title, list] of organs) {
-    const box = document.createElement("details");
-    const sum = document.createElement("summary"); sum.textContent = title; box.append(sum);
+    const box = document.createElement("div"); box.className = "group";
+    const sum = document.createElement("h4"); sum.textContent = title; box.append(sum);
     for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
     panel.append(box);
   }
