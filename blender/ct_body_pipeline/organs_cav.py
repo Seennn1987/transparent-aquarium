@@ -33,7 +33,9 @@ VOX=0.25*MM
 lat=AR.mean(0); ax=int(np.argmax(np.abs(lat))); others=[i for i in range(3) if i!=ax]
 # 胴の範囲（体軸の点から 30 mm 以内）だけ
 lo=AP.min(0)-30*MM; hi=AP.max(0)+30*MM
-lo=np.maximum(lo,sv.min(0)-VOX); hi=np.minimum(hi,sv.max(0)+VOX)
+# 膜の箱で切らない（記録 41、2026-10-20）: 箱を膜の範囲で切ると、膜のどこか（手足）が変わるだけで格子の原点と大きさが変わり、
+#   organs.py のまだらの場（格子の大きさで乱数を引く）と管の格子への落とし方が変わって、胃・結腸・中身の形が変わった。
+#   格子は体軸の点（膜によらない）だけで決める
 shape=tuple(np.ceil((hi-lo)/VOX).astype(int)+1)
 print('grid',shape,'ray axis',ax, f'{time.time()-t0:.0f}s',flush=True)
 a,b=others
