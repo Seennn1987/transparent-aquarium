@@ -16,13 +16,26 @@ const SLIDERS = [
     ["奥のぼけ", chameleonLook.blur, 0, 30],
     ["曇りの明るさ", hazeBrightness, 0.8, 1.08],
   ]],
-  ["濃さ", [
-    ["膜", chameleonLook.skin, 0, 6],
-    ["膜の表面の層", chameleonLook.film, 0, 6],
-    ["骨", chameleonLook.bone, 0, 2],
-    ["臓器", chameleonLook.organs, 0, 2],
+  ["臓器（全体）", [
+    ["濃さ", chameleonLook.organs, 0, 3],
   ]],
 ];
+// Each tissue (C record 46, the producer: 「パネルについて骨や全ての組織について色や濃さを編集できるようにして」): its strength
+// (× the shipped value; the rib-gap cartilage and, in "06", the surface layer start at 0 = not drawn) and its colour (the share of
+// red, green and blue it takes away).
+const TISSUES = [
+  ["骨", chameleonLook.bone, 3, chameleonLook.boneSpectrum],
+  ["軟骨（肋骨の先）", chameleonLook.cartilage, 2, chameleonLook.cartSpectrum],
+  ["体の組織（膜の中）", chameleonLook.skin, 6, chameleonLook.skinSpectrum],
+  ["膜の表面の層", chameleonLook.film, 6, chameleonLook.filmSpectrum],
+];
+function tissueRows() {
+  return TISSUES.map(([label, strength, maxStrength, spectrum]) => {
+    const top = Math.max(1.5, 2 * Math.max(...spectrum.value.toArray()));
+    const comp = (i) => ({ get value() { return spectrum.value.getComponent(i); }, set value(v) { spectrum.value.setComponent(i, v); } });
+    return [label, [["濃さ", strength, 0, maxStrength], ["赤を吸う割合", comp(0), 0, top], ["緑を吸う割合", comp(1), 0, top], ["青を吸う割合", comp(2), 0, top]]];
+  });
+}
 
 const CSS = `
 #ch-tune, #ch-tune-open { position: fixed; z-index: 3; top: 12px; right: 12px; font: 12px/1.4 system-ui, sans-serif; color: #222; }
@@ -85,7 +98,8 @@ export function installChameleonTune() {
   if (new URLSearchParams(location.search).get("tune") === "0") return;
   const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
   const organs = organRows();
-  const rows = [...SLIDERS, ...organs.map(([t, list]) => ["臓器 " + t, list])]
+  const tissues = tissueRows();
+  const rows = [...SLIDERS, ...tissues.map(([t, list]) => ["組織 " + t, list]), ...organs.map(([t, list]) => ["臓器 " + t, list])]
     .flatMap(([title, list]) => list.map(([label, holder, min, max]) => ({ title, label, holder, min, max })));
   const defaults = rows.map((r) => r.holder.value);
 
@@ -102,6 +116,13 @@ export function installChameleonTune() {
     const h3 = document.createElement("h3"); h3.textContent = title; block.append(h3);
     for (const [label, holder, min, max] of list) refreshers.push(addSlider(block, label, holder, min, max));
     panel.append(block);
+  }
+  const tissueHead = document.createElement("h3"); tissueHead.textContent = "組織ごと（開いて調整）"; panel.append(tissueHead);
+  for (const [title, list] of tissues) {
+    const box = document.createElement("details");
+    const sum = document.createElement("summary"); sum.textContent = title; box.append(sum);
+    for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
+    panel.append(box);
   }
   const organHead = document.createElement("h3"); organHead.textContent = "臓器ごと（開いて調整）"; panel.append(organHead);
   for (const [title, list] of organs) {

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {
-  BONE_T0, stainOf,
+  BONE_T0, stainOf, CARTILAGE_GAIN, STAINS,
   HEART_PERIOD, HEART_RADIUS_MM, HEART_AMP, MODEL_UNITS_PER_MM,
 } from "./chameleon-stain.js";
 
@@ -27,6 +27,12 @@ export const chameleonLook = {
   hazeLength: { value: 1.5 },
   hazeColor: { value: new THREE.Vector3(0.93, 0.92, 0.88) },
   blur: { value: 8 },
+  // Each tissue's colour: the share of red, green and blue it takes away (its spectrum), set from the stain pattern when the
+  // lightbox is made, and shared with the panel (chameleon-tune.js, C record 46) so the panel can change it.
+  boneSpectrum: { value: new THREE.Vector3() },
+  cartSpectrum: { value: new THREE.Vector3() },
+  skinSpectrum: { value: new THREE.Vector3() },
+  filmSpectrum: { value: new THREE.Vector3() },
 };
 
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
@@ -294,6 +300,17 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
     samples: 4,
   });
   const film = k.film && k.film.gain > 0 ? k.film : null;
+  chameleonLook.boneSpectrum.value.set(...k.bone.spectrum);
+  chameleonLook.cartSpectrum.value.set(...k.cartilage.spectrum);
+  chameleonLook.skinSpectrum.value.set(...k.skin.spectrum);
+  // A pattern without the film ("06") gets "01"'s film at strength 0, so the panel can turn one on (C record 46).
+  const filmRef = film ?? STAINS["01"].film;
+  chameleonLook.filmSpectrum.value.set(...filmRef.spectrum);
+  if (!film) chameleonLook.film.value = 0;
+  // The rib-gap cartilage is not drawn by default (gain 0, C record 40): the panel's strength then multiplies the strength it had
+  // (CARTILAGE_GAIN) from 0, so it can be brought back.
+  const cartBase = k.cartilage.gain > 0 ? k.cartilage.gain : CARTILAGE_GAIN;
+  if (!(k.cartilage.gain > 0)) chameleonLook.cartilage.value = 0;
   for (const [name, abs] of Object.entries(k.organs ?? {})) organUniform(name).value.set(...abs);
   const organs = Object.keys(k.organs ?? {}).length > 0;
   const organTarget = new THREE.WebGLRenderTarget(1, 1, {
@@ -309,15 +326,15 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       tOrgan: { value: organTarget.texture },
       organGain: { value: organs ? 1 : 0 },
       filmGain: { value: film ? film.gain : 0 },
-      filmSpectrum: { value: new THREE.Vector3(...(film ? film.spectrum : [0, 0, 0])) },
+      filmSpectrum: chameleonLook.filmSpectrum,
       lightbox: { value: new THREE.Vector3(...k.lightbox) },
       boneGain: { value: k.bone.gain },
       boneT0: chameleonLook.boneT0,
-      cartGain: { value: k.cartilage.gain },
+      cartGain: { value: cartBase },
       skinGain: { value: k.skin.gain },
-      boneSpectrum: { value: new THREE.Vector3(...k.bone.spectrum) },
-      cartSpectrum: { value: new THREE.Vector3(...k.cartilage.spectrum) },
-      skinSpectrum: { value: new THREE.Vector3(...k.skin.spectrum) },
+      boneSpectrum: chameleonLook.boneSpectrum,
+      cartSpectrum: chameleonLook.cartSpectrum,
+      skinSpectrum: chameleonLook.skinSpectrum,
       visceraGain: { value: k.viscera.gain },
       visceraSpectrum: { value: new THREE.Vector3(...k.viscera.spectrum) },
       linearOut: { value: linear ? 1 : 0 },
@@ -366,10 +383,10 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
     material,
     render(scene, camera, output = null) {
       material.uniforms.boneGain.value = k.bone.gain * chameleonLook.bone.value;
-      material.uniforms.cartGain.value = k.cartilage.gain * chameleonLook.cartilage.value;
+      material.uniforms.cartGain.value = cartBase * chameleonLook.cartilage.value;
       material.uniforms.skinGain.value = k.skin.gain * chameleonLook.skin.value;
       material.uniforms.visceraGain.value = k.viscera.gain * chameleonLook.viscera.value;
-      material.uniforms.filmGain.value = film ? film.gain * chameleonLook.film.value : 0;
+      material.uniforms.filmGain.value = filmRef.gain * chameleonLook.film.value;
       material.uniforms.organGain.value = organs ? chameleonLook.organs.value : 0;
       const clear = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
       const background = scene.background; scene.background = null;
@@ -390,7 +407,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
         renderer.render(scene, camera);
         for (const [o, v] of swapped) { o.material = o.userData.pathMaterial; o.visible = v; }
       };
-      if (film) pass("filmMaterial", filmTarget);
+      if (material.uniforms.filmGain.value > 0) pass("filmMaterial", filmTarget);
       if (organs || calibrateOrgans.on) pass("organMaterial", organTarget);
       scene.background = background;
       renderer.setClearColor(clear, clearAlpha);

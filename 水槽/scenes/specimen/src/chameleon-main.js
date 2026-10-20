@@ -30,7 +30,7 @@ async function start() {
   // Pattern 01's blue skin is 3 times darker by default for now (the producer, 2026-10-18: 「一旦、青の濃さ3倍で」);
   // ?skin=1 gives photo 01's colour.
   const skinView = Number(query.get("skin")) || (stain === "01" ? 3 : 0);
-  if (skinView > 0) { chameleonLook.skin.value = skinView; chameleonLook.film.value = skinView; }
+  if (skinView > 0) { chameleonLook.skin.value = skinView; if (stain === "01") chameleonLook.film.value = skinView; }
   document.body.style.background = `rgb(${stainOf(stain).lightbox.map((v) => Math.round(v * 255)).join(",")})`;
 
   const gltf = await new GLTFLoader().loadAsync(CHAMELEON_URL);
