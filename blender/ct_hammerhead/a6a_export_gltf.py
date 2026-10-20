@@ -50,6 +50,8 @@ if os.environ.get("HH_PELV_CT175") == "1": PARTS["PelvicSkin"] = (PARTS["PelvicS
 if os.environ.get("HH_DFIN1_PHOTO") == "1" and float(os.environ.get("HH_DFIN1_RAYS", 0) or 0) > 0: PARTS["Dorsal1Ray"] = (["HH_dfin1ray"], 150000)   # 2026-10-20: 第 1 背びれの鰭条（a5h_dfin1_photo.py）。ページで色と濃さを変える別の部品
 if os.environ.get("HH_PELV_PHOTO") == "1": PARTS["PelvicCartilage"] = (PARTS["PelvicCartilage"][0], 60000); PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], int(os.environ.get("HH_PELV_PHOTO_SKINF", 40000)))
 FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
+if os.environ.get("HH_DFIN2_OUTLINE") == "raver":   # 2026-10-20 決定: 第 2 背びれの膜の板は Raver の図の外形（hh_fins.py の RAVER_DFIN2）
+    import hh_fins as _hf0; FIT_FD["dfin2"] = _hf0.dfin2_raver_fd()
 if os.environ.get("HH_DFIN2_PHOTO") == "1":   # 2026-10-20: 写真の第 2 背びれ（a5h_dfin1_photo.py dfin2）は、前の版の膜（軟骨に合わせた外形）の中に作ってあるので、膜の板もその外形
     import hh_fins as _hf
     _kl, _kz, _o = [float(v) for v in os.environ.get("HH_DFIN2_MEMB", "0.86,0.97,628.0").split(",")]; _fd = _hf.FINS["dfin2"]
@@ -187,6 +189,12 @@ def _body_warp(o, n):
                         k, kz, o_mm = [float(v_) for v_ in os.environ[f"HH_FINCT_MEMB_{fin}"].split(",")]
                     FIT_FD[fin] = dict(fd, o=o_mm / TLm, i=(o_mm + (fd["i"] - fd["o"]) * TLm * k) / TLm, H=fd["H"] * kz)
                     poly = _poly(o_mm, k)
+                    if fin == "dfin2" and os.environ.get("HH_DFIN2_OUTLINE") == "raver":
+                        # 2026-10-20 決定（プロデューサー「ヒレの形状はOK。規定にして。ただ軟骨は全然ダメ。作り直し。」）: 膜は軟骨に合わせず Raver の図の外形のまま。
+                        #  軟骨（CT の細かさの第 2 背びれ）は下の寄せ（外形の内側 1 mm へ前後に寄せる）でこの外形に収める
+                        import hh_fins as _hf2; FIT_FD[fin] = _rf = _hf2.dfin2_raver_fd(); _Lr = (_rf["i"] - _rf["o"]) * TLm; _Hr = _rf["H"] * TLm
+                        poly = [(_rf["o"] * TLm + s_ * _Lr, -(_np.interp(_rf["o"] * TLm + s_ * _Lr, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * _Hr if h_ > 0 else -4.0))) for s_, h_ in _rf["poly"]]
+                        report[f"fin_membrane_fit_{n}"]["outline"] = "raver"
                     report[f"fin_membrane_fit_{n}"] = {"k_len": round(float(k), 2), "k_height": round(float(kz), 2), "tip_mm": round(tipd, 1), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * kz), 1)}
                 elif fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
