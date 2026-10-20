@@ -142,6 +142,11 @@ step py a5a_shell.py 4
 step fig a5a_check.py
 step py a5c_photo_pect.py
 step py a5d_pect_membrane.py
+# 2026-10-20 決定（プロデューサー「他のヒレに進んでください」→「胸びれはこの案を既定にして、次のひれ（第 1 背びれ）に進んでください」）: 胸びれの軟骨を
+#  ウチワシュモクザメの透明標本の写真のつくり（放射軟骨が付け根から先へ幅いっぱいに並ぶ）にし、膜は NOAA の写真の外形のまま CT の軟骨でふくらませない（a5g_pect_photo.py）。
+#  前の形は HH_PECT_PHOTO=
+export HH_PECT_PHOTO=${HH_PECT_PHOTO-1}
+[[ $HH_PECT_PHOTO == 1 ]] && step py a5g_pect_photo.py
 step py a5e_pelv_membrane.py
 # 2026-10-20 決定（プロデューサー「腹びれの軟骨と膜を、腰帯・基鰭軟骨・放射軟骨のつくりに合わせて直す案を…」→「ヒレそのものの形はこれまでのものの方が実態に近いのでは？…」→
 #  「腹びれはこの案を既定にしてください」）: 腹びれの膜は前の版の外形の縁を直線にならし、軟骨はウチワシュモクザメの透明標本の写真の形（腰帯・基鰭軟骨・放射軟骨）を
