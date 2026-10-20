@@ -50,6 +50,10 @@ if os.environ.get("HH_PELV_CT175") == "1": PARTS["PelvicSkin"] = (PARTS["PelvicS
 if os.environ.get("HH_DFIN1_PHOTO") == "1" and float(os.environ.get("HH_DFIN1_RAYS", 0) or 0) > 0: PARTS["Dorsal1Ray"] = (["HH_dfin1ray"], 150000)   # 2026-10-20: 第 1 背びれの鰭条（a5h_dfin1_photo.py）。ページで色と濃さを変える別の部品
 if os.environ.get("HH_PELV_PHOTO") == "1": PARTS["PelvicCartilage"] = (PARTS["PelvicCartilage"][0], 60000); PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], int(os.environ.get("HH_PELV_PHOTO_SKINF", 40000)))
 FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
+if os.environ.get("HH_DFIN2_PHOTO") == "1":   # 2026-10-20: 写真の第 2 背びれ（a5h_dfin1_photo.py dfin2）は、前の版の膜（軟骨に合わせた外形）の中に作ってあるので、膜の板もその外形
+    import hh_fins as _hf
+    _kl, _kz, _o = [float(v) for v in os.environ.get("HH_DFIN2_MEMB", "0.86,0.97,628.0").split(",")]; _fd = _hf.FINS["dfin2"]
+    FIT_FD["dfin2"] = dict(_fd, o=_o / _hf.TL_MM, i=(_o + (_fd["i"] - _fd["o"]) * _hf.TL_MM * _kl) / _hf.TL_MM, H=_fd["H"] * _kz)
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)
@@ -88,7 +92,7 @@ import numpy as _np, json as _json, hh_warp
 _RIGID = {"HH_pect_L", "HH_pect_R", "HH_pectmem_L", "HH_pectmem_R", "HH_pelv_L", "HH_pelv_R", "HH_pelvmem_L", "HH_pelvmem_R"}
 _twp = os.path.join(hh_paths.WORK, "a5_trunk_width.json"); _TW = _json.load(open(_twp)) if os.path.exists(_twp) else None
 def _body_warp(o, n):
-    if n == "HH_dfin1" and os.environ.get("HH_DFIN1_PHOTO") == "1":   # 2026-10-20: a5h_dfin1_photo.py の軟骨は、膜の板と同じ体の線（a5_side_fit.json）から作ってあるので、体軸の伸び縮みだけ
+    if (n == "HH_dfin1" and os.environ.get("HH_DFIN1_PHOTO") == "1") or (n == "HH_dfin2" and os.environ.get("HH_DFIN2_PHOTO") == "1"):   # 2026-10-20: 第 2 背びれも（a5h_dfin1_photo.py dfin2）   # 2026-10-20: a5h_dfin1_photo.py の軟骨は、膜の板と同じ体の線（a5_side_fit.json）から作ってあるので、体軸の伸び縮みだけ
         me = o.data; co = _np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
         co[:, 0] = hh_warp.warp_mm(co[:, 0] * 1000) / 1000; me.vertices.foreach_set("co", co.ravel()); me.update(); return
     if n in ("HH_dfin1", "HH_dfin2", "HH_anal"):   # 背と腹を足した案（a5a_shell.py の HH_TRUNK_PROFILE=ref）: 背びれ・臀びれの軟骨を膜と同じだけ動かす

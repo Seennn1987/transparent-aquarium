@@ -14,14 +14,20 @@ from skimage.measure import marching_cubes
 from PIL import Image, ImageOps
 from matplotlib.path import Path as _Path
 exec(open(hh_paths.script('a4e_mesh.py')).read().split("which=sys.argv[1]")[0])
-import hh_fins
+import hh_fins, sys
+# 2026-10-20（プロデューサー「進んで」、第 1 背びれの次）: 引数 dfin2 で第 2 背びれ。ピサの標本に第 2 背びれは付いていないので、同じつくりの臀びれ
+#  （Compagno 1988 の背びれ・臀びれの骨格: 基底の軟骨と平行な放射軟骨）を上下・左右に返して使う。外形は前の版の膜（CT の軟骨に合わせた外形、a6a の FIT_FD）のまま
+NAME = sys.argv[1] if len(sys.argv) > 1 else 'dfin1'
+CFG = {'dfin1': dict(crop=(1130, 630, 1400, 905), flip=False),
+       'dfin2': dict(crop=(680, 890, 900, 1020), flip=True)}[NAME]
 PHOTO = os.path.join(hh_paths.ROOT, 'docs', 'references', 'hammerhead', 'ref1_pisa_sphyrna_zygaena_skeleton_lateral.jpg')
 if not os.path.exists(PHOTO): raise SystemExit(f'見本の写真がありません（git に入れていない）: {PHOTO}')
 im = Image.open(PHOTO).convert('RGB'); sc = im.width / 2000
-im = ImageOps.mirror(im.crop(tuple(int(v * sc) for v in (1130, 630, 1400, 905))))
+im = ImageOps.mirror(im.crop(tuple(int(v * sc) for v in CFG['crop'])))
+if CFG['flip']: im = ImageOps.flip(im)
 A = np.asarray(im).astype(float); Hh, Ww = A.shape[:2]; yy, xx = np.mgrid[0:Hh, 0:Ww]
 mn = A.min(2); mx = A.max(2); sat = (mx - mn) / np.maximum(mx, 1)
-col_y = int(0.86 * Hh)                                                      # 背骨（切り出しの下の 14%）より上だけ
+col_y = int(0.86 * Hh) if NAME == 'dfin1' else 132                           # 背骨（第 1 背びれ: 切り出しの下の 14%、臀びれ: 血道弓と透けた膜の y 132）より上だけ
 fin = (mx > 60) & (yy < col_y); cl, n = nd.label(fin); fin = cl == (1 + np.argmax(nd.sum(fin, cl, range(1, n + 1))))
 fin = nd.binary_fill_holes(fin)
 # 放射軟骨の帯: 帯の上の境（放射軟骨と膜の境の明るい筋）を、左右を返した切り出し（548 × 558 px）で目で読んだ点（x, y）を結ぶ:
@@ -29,13 +35,25 @@ fin = nd.binary_fill_holes(fin)
 #  色や暗いすき間だけで帯を探す版は、照明の暗い後ろ半分が抜けたり、膜の後ろの縁の筋まで拾ったりした。
 #  帯 = ひれの中で境の線より下。棒 = 帯の中で、周り（4 px でぼかした値）より明るい所（棒の間は茶色く暗い）
 SEAM = np.array([(60, 345), (100, 322), (150, 307), (200, 300), (250, 301), (300, 310), (340, 328), (380, 350), (420, 372), (460, 392), (500, 412), (520, 425)], float)
+YLIM = 452
+if NAME == 'dfin2':
+    # 臀びれ（上下・左右に返した 446 × 264 px）: 棒の帯の外の境を目で読んだ点。棒の付け根の側は y 128 まで（その下は透けた膜と血道弓）
+    SEAM = np.array([(95, 92), (140, 80), (190, 68), (240, 64), (265, 78), (285, 100), (300, 110)], float); YLIM = 128
 band = fin & (yy >= np.interp(xx, SEAM[:, 0], SEAM[:, 1])) & (xx >= SEAM[0, 0] - 30)
-rad = band & (mn > nd.gaussian_filter(mn, 4) + 2) & (yy <= 452)   # 付け根の下の破れた縁と、留めの針金（y 455 より下）は使わない
-cl, n = nd.label(rad); sz = nd.sum(rad, cl, range(1, n + 1)); rad = np.isin(cl, 1 + np.nonzero(sz >= 20)[0])
+rad = band & (mn > nd.gaussian_filter(mn, 4) + 2) & (yy <= YLIM)
+if NAME == 'dfin2':   # 臀びれの写真は小さく（棒の間 約 6 px）、4 px ぼかし + 2 では棒が切れ切れになった（軟骨が膜の 15%）。3 px ぼかしより明るい所（帯の 54%）
+    rad = band & (mn > nd.gaussian_filter(mn, 3)) & (yy <= YLIM)   # 付け根の下の破れた縁と、留めの針金（y 455 より下）は使わない
+cl, n = nd.label(rad); sz = nd.sum(rad, cl, range(1, n + 1)); rad = np.isin(cl, 1 + np.nonzero(sz >= (20 if NAME == 'dfin1' else 8))[0])
 fy, fx = np.nonzero(fin)
 ybase = float(np.percentile(fy, 99)); apex_y = float(fy.min())
-x_or = float(fx[fy > ybase - 0.10 * (ybase - apex_y)].min()); x_rear = float(fx.max())
-fd = hh_fins.FINS['dfin1']; TLm = hh_fins.TL_MM; Lb = (fd['i'] - fd['o']) * TLm; Hm = fd['H'] * TLm; s_rear = max(s for s, h in fd['poly'])
+x_or = float(fx[fy > ybase - 0.10 * (ybase - apex_y)].min()); x_rear = float(fx.max()); x_apex = None
+fd = hh_fins.FINS[NAME]
+if NAME == 'dfin2':
+    # 臀びれの写真の目印（目で読んだ）: 付け根の前の端 x 72、頂点 x 305・y 22、後ろの細い端 x 410。外形の s 0・0.8（頂点）・1.8（後端）に合わせる
+    x_or, x_apex, x_rear, apex_y = 72.0, 305.0, 410.0, 22.0
+    kl, kz, o_mm = [float(v) for v in os.environ.get('HH_DFIN2_MEMB', '0.86,0.97,628.0').split(',')]   # 前の版の膜（a6a の fin_membrane_fit_HH_dfin2）
+    TL_ = hh_fins.TL_MM; fd = dict(fd, o=o_mm / TL_, i=(o_mm + (fd['i'] - fd['o']) * TL_ * kl) / TL_, H=fd['H'] * kz)
+TLm = hh_fins.TL_MM; Lb = (fd['i'] - fd['o']) * TLm; Hm = fd['H'] * TLm; s_rear = max(s for s, h in fd['poly'])
 sf = json.load(open('a5_side_fit.json')); top = lambda x: np.interp(x, sf['z_mm'], sf['top_target_mm'])
 poly = [(fd['o'] * TLm + s * Lb, (h * Hm if h > 0 else -4.0)) for s, h in fd['poly']]     # (体軸 mm, 体の線からの高さ mm)
 G = 0.25
@@ -43,7 +61,8 @@ G = 0.25
 #  体の中は CT の軟骨をつなげる案を…」）: 前の試しは写真の付け根を 1 本の水平の線（y 470、破れた縁と針金を含む）で合わせたので、帯が体の背から 2〜13 mm 浮いた
 #  （写真の付け根は後ろで上がる）。写真の列ごとに、棒のいちばん下（3 次の式でならす）を外形の付け根（体の線）に合わせる。高さの倍率は付け根の中ほど〜頂点で決める
 XC = np.arange(Ww); _hasr = rad.any(0); _yb = np.where(_hasr, Hh - 1 - np.argmax(rad[::-1], 0), 0).astype(float)
-_k = _hasr & (XC >= x_or) & (XC <= x_rear); YB = np.polyval(np.polyfit(XC[_k], _yb[_k], 3), XC.astype(float))
+_k = _hasr & (XC >= x_or) & (XC <= x_rear); YB = np.polyval(np.polyfit(XC[_k], _yb[_k], 3), np.clip(XC, XC[_k].min(), XC[_k].max()).astype(float))
+#  棒のある列の外は端の値のまま（3 次の式を伸ばすと、第 2 背びれでは棒の無い後ろで付け根が 200 px 上へ外れた）
 kh = (float(np.median(YB[_k])) - apex_y) / Hm                                # 写真の画素 / mm（高さ）
 X0, X1 = fd['o'] * TLm - 5, fd['o'] * TLm + s_rear * Lb + 5; Z0, Z1 = -34.0, Hm + 5; YW = 6.0
 gx = np.arange(X0, X1, G); gz = np.arange(Z0, Z1, G); gy = np.arange(-YW, YW + G / 2, G)
@@ -51,12 +70,13 @@ GX, GZ = np.meshgrid(gx, gz, indexing='ij')
 OUT2 = _Path(poly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
 INNER = nd.binary_erosion(OUT2, iterations=int(1.0 / G))
 s_g = (GX - fd['o'] * TLm) / Lb
-px = x_or + s_g / s_rear * (x_rear - x_or); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
+px = (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
 cart2 = (nd.map_coordinates(rad.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= -2.5)
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.2); hc[~cart2] = 0
+if NAME == 'dfin2': hc = np.where(cart2, np.maximum(hc, 0.6), 0)   # 棒は幅 0.3 mm ほどと細く、縁からの距離のままでは左右も 0.15 mm になってほとんど写らなかった。左右は片側 0.6 mm 以上
 Fp = hc[..., None] - np.abs(gy)[None, None, :]; Fp[~cart2] = -1
 # 体の中（体の線より下）: CT の第 1 背びれ（a4_dfin1.npz、a4e と同じ体積）を、a6a が CT の軟骨にしていたのと同じく体の線の動き（a5_trunk_width.json の dtop）だけ動かして使う
-ct = np.load('a4_dfin1.npz'); fld = ct['field']; org = ct['origin']; VX_ = 0.735; U0_, V0_ = -180.0, -150.0
+ct = np.load(f'a4_{NAME}.npz'); fld = ct['field']; org = ct['origin']; VX_ = 0.735; U0_, V0_ = -180.0, -150.0
 _tw = json.load(open('a5_trunk_width.json')) if os.path.exists('a5_trunk_width.json') else None
 dtop = np.interp(gx, _tw['z_mm'], _tw['dtop_mm']) if _tw and 'dtop_mm' in _tw else np.zeros_like(gx)
 GX3, GZ3, GY3 = np.meshgrid(gx, gz, gy, indexing='ij')
@@ -71,19 +91,19 @@ Xv = X0 + v[:, 0] * G; Zv = Z0 + v[:, 1] * G; Yv = -YW + v[:, 2] * G
 Vb = np.stack([Xv, Yv, -top(Xv) + Zv], 1) / 1000.0                          # Blender（x = 体軸、y = 左右、z = 背）。体の線は z = −top_target
 vol = np.einsum('ij,ij->i', Vb[f[:, 0]], np.cross(Vb[f[:, 1]], Vb[f[:, 2]])).sum() / 6
 if vol > 0: f = f[:, ::-1]                                                  # write_ply が裏返して書くので、内向きにそろえて渡す
-write_ply(f'{OUT}/HH_dfin1.ply', Vb, f)
+write_ply(f'{OUT}/HH_{NAME}.ply', Vb, f)
 memb = OUT2 & (GZ > 0)
 ctin = (Fc > 0).any(2)
 rep = {'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_y_fit': [round(float(YB[int(x_or)]), 1), round(float(YB[int(x_rear)]), 1)]}, 'kh_px_per_mm': round(kh, 3),
        'cart_area_mm2': round(float((cart2 & (GZ > 0)).sum() * G * G), 1), 'memb_area_mm2': round(float(memb.sum() * G * G), 1), 'cart_in_memb': round(float((cart2 & memb).sum() / memb.sum()), 3),
        'ct_below_line_mm': round(float(-GZ[ctin].min()), 1) if ctin.any() else None, 'volume_ml': round(abs(vol) * 1e6, 3), 'faces': int(len(f))}
-json.dump(rep, open('a5_dfin1photo.json', 'w'), ensure_ascii=False, indent=1); print(rep)
+json.dump(rep, open(f'a5_{NAME}photo.json', 'w'), ensure_ascii=False, indent=1); print(rep)
 # 2026-10-20 鰭条（プロデューサー「既定にする前に、ひれの先の鰭条を薄く描く案も作って、見本と並べて見せてください」→「強で規定にした上で後で色を調整できるように
 #  編集パネルに機能追加して」）: HH_DFIN1_RAYS=<mm> で、鰭条（ceratotrichia、コラーゲンに近い糸で軟骨ではない）を別の部品 HH_dfin1ray（ページの Dorsal1Ray）にする。
 #  ピサの写真の膜に見える鰭条（帯の上の境より 4 px 以上上の膜で、周り（3 px ぼかし）より 4 以上明るい所、8 px 以上の塊）に沿う細い帯で、左右の厚さは片側 <mm>
 #  （膜の板 ±1.6 mm の中）。色と濃さはページの調整の欄で変える（既定は、膜を鰭条に沿って左右 0.6 mm 厚くした版と同じ見え方）。
 #  前の試し（膜そのものを鰭条に沿って厚くする）は、色を膜と別に変えられなかった
-RAYS = float(os.environ.get('HH_DFIN1_RAYS', 0) or 0)
+RAYS = float(os.environ.get('HH_DFIN1_RAYS', 0) or 0) if NAME == 'dfin1' else 0.0
 if RAYS > 0:
     membp = fin & (yy < np.interp(xx, SEAM[:, 0], SEAM[:, 1]) - 4); membp = nd.binary_erosion(membp, iterations=3)
     fib = membp & (mn > nd.gaussian_filter(mn, 3) + 4)
