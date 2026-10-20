@@ -33,7 +33,7 @@ nearA(transmitted({ film: 2.1888, skin: 0.9178 }, { stain: "01" }), [0.251, 0.20
 nearA(transmitted({ bone: 0.1366, film: 2.2298, skin: 0.9005 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
 // "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the gut).
 nearA(transmitted({ organs: { liver_r: 0.2380 } }, { stain: "01" }), [0.150, 0.231, 0.415], 0.01, "01 の肝臓（C）");
-nearA(transmitted({ organs: { intestine: 0.1576 } }, { stain: "01" }), [0.494, 0.599, 0.746], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
+nearA(transmitted({ organs: { intestine: 0.1499 } }, { stain: "01" }), [0.494, 0.599, 0.746], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
 // The eye: half photo 01's ring (0.677 / 0.769 / 0.936) over the median eye path, as the producer chose (C record 26,
 // "眼窩を埋めて淡く").
 nearA(transmitted({ organs: { eye_r: 0.2859 } }, { stain: "01" }), [0.339, 0.385, 0.468], 0.01, "01 の目（写真 01 の輪の半分の濃さ）");

@@ -209,6 +209,8 @@ export const STAINS = {
     // After C record 31 (hind feet, the organs kept from C record 29): liver 0.2928 → 0.3088 (× 0.948), gut 0.1580 → 0.1595,
     // eye 0.1706 → 0.2942: the values below are unchanged at this rounding.
     // After C record 34 (hands): liver 0.2928 → 0.3084 (× 0.949), gut 0.1580 → 0.1596 (× 0.990), eye 0.1706 → 0.2938.
+    // After the organs were drawn again on a grid that no longer depends on the skin (C record 42, 2026-10-20; organs_cav.py):
+    // liver 0.2928 → 0.3077 (× 0.952, unchanged at this rounding), gut 0.1580 → 0.1518 (× 1.041), eye unchanged.
     // The middle comes out darker from the longer path through the ball alone, so the lens adds nothing (0, fitted:
     // ct_body_pipeline/fit_eyes01.py).
     // The gut's value is given to the stomach, intestine and colon alike. The contents are not told apart from the
@@ -220,7 +222,7 @@ export const STAINS = {
       contents: [0, 0, 0],
       heart: [0, 0.0218, 0.0821], gallbladder: [0, 0.0218, 0.0821], fat_r: [0, 0.0218, 0.0821], fat_l: [0, 0.0218, 0.0821],
       kidney_r: [0, 0.0218, 0.0821], kidney_l: [0, 0.0218, 0.0821],
-      stomach: [3.13, 3.80, 4.74], intestine: [3.13, 3.80, 4.74], colon: [3.13, 3.80, 4.74],
+      stomach: [3.29, 4.00, 4.99], intestine: [3.29, 4.00, 4.99], colon: [3.29, 4.00, 4.99],
       eye_r: [1.18, 1.34, 1.64], eye_l: [1.18, 1.34, 1.64], lens_r: [0, 0, 0], lens_l: [0, 0, 0],
       // Not measured on 01 (its throat is under the blue film): kept as "06", like the rib-gap cartilage.
       hyoid_cartilage: HYOID_CARTILAGE,
