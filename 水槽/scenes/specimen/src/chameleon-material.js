@@ -18,14 +18,15 @@ export const chameleonLook = {
   film: { value: 1 },
   organs: { value: 1 },
   heartAmp: { value: HEART_AMP },
-  // The tissue's cloudiness (C record 43, 2026-10-20, proposals; 0 = off, the default for now). Light scattered in the
+  // The tissue's cloudiness (C record 43, 2026-10-20). Default proposal B (C record 44, the producer: 「Bで進めて規定にするが、
+  // パネルで後から調整できるようにして」): strength 0.35, blur 8 px; provisional, not measured on a photo (chameleon-tune.js adjusts it). Light scattered in the
   // cleared tissue veils what lies behind it and turns the thick parts (the belly) milky, the thin ones (limbs) stay clear:
   //   veil = haze × (1 − exp(−skin path / hazeLength)), the pixel goes toward hazeColor × lightbox by veil;
   //   blur: what is inside the skin (bone, cartilage, organs) is seen through a blur of radius blur × veil output pixels.
-  haze: { value: 0 },
+  haze: { value: 0.35 },
   hazeLength: { value: 1.5 },
   hazeColor: { value: new THREE.Vector3(0.93, 0.92, 0.88) },
-  blur: { value: 0 },
+  blur: { value: 8 },
 };
 
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
