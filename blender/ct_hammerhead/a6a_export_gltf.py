@@ -194,7 +194,7 @@ def _body_warp(o, n):
                         #  軟骨（CT の細かさの第 2 背びれ）は下の寄せ（外形の内側 1 mm へ前後に寄せる）でこの外形に収める
                         import hh_fins as _hf2; FIT_FD[fin] = _rf = _hf2.dfin2_raver_fd(); _Lr = (_rf["i"] - _rf["o"]) * TLm; _Hr = _rf["H"] * TLm
                         poly = [(_rf["o"] * TLm + s_ * _Lr, -(_np.interp(_rf["o"] * TLm + s_ * _Lr, _sf["z_mm"], _sf[key]) + fd["side"] * (h_ * _Hr if h_ > 0 else -4.0))) for s_, h_ in _rf["poly"]]
-                        report[f"fin_membrane_fit_{n}"]["outline"] = "raver"
+                        report[f"fin_membrane_outline_{n}"] = "raver"
                     report[f"fin_membrane_fit_{n}"] = {"k_len": round(float(k), 2), "k_height": round(float(kz), 2), "tip_mm": round(tipd, 1), "o_mm": round(float(o_mm), 1), "base_mm": round(float((fd["i"] - fd["o"]) * TLm * k), 1), "H_mm": round(float(fd["H"] * TLm * kz), 1)}
                 elif fin == "anal":
                     dx = max(0.0, fd["o"] * TLm + 2.0 - float(X[w > 0.99].min())); X = X + dx * w; report[f"fin_cart_dx_{n}_mm"] = round(dx, 1)
