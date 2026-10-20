@@ -54,6 +54,7 @@ if os.environ.get("HH_DFIN2_PHOTO") == "1":   # 2026-10-20: 写真の第 2 背�
     import hh_fins as _hf
     _kl, _kz, _o = [float(v) for v in os.environ.get("HH_DFIN2_MEMB", "0.86,0.97,628.0").split(",")]; _fd = _hf.FINS["dfin2"]
     FIT_FD["dfin2"] = dict(_fd, o=_o / _hf.TL_MM, i=(_o + (_fd["i"] - _fd["o"]) * _hf.TL_MM * _kl) / _hf.TL_MM, H=_fd["H"] * _kz)
+    if os.environ.get("HH_DFIN2_OUTLINE") == "raver": FIT_FD["dfin2"] = _hf.dfin2_raver_fd()   # 2026-10-20: Raver の図の外形（hh_fins.py の RAVER_DFIN2）
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
 if os.path.exists(f"{MESH}/HH_viscera.ply"):
     PARTS["Viscera"] = (["HH_viscera"], 120000)

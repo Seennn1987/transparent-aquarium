@@ -53,6 +53,7 @@ if NAME == 'dfin2':
     x_or, x_apex, x_rear, apex_y = 72.0, 305.0, 410.0, 22.0
     kl, kz, o_mm = [float(v) for v in os.environ.get('HH_DFIN2_MEMB', '0.86,0.97,628.0').split(',')]   # 前の版の膜（a6a の fin_membrane_fit_HH_dfin2）
     TL_ = hh_fins.TL_MM; fd = dict(fd, o=o_mm / TL_, i=(o_mm + (fd['i'] - fd['o']) * TL_ * kl) / TL_, H=fd['H'] * kz)
+    if os.environ.get('HH_DFIN2_OUTLINE') == 'raver': fd = hh_fins.dfin2_raver_fd()   # Raver の図の外形（a6a の膜の板も同じ）
 TLm = hh_fins.TL_MM; Lb = (fd['i'] - fd['o']) * TLm; Hm = fd['H'] * TLm; s_rear = max(s for s, h in fd['poly'])
 sf = json.load(open('a5_side_fit.json')); top = lambda x: np.interp(x, sf['z_mm'], sf['top_target_mm'])
 poly = [(fd['o'] * TLm + s * Lb, (h * Hm if h > 0 else -4.0)) for s, h in fd['poly']]     # (体軸 mm, 体の線からの高さ mm)
@@ -89,6 +90,58 @@ INNER = nd.binary_erosion(OUT2, iterations=int(1.0 / G))
 s_g = (GX - fd['o'] * TLm) / Lb
 px = ((GX - XMIN) / RES) if SRC_CT else (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
 cart2 = (nd.map_coordinates(rad.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= -2.5)
+RODS = []; RESID = []
+if NAME == 'dfin2' and os.environ.get('HH_DFIN2_SRC') == 'trace':
+    # 2026-10-20（プロデューサー「…軟骨はピサの臀びれの写真の棒を 1 本ずつたどって割り振る案を…」）: 写真の棒を 1 本ずつ中心線でたどり、それぞれの太さのまま外形へ写す。
+    #  写真を画素のまま写す版は、写真が小さく（棒の間 約 10 px）棒が切れ切れになった。CT を横から塗る版は棒どうしが重なって塊になった。
+    #  たどり方: 帯の中で 3 px ぼかしより明るい所（棒）を、つながった塊ごとに 1 本の棒の切れ端とする（10 px 以上）。塊の点の主軸（主成分）を中心線、
+    #  長さ = 主軸の向きの広がり（両端の 2% と 98%）、太さ = 面積 ÷ 長さ。1 行ずつ明るい所へ寄せてたどる版は、となりの棒へ移ったり同じ棒を何度もたどったりした
+    #  2026-10-20 直し: 明るい所をそのまま使うと、帯の中で棒どうしがつながって 13 本の太い塊になった。細い明るい筋を強める処理（skimage の sato、太さ 1〜2 px）を
+    #  かけて、帯の中の上位 25% を棒の切れ端とする
+    from skimage.filters import sato as _sato
+    _bb = band & (yy <= YLIM); _rr = _sato(mn / 255.0, sigmas=[1.0, 1.5, 2.0], black_ridges=False) * _bb
+    _r = _rr > np.percentile(_rr[_bb], 75)
+    #  筋の形をそのまま写す版は、筋が切れ切れ（帯の 10%）になった。写真が小さく、筋を画素のまま使うのは無理なので、棒を 1 本ずつ数と位置で読む:
+    #  帯の中ほどの 2 本の行（y 106・116）で筋の強さの山（間 5 px 以上）を棒の通る所とし、そこでの濃淡の向き（構造テンソル、半径 6 px）に沿って、
+    #  帯の外の境（SEAM）と付け根（y 128）まで伸ばす。太さはその行で山の強さが半分になる幅。2 本の行で同じ棒（線の距離 3 px 以内）は 1 本にする
+    _g = nd.gaussian_filter(mn, 1.0); _gy, _gx = np.gradient(_g)
+    _J = [nd.gaussian_filter(q_, 6) for q_ in (_gx * _gx, _gy * _gy, _gx * _gy)]
+    _th = 0.5 * np.arctan2(2 * _J[2], _J[0] - _J[1]) + np.pi / 2               # 棒の向き（画像の x 右・y 下）
+    lines = []
+    for yr in (106, 116):
+        prof = _rr[yr]; pk = [x for x in range(3, Ww - 3) if _bb[yr, x] and prof[x] == prof[x - 2:x + 3].max() and prof[x] > np.percentile(_rr[_bb], 70)]
+        for x0 in pk:
+            d_ = np.array([np.cos(_th[yr, x0]), np.sin(_th[yr, x0])]); d_ = -d_ if d_[1] > 0 else d_   # 上（y が減る）向きへ
+            p0 = np.array([float(x0), float(yr)])
+            if any(abs(L_[1][0] * (p0 - L_[0])[1] - L_[1][1] * (p0 - L_[0])[0]) < 3 for L_ in lines): continue
+            half = prof[x0] / 2; a_ = b_ = x0
+            while a_ > 0 and prof[a_ - 1] > half and x0 - a_ < 5: a_ -= 1
+            while b_ < Ww - 1 and prof[b_ + 1] > half and b_ - x0 < 5: b_ += 1
+            wpx = (b_ - a_ + 1) * abs(d_[1])                                      # 横の幅 → 棒に直角の幅
+            ends = []
+            for sg in (1, -1):
+                t = 0.0
+                while True:
+                    q_ = p0 + sg * (t + 0.5) * d_; xi, yi = int(round(q_[0])), int(round(q_[1]))
+                    if not (0 <= xi < Ww and 0 <= yi < Hh) or not _bb[yi, xi]: break
+                    t += 0.5
+                ends.append(p0 + sg * t * d_)
+            if np.linalg.norm(ends[0] - ends[1]) < 8: continue
+            lines.append((p0, d_, ends, wpx))
+    _angs = np.array([np.degrees(np.arctan2(-L_[1][1], L_[1][0])) % 180 for L_ in lines]); _med = float(np.median(_angs))
+    RODS = [L_ for L_, a_ in zip(lines, _angs) if abs(a_ - _med) < 12]          # 向きが中央値から 12° より外れた線（帯の縁・膜のしわを拾ったもの）は使わない
+    _YB0 = np.polyval(np.polyfit(XC[_k], _yb[_k], 1), XC.astype(float))         # 付け根はまっすぐな線（3 次の式では棒の向きが場所ごとにゆがんだ）
+    from PIL import ImageDraw as _ID
+    _img = Image.new('L', (GX.shape[0], GX.shape[1]), 0); _d = _ID.Draw(_img)
+    def _tomm(q_):
+        return fd['o'] * TLm + (q_[0] - x_or) / kh, (float(np.interp(q_[0], XC, _YB0)) - q_[1]) / kh
+    for p0, d_, ends, wpx in RODS:
+        (xa, za), (xb, zb) = _tomm(ends[0]), _tomm(ends[1]); w_ = float(np.clip(wpx / kh, 0.4, 1.6))
+        # 棒の先へ細くなる（写真の棒も先が細い）: 3 つに分けて、付け根の側 1.0・中 0.85・先 0.6 倍
+        for f0, f1, kw in ((0.0, 0.4, 1.0), (0.4, 0.75, 0.85), (0.75, 1.0, 0.6)):
+            pa = (xb + (xa - xb) * f0, zb + (za - zb) * f0); pb = (xb + (xa - xb) * f1, zb + (za - zb) * f1)   # b が付け根の側（下）
+            _d.line([((pa[0] - X0) / G, (pa[1] - Z0) / G), ((pb[0] - X0) / G, (pb[1] - Z0) / G)], fill=255, width=max(1, int(round(w_ * kw / G))))
+    cart2 = (np.asarray(_img).T > 127) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= 0)
 if NAME == 'dfin2':
     # 体の線の 2.5 mm 下〜体の線: 棒のいちばん下の行をそのまま下へ伸ばすと、縦の歯のような筋が並んだ。ここは基底の軟骨（棒の付け根をつなぐ 1 本の板。Compagno 1988）なので、
     #  体の線から 1 mm 上までに棒のある所の前後 ±1 mm を、つながった帯にする
@@ -117,7 +170,7 @@ if vol > 0: f = f[:, ::-1]                                                  # wr
 write_ply(f'{OUT}/HH_{NAME}.ply', Vb, f)
 memb = OUT2 & (GZ > 0)
 ctin = (Fc > 0).any(2)
-rep = {'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_y_fit': [round(float(YB[int(x_or)]), 1), round(float(YB[int(x_rear)]), 1)]}, 'kh_px_per_mm': round(kh, 3),
+rep = {'rods': len(RODS), 'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_y_fit': [round(float(YB[int(x_or)]), 1), round(float(YB[int(x_rear)]), 1)]}, 'kh_px_per_mm': round(kh, 3),
        'cart_area_mm2': round(float((cart2 & (GZ > 0)).sum() * G * G), 1), 'memb_area_mm2': round(float(memb.sum() * G * G), 1), 'cart_in_memb': round(float((cart2 & memb).sum() / memb.sum()), 3),
        'ct_below_line_mm': round(float(-GZ[ctin].min()), 1) if ctin.any() else None, 'volume_ml': round(abs(vol) * 1e6, 3), 'faces': int(len(f))}
 json.dump(rep, open(f'a5_{NAME}photo.json', 'w'), ensure_ascii=False, indent=1); print(rep)
