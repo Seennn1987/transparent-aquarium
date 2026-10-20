@@ -42,9 +42,9 @@ near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 で�
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });
 assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);
 // The hyoid cartilage (an organ, so that it has its own strength): photo 06's throat patch less the screen's tissue there,
-// over the median hyoid path (0.0328; 0.0390 after C records 21–34), and lighter in red than the rib-gap cartilage over the same path.
+// over the median hyoid path (0.0328; 0.0390 after C records 21–34). The rib-gap cartilage is not drawn by default (C record 40).
 nearA(transmitted({ organs: { hyoid_cartilage: 0.0390 } }), [0.393, 0.135, 0.054], 0.005, "06 の舌骨の軟骨");
-assert.ok(transmitted({ organs: { hyoid_cartilage: 0.0390 } })[0] > transmitted({ cartilage: 0.0379 })[0], "舌骨の軟骨が肋骨の軟骨より薄くない");
+nearA(transmitted({ cartilage: 0.0379 }), [0, 0, 0], 1e-9, "肋骨の途切れの軟骨（既定では描かない）");
 // "06" stays as it was when no stain is named.
 near(transmitted({ skin: 0.627 }, { stain: "06" }), transmitted({ skin: 0.627 }), 1e-12, "06 の既定");
 console.log("chameleon-stain: ok");

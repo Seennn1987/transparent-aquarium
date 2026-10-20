@@ -37,6 +37,11 @@ export const BONE_GAIN = 70;
 export const CARTILAGE_SPECTRUM = [1, 0.1, 0.05];
 // About 0.4 red absorbance across a rib-thick bar (0.015).
 export const CARTILAGE_GAIN = 27;
+// The rib-gap cartilage (the ventral ends of the ribs) is not drawn by default (C record 40, 2026-10-20, the producer:
+// 「Cを規定値にして」): over the red rib tips it came out as near-black dots at the belly line (30 places in "06"), and photo 06
+// shows neither dots nor blue there. The cartilage is there in the animal (Williston 1925); its stain is not seen in 06.
+// CARTILAGE_GAIN above is kept as the strength it had (chameleonPage.look.cartilage multiplies the gain used here).
+export const RIB_GAP_CARTILAGE_GAIN = 0;
 // Cleared tissue, yellowish: the neck absorbs 0.105 : 0.139 : 0.371 (0.28 : 0.37 : 1).
 export const SKIN_SPECTRUM = [0.28, 0.37, 1];
 // Per model unit of tissue crossed side-on. The skin is a closed shell (ct_body_pipeline/skinloft2.py);
@@ -82,7 +87,7 @@ export const STAINS = {
   "06": {
     lightbox: LIGHTBOX,
     bone: { spectrum: BONE_SPECTRUM, gain: BONE_GAIN },
-    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
+    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: RIB_GAP_CARTILAGE_GAIN },
     skin: { spectrum: SKIN_SPECTRUM, gain: SKIN_GAIN },
     viscera: { spectrum: VISCERA_SPECTRUM, gain: VISCERA_GAIN },
     film: { spectrum: [0, 0, 0], gain: 0 },
@@ -159,7 +164,7 @@ export const STAINS = {
     lightbox: [224 / 255, 224 / 255, 224 / 255],
     bone: { spectrum: [0.485, 1, 0.798], gain: 30.16 },
     // Not measured on 01: the rib-gap cartilage is too small to find there. Kept as "06".
-    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: CARTILAGE_GAIN },
+    cartilage: { spectrum: CARTILAGE_SPECTRUM, gain: RIB_GAP_CARTILAGE_GAIN },
     skin: { spectrum: [0, 0.266, 1], gain: 0.0821 },
     // The one brown mass is not drawn in "01" (the organs below take its place). Its fit, kept for reference:
     // spectrum 0.571 / 0.861 / 1, gain 4.32.
