@@ -47,6 +47,7 @@ for _fin, _part in PLATE_FINS.items():
 # 2026-10-18: CT の細かさで作った腹びれの軟骨（HH_PELV_CT175）は、膜を 6.5%（7700 面）まで減らすと薄い所で覆いが欠け、軟骨が膜の外に出た。膜は 30% まで
 if os.environ.get("HH_PELV_CT175") == "1": PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], 0.30)
 # 2026-10-19 案: 写真の形から作った腹びれ（a5f_pelv_photo.py、HH_PELV_PHOTO）は、0.25 mm の格子の面なので面が多い。軟骨は 6800 面では細い放射軟骨がつぶれるので 60000 面、膜は 40000 面まで
+if float(os.environ.get("HH_DFIN1_RAYS", 0) or 0) > 0: PARTS["Dorsal1Skin"] = (PARTS.get("Dorsal1Skin", ([], 1.0))[0], 200000)   # 2026-10-20: 鰭条の筋を付けた膜は 0.25 mm の格子の面なので 20 万面まで
 if os.environ.get("HH_PELV_PHOTO") == "1": PARTS["PelvicCartilage"] = (PARTS["PelvicCartilage"][0], 60000); PARTS["PelvicSkin"] = (PARTS["PelvicSkin"][0], int(os.environ.get("HH_PELV_PHOTO_SKINF", 40000)))
 FIT_FD = {}   # 2026-10-18: 軟骨に合わせて大きくした膜の外形（HH_FINCT_FIT=membrane の臀びれ）。軟骨の部品の後に、膜の板がこれを使う
 # A8 内臓（a8a_viscera.py）。面があるときだけ書き出す（2026-10-15）
@@ -286,6 +287,10 @@ for part, (names, target) in PARTS.items():
     #  背の線・腹の線（a5_side_fit.json）から 4 mm 体の中から立て、厚さ 3.2 mm（ひれの先の膜の厚さとして、体積で作るときの最小と同じ）
     for _fin, _part in PLATE_FINS.items():
         if part != _part: continue
+        if _fin == "dfin1" and os.environ.get("HH_DFIN1_PHOTO") == "1" and float(os.environ.get("HH_DFIN1_RAYS", 0) or 0) > 0:
+            # 2026-10-20 案: 鰭条の筋を付けた膜の板（a5h_dfin1_photo.py の HH_DFIN1_RAYS）。外形・厚さ・体の線は下の板と同じ
+            bpy.ops.wm.ply_import(filepath=f"{MESH}/HH_dfin1mem.ply"); ob_ = bpy.context.selected_objects[0]; ob_.name = "tmp_plate_dfin1"; objs.append(ob_)
+            continue
         import hh_fins
         _sf = _json.load(open(os.path.join(hh_paths.WORK, "a5_side_fit.json"))); fd = FIT_FD.get(_fin, hh_fins.FINS[_fin]); TLm = hh_fins.TL_MM
         Lb = (fd["i"] - fd["o"]) * TLm; Hm = fd["H"] * TLm
