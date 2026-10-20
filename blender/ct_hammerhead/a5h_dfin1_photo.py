@@ -60,18 +60,41 @@ G = 0.25
 # 2026-10-20 直し（プロデューサー「ヒレの根元に一部かけている部分があり…」→「体の背から上はピサの写真の放射軟骨の帯にし、写真の付け根を列ごとに外形の付け根へ合わせ、
 #  体の中は CT の軟骨をつなげる案を…」）: 前の試しは写真の付け根を 1 本の水平の線（y 470、破れた縁と針金を含む）で合わせたので、帯が体の背から 2〜13 mm 浮いた
 #  （写真の付け根は後ろで上がる）。写真の列ごとに、棒のいちばん下（3 次の式でならす）を外形の付け根（体の線）に合わせる。高さの倍率は付け根の中ほど〜頂点で決める
+# 2026-10-20（プロデューサー「第 2 背びれは案 A（臀びれの CT を写す）にして、付け根を列ごとに体の線へ合わせ、体の中は CT とつなげる直しを足して…」）:
+#  HH_DFIN2_SRC=ct で、写真の代わりに案 A の軟骨（a4d3_fin_ct_mesh.py dfin2 を HH_DFIN2_FROM_ANAL=1 で作った面、mesh/HH_dfin2_fromanal.ply）を横から見た形を使う。
+#  0.1 mm の格子に面を塗り、体の線より上だけ。前後と高さは mm のまま（倍率 1）で、付け根だけ列ごとに体の線へ合わせる
+SRC_CT = NAME == 'dfin2' and os.environ.get('HH_DFIN2_SRC') == 'ct'
+if SRC_CT:
+    from PIL import ImageDraw as _IDraw
+    _b = open(f'{OUT}/HH_dfin2_fromanal.ply', 'rb').read(); _h = _b.index(b'end_header\n') + 11; _hd = _b[:_h].decode()
+    _nv = int(_hd.split('element vertex ')[1].split()[0]); _nf = int(_hd.split('element face ')[1].split()[0])
+    _V = np.frombuffer(_b, '<f4', _nv * 3, _h).reshape(-1, 3).astype(float) * 1000; _F = np.frombuffer(_b, np.dtype([('n', 'u1'), ('i', '<i4', 3)]), _nf, _h + _nv * 12)['i']
+    _hgt = _V[:, 2] + np.interp(_V[:, 0], sf['z_mm'], sf['top_target_mm'])     # 体の線からの高さ（mm）
+    RES = 0.1; XMIN = _V[:, 0].min() - 1; HMAX = _hgt.max() + 1
+    Ww = int((_V[:, 0].max() + 1 - XMIN) / RES) + 1; Hh = int((HMAX + 4) / RES) + 1
+    _img = Image.new('1', (Ww, Hh), 0); _d = _IDraw.Draw(_img); _P = np.c_[(_V[:, 0] - XMIN) / RES, (HMAX - _hgt) / RES]
+    for t_ in _F: _d.polygon([tuple(_P[i]) for i in t_], fill=1)
+    rad = np.asarray(_img).copy(); rad[int(HMAX / RES) + 1:] = False      # 体の線より上だけ（体の中は第 2 背びれの CT）
+    yy, xx = np.mgrid[0:Hh, 0:Ww]; apex_y = 0.0; x_or, x_rear = 0.0, float(Ww - 1)
 XC = np.arange(Ww); _hasr = rad.any(0); _yb = np.where(_hasr, Hh - 1 - np.argmax(rad[::-1], 0), 0).astype(float)
 _k = _hasr & (XC >= x_or) & (XC <= x_rear); YB = np.polyval(np.polyfit(XC[_k], _yb[_k], 3), np.clip(XC, XC[_k].min(), XC[_k].max()).astype(float))
 #  棒のある列の外は端の値のまま（3 次の式を伸ばすと、第 2 背びれでは棒の無い後ろで付け根が 200 px 上へ外れた）
 kh = (float(np.median(YB[_k])) - apex_y) / Hm                                # 写真の画素 / mm（高さ）
+if SRC_CT: kh = 1.0 / RES
 X0, X1 = fd['o'] * TLm - 5, fd['o'] * TLm + s_rear * Lb + 5; Z0, Z1 = -34.0, Hm + 5; YW = 6.0
 gx = np.arange(X0, X1, G); gz = np.arange(Z0, Z1, G); gy = np.arange(-YW, YW + G / 2, G)
 GX, GZ = np.meshgrid(gx, gz, indexing='ij')
 OUT2 = _Path(poly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
 INNER = nd.binary_erosion(OUT2, iterations=int(1.0 / G))
 s_g = (GX - fd['o'] * TLm) / Lb
-px = (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
+px = ((GX - XMIN) / RES) if SRC_CT else (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
 cart2 = (nd.map_coordinates(rad.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= -2.5)
+if NAME == 'dfin2':
+    # 体の線の 2.5 mm 下〜体の線: 棒のいちばん下の行をそのまま下へ伸ばすと、縦の歯のような筋が並んだ。ここは基底の軟骨（棒の付け根をつなぐ 1 本の板。Compagno 1988）なので、
+    #  体の線から 1 mm 上までに棒のある所の前後 ±1 mm を、つながった帯にする
+    _lo = (GZ >= -2.5) & (GZ < 0.0); _cols = (cart2 & (GZ >= 0) & (GZ < 1.0)).any(1)
+    _cols = nd.binary_closing(nd.binary_dilation(_cols, iterations=int(1.0 / G)), iterations=int(2.0 / G))
+    cart2 = (cart2 & ~_lo) | (_lo & _cols[:, None] & OUT2)
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.2); hc[~cart2] = 0
 if NAME == 'dfin2': hc = np.where(cart2, np.maximum(hc, 0.6), 0)   # 棒は幅 0.3 mm ほどと細く、縁からの距離のままでは左右も 0.15 mm になってほとんど写らなかった。左右は片側 0.6 mm 以上
 Fp = hc[..., None] - np.abs(gy)[None, None, :]; Fp[~cart2] = -1
