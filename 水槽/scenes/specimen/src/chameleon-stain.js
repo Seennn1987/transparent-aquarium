@@ -230,6 +230,10 @@ export const STAINS = {
     },
   },
 };
+// "06" draws the organs too (C record 45, 2026-10-20, the producer: 「臓器を書いた上で、パネルに全て足して」), with "01"'s
+// values (fitted on photo 01; photo 06 shows no brown mass, so they are not measured for "06": provisional). The panel
+// (chameleon-tune.js) adjusts each organ's strength and colour.
+STAINS["06"].organs = { ...STAINS["01"].organs, hyoid_cartilage: HYOID_CARTILAGE, claw: CLAW };
 export const stainOf = (name) => STAINS[name] ?? STAINS["06"];
 
 /** Light let through (red, green, blue) for paths through bone, cartilage and skin films. */

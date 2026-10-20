@@ -1,4 +1,4 @@
-import { chameleonLook } from "./chameleon-material.js";
+import { chameleonLook, chameleonOrgans } from "./chameleon-material.js";
 
 // The chameleon page's adjustment panel (C record 44, 2026-10-20, the producer: 「Bで進めて規定にするが、パネルで後から調整
 // できるようにして」). Moving a slider writes chameleonLook in place; the next frame reads it. Nothing is saved: "設定をコピー"
@@ -35,12 +35,37 @@ const CSS = `
 #ch-tune p { margin: 0 0 4px; color: #666; }
 #ch-tune label { display: grid; grid-template-columns: 7em 1fr 2.8em; gap: 6px; align-items: center; margin: 3px 0; }
 #ch-tune input[type="range"] { width: 100%; }
+#ch-tune details { margin: 2px 0 2px 4px; } #ch-tune summary { cursor: pointer; padding: 2px 0; }
 #ch-tune .value { text-align: right; font-variant-numeric: tabular-nums; }
 #ch-tune button, #ch-tune-open { min-height: 28px; padding: 0 10px; border: 1px solid #aaa; border-radius: 4px; background: #fff; color: #222; cursor: pointer; }
 #ch-tune .wide { display: block; width: 100%; margin-top: 8px; }
 #ch-tune button:hover, #ch-tune-open:hover { background: #eee; }
 @media (max-width: 600px) { #ch-tune { top: auto; bottom: 40px; max-height: 45dvh; } }
 `;
+
+// Each organ (paired ones together): its strength (× the shipped absorbance) and its colour (the absorbance of red, green and
+// blue light per model unit; higher = that colour taken away more, so a high red reads blue-green). C record 45.
+const ORGANS = [
+  ["肝臓", ["liver_r", "liver_l"]], ["胆嚢", ["gallbladder"]], ["胃", ["stomach"]], ["腸", ["intestine"]], ["結腸", ["colon"]],
+  ["消化管の中身", ["contents"]], ["心臓", ["heart"]], ["脂肪体", ["fat_r", "fat_l"]], ["腎臓", ["kidney_r", "kidney_l"]],
+  ["目", ["eye_r", "eye_l"]], ["水晶体", ["lens_r", "lens_l"]], ["舌骨の軟骨", ["hyoid_cartilage"]], ["爪の鞘", ["claw"]],
+];
+function organRows() {
+  const out = [];
+  for (const [label, names] of ORGANS) {
+    const us = names.map((n) => chameleonOrgans[n]).filter(Boolean);
+    if (!us.length) continue;
+    const base = us[0].value.toArray(); let strength = 1;
+    const apply = () => { for (const u of us) u.value.set(base[0] * strength, base[1] * strength, base[2] * strength); };
+    const top = Math.max(0.5, 3 * Math.max(...base));
+    const comp = (i) => ({ get value() { return base[i]; }, set value(v) { base[i] = v; apply(); } });
+    out.push([label, [
+      ["濃さ", { get value() { return strength; }, set value(v) { strength = v; apply(); } }, 0, 3],
+      ["赤を吸う", comp(0), 0, top], ["緑を吸う", comp(1), 0, top], ["青を吸う", comp(2), 0, top],
+    ]]);
+  }
+  return out;
+}
 
 function addSlider(parent, label, holder, min, max) {
   const row = document.createElement("label");
@@ -59,7 +84,9 @@ function addSlider(parent, label, holder, min, max) {
 export function installChameleonTune() {
   if (new URLSearchParams(location.search).get("tune") === "0") return;
   const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
-  const rows = SLIDERS.flatMap(([title, list]) => list.map(([label, holder, min, max]) => ({ title, label, holder, min, max })));
+  const organs = organRows();
+  const rows = [...SLIDERS, ...organs.map(([t, list]) => ["臓器 " + t, list])]
+    .flatMap(([title, list]) => list.map(([label, holder, min, max]) => ({ title, label, holder, min, max })));
   const defaults = rows.map((r) => r.holder.value);
 
   const panel = document.createElement("aside"); panel.id = "ch-tune"; panel.setAttribute("aria-label", "見た目の調整");
@@ -75,6 +102,13 @@ export function installChameleonTune() {
     const h3 = document.createElement("h3"); h3.textContent = title; block.append(h3);
     for (const [label, holder, min, max] of list) refreshers.push(addSlider(block, label, holder, min, max));
     panel.append(block);
+  }
+  const organHead = document.createElement("h3"); organHead.textContent = "臓器ごと（開いて調整）"; panel.append(organHead);
+  for (const [title, list] of organs) {
+    const box = document.createElement("details");
+    const sum = document.createElement("summary"); sum.textContent = title; box.append(sum);
+    for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
+    panel.append(box);
   }
   const copy = document.createElement("button"); copy.type = "button"; copy.className = "wide"; copy.textContent = "設定をコピー";
   copy.addEventListener("click", async () => {
