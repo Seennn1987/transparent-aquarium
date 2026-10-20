@@ -60,6 +60,7 @@ else:
     u2 = u2 - np.interp(np.round(v2 / 2), X['band_keys'], X['band_med']) * np.clip(np.abs(v2 - vb) / 10, 0, 1)
     if FROM_ANAL:
         import hh_fins; fa, fd2 = hh_fins.FINS['anal'], hh_fins.FINS['dfin2']; TLm = hh_fins.TL_MM
+        if os.environ.get('HH_DFIN2_OUTLINE') == 'raver': fd2 = hh_fins.dfin2_raver_fd()   # 2026-10-20: 膜は Raver の図の外形（付け根 52 mm・高さ 27 mm）。臀びれの CT はほぼそのままの大きさ（1.06 倍・0.92 倍）で入る
         LA, HA = float(os.environ.get('HH_ANAL_FIT_BASE', 49.2)), float(os.environ.get('HH_ANAL_FIT_H', 29.2))   # a6a の fin_membrane_fit_HH_anal（2026-10-18）
         sx, sy = (fd2['i'] - fd2['o']) * TLm / LA, fd2['H'] * TLm / HA
         Xd = np.load('a4_dfin2_xform.npz'); vbd = float(Xd['vb'])
