@@ -18,6 +18,14 @@ export const chameleonLook = {
   film: { value: 1 },
   organs: { value: 1 },
   heartAmp: { value: HEART_AMP },
+  // The tissue's cloudiness (C record 43, 2026-10-20, proposals; 0 = off, the default for now). Light scattered in the
+  // cleared tissue veils what lies behind it and turns the thick parts (the belly) milky, the thin ones (limbs) stay clear:
+  //   veil = haze × (1 − exp(−skin path / hazeLength)), the pixel goes toward hazeColor × lightbox by veil;
+  //   blur: what is inside the skin (bone, cartilage, organs) is seen through a blur of radius blur × veil output pixels.
+  haze: { value: 0 },
+  hazeLength: { value: 1.5 },
+  hazeColor: { value: new THREE.Vector3(0.93, 0.92, 0.88) },
+  blur: { value: 0 },
 };
 
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
@@ -213,12 +221,22 @@ uniform float boneGain, boneT0, cartGain, skinGain;
 uniform float visceraGain;
 uniform vec3 boneSpectrum, cartSpectrum, skinSpectrum, visceraSpectrum;
 uniform vec2 tap;
+uniform vec2 px;
+uniform float haze, hazeLength, blur;
+uniform vec3 hazeColor;
 varying vec2 vUv;
 // The signed paths, averaged over the output pixel's fine texels and the ring round them
 // (weights 1-3-3-1), before anything is clamped.
-vec4 signedAt(sampler2D t) {
-  return .25 * (texture2D(t, vUv + vec2(-tap.x, -tap.y)) + texture2D(t, vUv + vec2(tap.x, -tap.y))
-    + texture2D(t, vUv + vec2(-tap.x, tap.y)) + texture2D(t, vUv + vec2(tap.x, tap.y)));
+vec4 signedAtUV(sampler2D t, vec2 uv) {
+  return .25 * (texture2D(t, uv + vec2(-tap.x, -tap.y)) + texture2D(t, uv + vec2(tap.x, -tap.y))
+    + texture2D(t, uv + vec2(-tap.x, tap.y)) + texture2D(t, uv + vec2(tap.x, tap.y)));
+}
+vec4 signedAt(sampler2D t) { return signedAtUV(t, vUv); }
+// What lies inside the skin (bone, cartilage, the one mass, organs) at uv.
+vec3 innerAt(vec2 uv) {
+  vec4 m = max(signedAtUV(tPath, uv), 0.) * pathScale;
+  return boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum + cartGain * m.g * cartSpectrum
+    + visceraGain * m.a * visceraSpectrum + organGain * max(signedAtUV(tOrgan, uv).rgb * pathScale, 0.);
 }
 void main() {
   vec4 p = max(signedAt(tPath), 0.);
@@ -232,8 +250,22 @@ void main() {
     + organGain * max(signedAt(tOrgan).rgb * pathScale, 0.);
   // In the jar the image is a linear light let through over white (jar-optics.js looks it up and the
   // final pass tone-maps it); the ratios measured on the photo are in display (sRGB) values.
-  if (linearOut > .5) gl_FragColor = vec4(pow(exp(-a), vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
-  else gl_FragColor = vec4(lightbox * exp(-a), 1.);
+  vec3 T = exp(-a);
+  float veil = haze * (1. - exp(-m.b / hazeLength));
+  if (blur > 0. && veil > 0.) {
+    // Seen through the cloudy tissue, the inside is blurred: the inner light let through, averaged on two rings.
+    vec3 aIn = innerAt(vUv), skinPart = a - aIn, acc = exp(-aIn); float wsum = 1.;
+    float r = blur * veil;
+    for (int i = 0; i < 12; i++) {
+      float ang = 6.2831853 * float(i) / 12.;
+      vec2 d = vec2(cos(ang), sin(ang)) * px;
+      acc += exp(-innerAt(vUv + d * r)) * .7; acc += exp(-innerAt(vUv + d * r * .5)) * .7; wsum += 1.4;
+    }
+    T = exp(-skinPart) * acc / wsum;
+  }
+  T = mix(T, hazeColor, veil);
+  if (linearOut > .5) gl_FragColor = vec4(pow(T, vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
+  else gl_FragColor = vec4(lightbox * T, 1.);
 }`;
 
 /**
@@ -291,6 +323,11 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       alphaScale: { value: alphaScale },
       pathScale: { value: pathScale },
       tap: { value: new THREE.Vector2() },
+      px: { value: new THREE.Vector2() },
+      haze: chameleonLook.haze,
+      hazeLength: chameleonLook.hazeLength,
+      hazeColor: chameleonLook.hazeColor,
+      blur: chameleonLook.blur,
     },
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }",
     fragmentShader: compositeFragment,
@@ -320,6 +357,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       const s = Math.max(1, Math.min(supersample, Math.sqrt(FINE_PIXELS / Math.max(1, w * h))));
       const W = Math.max(1, Math.round(w * s)), H = Math.max(1, Math.round(h * s));
       target.setSize(W, H); filmTarget.setSize(W, H); organTarget.setSize(W, H);
+      material.uniforms.px.value.set(1 / Math.max(1, w), 1 / Math.max(1, h));
       // Four bilinear taps 0.75 fine texel either side of the output pixel's centre (a texel corner):
       // 4 × 4 fine texels, weights 1-3-3-1 along each axis.
       if (supersample > 1) material.uniforms.tap.value.set(0.75 / W, 0.75 / H); else material.uniforms.tap.value.set(0, 0);
