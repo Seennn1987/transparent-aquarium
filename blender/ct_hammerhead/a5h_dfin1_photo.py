@@ -90,6 +90,13 @@ INNER = nd.binary_erosion(OUT2, iterations=int(1.0 / G))
 s_g = (GX - fd['o'] * TLm) / Lb
 px = ((GX - XMIN) / RES) if SRC_CT else (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
 cart2 = (nd.map_coordinates(rad.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= -2.5)
+# 2026-10-21（プロデューサー「Mivart の図 1 とピサの写真から、第 1 背びれの軟骨を 3 段の放射軟骨（先の段まで）で作り直す案を…」）: HH_DFIN1_DISTAL=1 で、
+#  帯の上の境（中の段と先の段の継ぎ目）より上の先の段の放射軟骨も入れる。根拠: Mivart 1879 の Zygaena malleus（シロシュモクザメ）の第 1 背びれ（図版 LXXIV 図 1、本文:
+#  放射軟骨は基部 26・中 29・先 29 本の 3 段、先の段が最も長い）。先の段の棒の形はピサの写真の、継ぎ目より上の細い筋（周り（4 px ぼかし）より 2 以上明るい所）から。
+#  軟骨のある範囲は Mivart の図 1 から: 図版 2112 × 3198 px の x 40〜1060・y 260〜1460 を 800 × 941 px に縮めた画面（頭が右）で目で読み、左右を返した点 (x', y)
+#  （x' = 400 − x）。ひれの前の端 x' 20・頂点 x' 325・y 18・細い後端 x' 385、体の線 y 325。軟骨の外の線（前の縁に沿う膜の帯と、頂点の下の後ろの縁を除く）:
+MIV = [(65, 330), (70, 290), (150, 200), (210, 140), (250, 100), (275, 90), (290, 95), (295, 110), (290, 200), (275, 265), (305, 290), (330, 318), (290, 330)]
+MIV_X = (20.0, 325.0, 385.0); MIV_Y = (325.0, 18.0)
 RODS = []; RESID = []
 if NAME == 'dfin2' and os.environ.get('HH_DFIN2_SRC') == 'trace':
     # 2026-10-20（プロデューサー「…軟骨はピサの臀びれの写真の棒を 1 本ずつたどって割り振る案を…」）: 写真の棒を 1 本ずつ中心線でたどり、それぞれの太さのまま外形へ写す。
@@ -148,7 +155,26 @@ if NAME == 'dfin2':
     _lo = (GZ >= -2.5) & (GZ < 0.0); _cols = (cart2 & (GZ >= 0) & (GZ < 1.0)).any(1)
     _cols = nd.binary_closing(nd.binary_dilation(_cols, iterations=int(1.0 / G)), iterations=int(2.0 / G))
     cart2 = (cart2 & ~_lo) | (_lo & _cols[:, None] & OUT2)
+if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
+    s_apex1 = max(fd['poly'], key=lambda q: q[1])[0]
+    _cpoly = [(fd['o'] * TLm + float(np.interp(x_, MIV_X, [0, s_apex1, s_rear])) * Lb, (MIV_Y[0] - y_) / (MIV_Y[0] - MIV_Y[1]) * Hm) for x_, y_ in MIV]
+    CREG = _Path(_cpoly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
+    _rall = fin & (mn > nd.gaussian_filter(mn, 4) + 2) & (yy <= YLIM) & (xx >= SEAM[0, 0] - 30) & (yy < np.interp(xx, SEAM[:, 0], SEAM[:, 1]))
+    cl_, n_ = nd.label(_rall); sz_ = nd.sum(_rall, cl_, range(1, n_ + 1)); _rall = np.isin(cl_, 1 + np.nonzero(sz_ >= 20)[0])
+    _rall = nd.binary_dilation(_rall, iterations=1)   # 筋は幅 2 px ほどと細く、0.25 mm の格子に写すと半分ほど消えた
+    distal = (nd.map_coordinates(_rall.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & CREG & INNER & (GZ > 0)
+    # 継ぎ目（中の段と先の段の境）は 0.4 mm のすき間（Mivart の図でも棒が継ぎ目で切れる）
+    _sx = np.interp(SEAM[:, 0], [x_or, x_rear], [0, s_rear]) * Lb + fd['o'] * TLm; _sz = (np.interp(SEAM[:, 0], XC, YB) - SEAM[:, 1]) / kh
+    _seam = np.zeros(GX.shape, bool); _gi = np.round((_sx - X0) / G).astype(int); _gj = np.round((_sz - Z0) / G).astype(int)
+    from PIL import ImageDraw as _ID2
+    _im2 = Image.new('L', (GX.shape[0], GX.shape[1]), 0); _ID2.Draw(_im2).line(list(zip(_gi.tolist(), _gj.tolist())), fill=255, width=max(1, int(round(0.4 / G))))
+    _seam = np.asarray(_im2).T > 127
+    cart2 = (cart2 | distal) & ~_seam
+    rep_distal = {'distal_area_mm2': round(float(distal.sum() * G * G), 1), 'creg_area_mm2': round(float((CREG & (GZ > 0)).sum() * G * G), 1)}
+else:
+    rep_distal = {}
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.2); hc[~cart2] = 0
+if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1': hc = np.where(cart2, np.maximum(hc, 0.5), 0)   # 先の段の細い棒も左右に片側 0.5 mm 以上
 if NAME == 'dfin2': hc = np.where(cart2, np.maximum(hc, 0.6), 0)   # 棒は幅 0.3 mm ほどと細く、縁からの距離のままでは左右も 0.15 mm になってほとんど写らなかった。左右は片側 0.6 mm 以上
 Fp = hc[..., None] - np.abs(gy)[None, None, :]; Fp[~cart2] = -1
 # 体の中（体の線より下）: CT の第 1 背びれ（a4_dfin1.npz、a4e と同じ体積）を、a6a が CT の軟骨にしていたのと同じく体の線の動き（a5_trunk_width.json の dtop）だけ動かして使う
@@ -170,7 +196,7 @@ if vol > 0: f = f[:, ::-1]                                                  # wr
 write_ply(f'{OUT}/HH_{NAME}.ply', Vb, f)
 memb = OUT2 & (GZ > 0)
 ctin = (Fc > 0).any(2)
-rep = {'rods': len(RODS), 'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_y_fit': [round(float(YB[int(x_or)]), 1), round(float(YB[int(x_rear)]), 1)]}, 'kh_px_per_mm': round(kh, 3),
+rep = {**rep_distal, 'rods': len(RODS), 'photo_px': {'origin_x': x_or, 'rear_x': x_rear, 'apex_y': apex_y, 'base_y_fit': [round(float(YB[int(x_or)]), 1), round(float(YB[int(x_rear)]), 1)]}, 'kh_px_per_mm': round(kh, 3),
        'cart_area_mm2': round(float((cart2 & (GZ > 0)).sum() * G * G), 1), 'memb_area_mm2': round(float(memb.sum() * G * G), 1), 'cart_in_memb': round(float((cart2 & memb).sum() / memb.sum()), 3),
        'ct_below_line_mm': round(float(-GZ[ctin].min()), 1) if ctin.any() else None, 'volume_ml': round(abs(vol) * 1e6, 3), 'faces': int(len(f))}
 json.dump(rep, open(f'a5_{NAME}photo.json', 'w'), ensure_ascii=False, indent=1); print(rep)
