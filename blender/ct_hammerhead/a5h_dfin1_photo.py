@@ -161,7 +161,7 @@ if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
     CREG = _Path(_cpoly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
     _rall = fin & (mn > nd.gaussian_filter(mn, 4) + 2) & (yy <= YLIM) & (xx >= SEAM[0, 0] - 30) & (yy < np.interp(xx, SEAM[:, 0], SEAM[:, 1]))
     cl_, n_ = nd.label(_rall); sz_ = nd.sum(_rall, cl_, range(1, n_ + 1)); _rall = np.isin(cl_, 1 + np.nonzero(sz_ >= 20)[0])
-    _rall = nd.binary_dilation(_rall, iterations=1)   # 筋は幅 2 px ほどと細く、0.25 mm の格子に写すと半分ほど消えた
+    _rall = nd.binary_dilation(_rall, iterations=int(os.environ.get('HH_DFIN1_DISTAL_DIL', 1)))   # 筋は幅 2 px ほどと細く、0.25 mm の格子に写すと半分ほど消えた（2026-10-21: 2 px 広げる版も）
     distal = (nd.map_coordinates(_rall.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & CREG & INNER & (GZ > 0)
     # 継ぎ目（中の段と先の段の境）は 0.4 mm のすき間（Mivart の図でも棒が継ぎ目で切れる）
     _sx = np.interp(SEAM[:, 0], [x_or, x_rear], [0, s_rear]) * Lb + fd['o'] * TLm; _sz = (np.interp(SEAM[:, 0], XC, YB) - SEAM[:, 1]) / kh
@@ -174,7 +174,12 @@ if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
 else:
     rep_distal = {}
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.2); hc[~cart2] = 0
-if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1': hc = np.where(cart2, np.maximum(hc, 0.5), 0)   # 先の段の細い棒も左右に片側 0.5 mm 以上
+if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
+    hc = np.where(cart2, np.maximum(hc, 0.5), 0)   # 先の段の細い棒も左右に片側 0.5 mm 以上
+    # 2026-10-21（プロデューサー「先の段の棒を下の 2 段と同じくらいはっきり見えるようにした版を作って…」）: 下の 2 段の棒は左右に片側 約 1.0〜1.2 mm（縁からの距離）。
+    #  先の段は写真の筋が細く 0.5 mm になっていたので、HH_DFIN1_DISTAL_T（片側 mm）までそろえる
+    _dt_ = float(os.environ.get('HH_DFIN1_DISTAL_T', 0) or 0)
+    if _dt_ > 0: hc = np.where(distal & cart2, np.maximum(hc, _dt_), hc)
 if NAME == 'dfin2': hc = np.where(cart2, np.maximum(hc, 0.6), 0)   # 棒は幅 0.3 mm ほどと細く、縁からの距離のままでは左右も 0.15 mm になってほとんど写らなかった。左右は片側 0.6 mm 以上
 Fp = hc[..., None] - np.abs(gy)[None, None, :]; Fp[~cart2] = -1
 # 体の中（体の線より下）: CT の第 1 背びれ（a4_dfin1.npz、a4e と同じ体積）を、a6a が CT の軟骨にしていたのと同じく体の線の動き（a5_trunk_width.json の dtop）だけ動かして使う
