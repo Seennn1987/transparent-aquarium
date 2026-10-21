@@ -18,7 +18,7 @@ from mathutils import Vector, Matrix
 argv = sys.argv[sys.argv.index('--') + 1:]
 body_p, feet_p, out_p = argv[:3]; FEET_FACES = int(argv[3]) if len(argv) > 3 else 40000
 CUT_MM = float(os.environ.get('CUT_MM', '1.0')); TOTAL_FACES = int(os.environ.get('TOTAL_FACES', '149000'))
-SEAM_MM = float(os.environ.get('SEAM_MM', '0')); SEAM_ITER = int(os.environ.get('SEAM_ITER', '40'))
+SEAM_MM = float(os.environ.get('SEAM_MM', '0')); CUT_PAD = float(os.environ.get('CUT_PAD_MM', '3.0')); SEAM_ITER = int(os.environ.get('SEAM_ITER', '40'))
 P = np.load('pose_jar.npz'); bn = [str(x) for x in P['names']]; k = float(P['k']); MM = k
 def ct2m(p): p = np.asarray(p, float); return np.stack([p[..., 1], -p[..., 2], -p[..., 0]], -1) * k
 def posed(n, x): M = P['M'][bn.index(n)]; return ct2m(x) @ M[:3, :3].T + M[:3, 3]
@@ -54,7 +54,8 @@ for n in LIMBS:
     x = posed(n, d[n + '__v'])
     e1 = np.cross(ax, [0, 0, 1.0]); e1 = e1 / np.linalg.norm(e1) if np.linalg.norm(e1) > 1e-6 else np.array([1.0, 0, 0]); e2 = np.cross(ax, e1)
     R = np.c_[e1, e2, ax]; q = (x - plane) @ R
-    lo = q.min(0) - 3 * MM; hi = q.max(0) + 3 * MM; lo[2] = 0.0
+    # 箱の余白 CUT_PAD_MM（既定 3 mm）。お腹を深くすると、3 mm の箱が後ろ足の近くの腹まで切り、肋骨が膜の外に出た（記録 49）
+    lo = q.min(0) - CUT_PAD * MM; hi = q.max(0) + CUT_PAD * MM; lo[2] = 0.0
     corners = np.array([[a, b, c] for a in (lo[0], hi[0]) for b in (lo[1], hi[1]) for c in (lo[2], hi[2])])
     cv = plane + corners @ R.T
     faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
