@@ -18,8 +18,13 @@ import hh_fins, sys
 # 2026-10-20（プロデューサー「進んで」、第 1 背びれの次）: 引数 dfin2 で第 2 背びれ。ピサの標本に第 2 背びれは付いていないので、同じつくりの臀びれ
 #  （Compagno 1988 の背びれ・臀びれの骨格: 基底の軟骨と平行な放射軟骨）を上下・左右に返して使う。外形は前の版の膜（CT の軟骨に合わせた外形、a6a の FIT_FD）のまま
 NAME = sys.argv[1] if len(sys.argv) > 1 else 'dfin1'
+# 2026-10-22（プロデューサー「続けて」、尾びれの次）: HH_DFIN2_SRC=dfin1 で、第 2 背びれに第 1 背びれのつくり（ピサの第 1 背びれの写真の棒、
+#  Mivart 1879 図 1 の 3 段・先の段の範囲）を Raver の外形の大きさに縮めて当てはめる。シロシュモクザメの第 2 背びれの骨格の図や写真は見つかっていないので、
+#  「同じ種の第 1 背びれと同じつくり」という推定（計画書「背びれの軟骨の実態」）
+FROM1 = NAME == 'dfin2' and os.environ.get('HH_DFIN2_SRC') == 'dfin1'
+PH = 'dfin1' if (NAME == 'dfin1' or FROM1) else NAME                       # 写真のどのひれを使うか
 CFG = {'dfin1': dict(crop=(1130, 630, 1400, 905), flip=False),
-       'dfin2': dict(crop=(680, 890, 900, 1020), flip=True)}[NAME]
+       'dfin2': dict(crop=(680, 890, 900, 1020), flip=True)}[PH]
 PHOTO = os.path.join(hh_paths.ROOT, 'docs', 'references', 'hammerhead', 'ref1_pisa_sphyrna_zygaena_skeleton_lateral.jpg')
 if not os.path.exists(PHOTO): raise SystemExit(f'見本の写真がありません（git に入れていない）: {PHOTO}')
 im = Image.open(PHOTO).convert('RGB'); sc = im.width / 2000
@@ -27,7 +32,7 @@ im = ImageOps.mirror(im.crop(tuple(int(v * sc) for v in CFG['crop'])))
 if CFG['flip']: im = ImageOps.flip(im)
 A = np.asarray(im).astype(float); Hh, Ww = A.shape[:2]; yy, xx = np.mgrid[0:Hh, 0:Ww]
 mn = A.min(2); mx = A.max(2); sat = (mx - mn) / np.maximum(mx, 1)
-col_y = int(0.86 * Hh) if NAME == 'dfin1' else 132                           # 背骨（第 1 背びれ: 切り出しの下の 14%、臀びれ: 血道弓と透けた膜の y 132）より上だけ
+col_y = int(0.86 * Hh) if PH == 'dfin1' else 132                           # 背骨（第 1 背びれ: 切り出しの下の 14%、臀びれ: 血道弓と透けた膜の y 132）より上だけ
 fin = (mx > 60) & (yy < col_y); cl, n = nd.label(fin); fin = cl == (1 + np.argmax(nd.sum(fin, cl, range(1, n + 1))))
 fin = nd.binary_fill_holes(fin)
 # 放射軟骨の帯: 帯の上の境（放射軟骨と膜の境の明るい筋）を、左右を返した切り出し（548 × 558 px）で目で読んだ点（x, y）を結ぶ:
@@ -36,21 +41,23 @@ fin = nd.binary_fill_holes(fin)
 #  帯 = ひれの中で境の線より下。棒 = 帯の中で、周り（4 px でぼかした値）より明るい所（棒の間は茶色く暗い）
 SEAM = np.array([(60, 345), (100, 322), (150, 307), (200, 300), (250, 301), (300, 310), (340, 328), (380, 350), (420, 372), (460, 392), (500, 412), (520, 425)], float)
 YLIM = 452
-if NAME == 'dfin2':
+if PH == 'dfin2':
     # 臀びれ（上下・左右に返した 446 × 264 px）: 棒の帯の外の境を目で読んだ点。棒の付け根の側は y 128 まで（その下は透けた膜と血道弓）
     SEAM = np.array([(95, 92), (140, 80), (190, 68), (240, 64), (265, 78), (285, 100), (300, 110)], float); YLIM = 128
 band = fin & (yy >= np.interp(xx, SEAM[:, 0], SEAM[:, 1])) & (xx >= SEAM[0, 0] - 30)
 rad = band & (mn > nd.gaussian_filter(mn, 4) + 2) & (yy <= YLIM)
-if NAME == 'dfin2':   # 臀びれの写真は小さく（棒の間 約 6 px）、4 px ぼかし + 2 では棒が切れ切れになった（軟骨が膜の 15%）。3 px ぼかしより明るい所（帯の 54%）
+if PH == 'dfin2':   # 臀びれの写真は小さく（棒の間 約 6 px）、4 px ぼかし + 2 では棒が切れ切れになった（軟骨が膜の 15%）。3 px ぼかしより明るい所（帯の 54%）
     rad = band & (mn > nd.gaussian_filter(mn, 3)) & (yy <= YLIM)   # 付け根の下の破れた縁と、留めの針金（y 455 より下）は使わない
-cl, n = nd.label(rad); sz = nd.sum(rad, cl, range(1, n + 1)); rad = np.isin(cl, 1 + np.nonzero(sz >= (20 if NAME == 'dfin1' else 8))[0])
+cl, n = nd.label(rad); sz = nd.sum(rad, cl, range(1, n + 1)); rad = np.isin(cl, 1 + np.nonzero(sz >= (20 if PH == 'dfin1' else 8))[0])
 fy, fx = np.nonzero(fin)
 ybase = float(np.percentile(fy, 99)); apex_y = float(fy.min())
 x_or = float(fx[fy > ybase - 0.10 * (ybase - apex_y)].min()); x_rear = float(fx.max()); x_apex = None
 fd = hh_fins.FINS[NAME]
-if NAME == 'dfin2':
+if FROM1: x_apex = float(fx[np.argmin(fy)])                                  # 第 1 背びれの写真の頂点の列（前の端・頂点・後端を第 2 背びれの外形の同じ所へ）
+if NAME == 'dfin2' and PH == 'dfin2':
     # 臀びれの写真の目印（目で読んだ）: 付け根の前の端 x 72、頂点 x 305・y 22、後ろの細い端 x 410。外形の s 0・0.8（頂点）・1.8（後端）に合わせる
     x_or, x_apex, x_rear, apex_y = 72.0, 305.0, 410.0, 22.0
+if NAME == 'dfin2':
     kl, kz, o_mm = [float(v) for v in os.environ.get('HH_DFIN2_MEMB', '0.86,0.97,628.0').split(',')]   # 前の版の膜（a6a の fin_membrane_fit_HH_dfin2）
     TL_ = hh_fins.TL_MM; fd = dict(fd, o=o_mm / TL_, i=(o_mm + (fd['i'] - fd['o']) * TL_ * kl) / TL_, H=fd['H'] * kz)
     if os.environ.get('HH_DFIN2_OUTLINE') == 'raver': fd = hh_fins.dfin2_raver_fd()   # Raver の図の外形（a6a の膜の板も同じ）
@@ -88,7 +95,7 @@ GX, GZ = np.meshgrid(gx, gz, indexing='ij')
 OUT2 = _Path(poly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
 INNER = nd.binary_erosion(OUT2, iterations=int(1.0 / G))
 s_g = (GX - fd['o'] * TLm) / Lb
-px = ((GX - XMIN) / RES) if SRC_CT else (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, 0.8, s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
+px = ((GX - XMIN) / RES) if SRC_CT else (x_or + s_g / s_rear * (x_rear - x_or)) if x_apex is None else np.interp(s_g, [0, (max(fd['poly'], key=lambda q: q[1])[0] if FROM1 else 0.8), s_rear], [x_or, x_apex, x_rear]); py = np.interp(px, XC, YB) - np.clip(GZ, 0, None) * kh - np.clip(GZ, None, 0) * 0   # 体の線より下は棒のいちばん下の行をそのまま下へ（CT とつなぐため 2.5 mm まで）
 cart2 = (nd.map_coordinates(rad.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= -2.5)
 # 2026-10-21（プロデューサー「Mivart の図 1 とピサの写真から、第 1 背びれの軟骨を 3 段の放射軟骨（先の段まで）で作り直す案を…」）: HH_DFIN1_DISTAL=1 で、
 #  帯の上の境（中の段と先の段の継ぎ目）より上の先の段の放射軟骨も入れる。根拠: Mivart 1879 の Zygaena malleus（シロシュモクザメ）の第 1 背びれ（図版 LXXIV 図 1、本文:
@@ -149,13 +156,13 @@ if NAME == 'dfin2' and os.environ.get('HH_DFIN2_SRC') == 'trace':
             pa = (xb + (xa - xb) * f0, zb + (za - zb) * f0); pb = (xb + (xa - xb) * f1, zb + (za - zb) * f1)   # b が付け根の側（下）
             _d.line([((pa[0] - X0) / G, (pa[1] - Z0) / G), ((pb[0] - X0) / G, (pb[1] - Z0) / G)], fill=255, width=max(1, int(round(w_ * kw / G))))
     cart2 = (np.asarray(_img).T > 127) & (INNER | ((GZ < 0.5) & OUT2)) & (GZ >= 0)
-if NAME == 'dfin2':
+if NAME == 'dfin2' and not FROM1:   # 第 1 背びれのつくりを当てはめるときは、第 1 背びれと同じく棒を下へ伸ばす（1 本の帯は太い棒に見えた）
     # 体の線の 2.5 mm 下〜体の線: 棒のいちばん下の行をそのまま下へ伸ばすと、縦の歯のような筋が並んだ。ここは基底の軟骨（棒の付け根をつなぐ 1 本の板。Compagno 1988）なので、
     #  体の線から 1 mm 上までに棒のある所の前後 ±1 mm を、つながった帯にする
     _lo = (GZ >= -2.5) & (GZ < 0.0); _cols = (cart2 & (GZ >= 0) & (GZ < 1.0)).any(1)
     _cols = nd.binary_closing(nd.binary_dilation(_cols, iterations=int(1.0 / G)), iterations=int(2.0 / G))
     cart2 = (cart2 & ~_lo) | (_lo & _cols[:, None] & OUT2)
-if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
+if (NAME == 'dfin1' or FROM1) and os.environ.get('HH_DFIN1_DISTAL') == '1':
     s_apex1 = max(fd['poly'], key=lambda q: q[1])[0]
     _cpoly = [(fd['o'] * TLm + float(np.interp(x_, MIV_X, [0, s_apex1, s_rear])) * Lb, (MIV_Y[0] - y_) / (MIV_Y[0] - MIV_Y[1]) * Hm) for x_, y_ in MIV]
     CREG = _Path(_cpoly).contains_points(np.c_[GX.ravel(), GZ.ravel()]).reshape(GX.shape)
@@ -164,17 +171,19 @@ if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
     _rall = nd.binary_dilation(_rall, iterations=int(os.environ.get('HH_DFIN1_DISTAL_DIL', 1)))   # 筋は幅 2 px ほどと細く、0.25 mm の格子に写すと半分ほど消えた（2026-10-21: 2 px 広げる版も）
     distal = (nd.map_coordinates(_rall.astype(np.float32), [py.ravel(), px.ravel()], order=1, cval=0).reshape(GX.shape) > 0.5) & CREG & INNER & (GZ > 0)
     # 継ぎ目（中の段と先の段の境）は 0.4 mm のすき間（Mivart の図でも棒が継ぎ目で切れる）
-    _sx = np.interp(SEAM[:, 0], [x_or, x_rear], [0, s_rear]) * Lb + fd['o'] * TLm; _sz = (np.interp(SEAM[:, 0], XC, YB) - SEAM[:, 1]) / kh
+    _sx = (np.interp(SEAM[:, 0], [x_or, x_rear], [0, s_rear]) if x_apex is None else np.interp(SEAM[:, 0], [x_or, x_apex, x_rear], [0, s_apex1, s_rear])) * Lb + fd['o'] * TLm; _sz = (np.interp(SEAM[:, 0], XC, YB) - SEAM[:, 1]) / kh
     _seam = np.zeros(GX.shape, bool); _gi = np.round((_sx - X0) / G).astype(int); _gj = np.round((_sz - Z0) / G).astype(int)
     from PIL import ImageDraw as _ID2
     _im2 = Image.new('L', (GX.shape[0], GX.shape[1]), 0); _ID2.Draw(_im2).line(list(zip(_gi.tolist(), _gj.tolist())), fill=255, width=max(1, int(round(0.4 / G))))
     _seam = np.asarray(_im2).T > 127
     cart2 = (cart2 | distal) & ~_seam
+    if FROM1:   # 第 2 背びれ: 下の 2 段も Mivart の図 1 の範囲だけ（第 1 背びれの写真の下の段は細い後端の下まで続くので、そのままでは後端の下にも付け根の帯が伸びた）
+        _cc = CREG.any(1); cart2 &= CREG | ((GZ < 0) & _cc[:, None])
     rep_distal = {'distal_area_mm2': round(float(distal.sum() * G * G), 1), 'creg_area_mm2': round(float((CREG & (GZ > 0)).sum() * G * G), 1)}
 else:
     rep_distal = {}
 dt = nd.distance_transform_edt(cart2) * G; hc = np.clip(nd.gaussian_filter(dt, 0.5), 0, 1.2); hc[~cart2] = 0
-if NAME == 'dfin1' and os.environ.get('HH_DFIN1_DISTAL') == '1':
+if (NAME == 'dfin1' or FROM1) and os.environ.get('HH_DFIN1_DISTAL') == '1':
     hc = np.where(cart2, np.maximum(hc, 0.5), 0)   # 先の段の細い棒も左右に片側 0.5 mm 以上
     # 2026-10-21（プロデューサー「先の段の棒を下の 2 段と同じくらいはっきり見えるようにした版を作って…」）: 下の 2 段の棒は左右に片側 約 1.0〜1.2 mm（縁からの距離）。
     #  先の段は写真の筋が細く 0.5 mm になっていたので、HH_DFIN1_DISTAL_T（片側 mm）までそろえる
