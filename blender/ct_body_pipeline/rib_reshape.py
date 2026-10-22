@@ -14,6 +14,7 @@
 頂点は、芯の線の上の同じ距離の点の動きと同じだけ動かす（断面の太さ 0.4 mm ほどなので回転は入れない）。肋骨の軟骨（cart__a・cart__b のうち
 肋骨の分）は、最も近い頂点の動きで動かす。付け根から 1.5 mm は動かさない（rib_roots.py で椎骨に差し込んだ所）
 """
+import os
 import sys
 import numpy as np
 from scipy import sparse
@@ -25,7 +26,7 @@ src, dst = sys.argv[1], sys.argv[2]
 opts = dict(a[2:].split('=', 1) for a in sys.argv[3:] if a.startswith('--'))
 rest = [a for a in sys.argv[3:] if not a.startswith('--')]
 LEAN = float(opts['lean']) if 'lean' in opts else None
-BOW = float(opts.get('bow', '0.06')); ROUND = float(opts.get('round', '0.30')); BELLY = float(opts.get('belly', '0.10'))
+BOW = float(opts.get('bow', '0.06')); VENTRAL = opts.get('ventral', 'tip'); DLEAN = float(opts.get('dlean', '0')); TB0 = float(opts.get('tb0', '0.7')); TF0 = float(opts.get('tf0', '-0.2')); TF1 = float(opts.get('tf1', '-0.19')); FRONT_ALL = opts.get('front_all', '0') == '1'; ROUND = float(opts.get('round', '0.30')); BELLY = float(opts.get('belly', '0.10'))
 d = dict(np.load(src)); names = [str(n) for n in d['rig__names']]
 A = d['rig__axis'].astype(np.float64); D = d['rig__dorsal'].astype(np.float64)
 T = np.gradient(A, axis=0); T /= np.linalg.norm(T, axis=1, keepdims=True)
@@ -67,7 +68,48 @@ def smax(x, y, r):
     return np.maximum(x, y) + r * np.log1p(np.exp(-np.abs(x - y) / r))
 
 panels = []
-for n in ribs:
+MODE = opts.get('mode', 'rib')
+if MODE == 'field':
+    # 場で動かす（記録 51、2026-10-22）: 肋骨ごとに形を決めると、前後の肋骨で動きがばらついて重なり・追い越しが出た（記録 50）。
+    #   動きを「胴の位置 t と、付け根からの深さ h」のなめらかな関数にし、どの肋骨にも同じ関数を当てる。隣の肋骨は t が近いので
+    #   ほぼ同じだけ動き、並び（前後の順）は変わらない。関数の係数（今の寝る角、曲がり目の深さ、肋骨の深さ）は、肋骨ごとに測って
+    #   t に沿ってならした値
+    rows_ = []
+    for n in ribs:
+        I = info[n]; C = I['C']; a, h = C[:, 0], C[:, 2]; H = h.max()
+        if H <= 0: continue
+        u = h / H; dm = (u > 0.10) & (u < 0.45); vm = (u > 0.60) & (u < 0.95)
+        if dm.sum() < 3 or vm.sum() < 3: continue
+        kd_ = np.polyfit(h[dm], a[dm], 1); kv_ = np.polyfit(h[vm], a[vm], 1)
+        hk = np.clip((kv_[1] - kd_[1]) / (kd_[0] - kv_[0]), 0.2 * H, 0.9 * H) if kd_[0] != kv_[0] else 0.55 * H
+        rows_.append((n, I['t'], np.arctan(kd_[0]), hk, H))
+    tt_ = np.array([r[1] for r in rows_]); o_ = np.argsort(tt_)
+    def smooth_t(vals):
+        v = np.array(vals)[o_]; vs = gaussian_filter1d(v, 2.5, mode='nearest'); out = np.empty_like(vs); out[o_] = vs; return out
+    lean_s = smooth_t([r[2] for r in rows_]); hk_s = smooth_t([r[3] for r in rows_]); H_s = smooth_t([r[4] for r in rows_])
+    par = {r[0]: (lean_s[i], hk_s[i], H_s[i]) for i, r in enumerate(rows_)}
+    for n in ribs:
+        if n not in par: continue
+        I = info[n]; C = I['C']; a, l, h = C[:, 0], C[:, 1], C[:, 2]; t = I['t']
+        lean0, hk, Hs = par[n]
+        tb = np.clip((t - TB0) / (1.0 - TB0), 0, 1); tb = tb * tb * (3 - 2 * tb); tf = 1 - tb
+        tfr = np.clip((t - TF0) / (TF1 - TF0), 0, 1); tf *= tfr * tfr * (3 - 2 * tfr)   # 肩の前後の短い肋骨（3〜5）も寝かせ方を弱める（寝かせると後ろの肋骨を追い越した）
+        hc = np.maximum(h, 0)
+        S = hc - (hc - hk) * (hc > hk)                                       # min(h, hk)
+        S = -smax(-hc, -np.full_like(hc, hk), ROUND * Hs / 6)              # なめらかな min（曲がり目の角を丸める分を兼ねる）
+        dk = (np.tan(lean0 + np.radians(DLEAN)) - np.tan(lean0)) * tf if DLEAN else 0.0
+        da = dk * S
+        da = da + BOW * np.hypot(hk, np.tan(lean0) * hk) * np.sin(np.pi * np.clip(hc / hk, 0, 1)) * (hc <= hk)
+        da = da - ROUND * Hs * 0.12 * np.exp(-((hc - hk) / (0.18 * Hs)) ** 2)   # 曲がり目の角を前へ引いて丸める
+        da = da * (tfr * tfr * (3 - 2 * tfr) if FRONT_ALL else 1.0)   # --front_all=1: 弓なりと丸めも肩の前後で弱める
+        dh = 0.0
+        if 0 <= t <= 1 and BELLY > 0: dh = max(0.0, (BELLY - BELLY_NOW) * SH_HP) * np.sin(np.pi * t)
+        dhh = dh * np.clip(hc / Hs, 0, 1.3) ** 3
+        s_ = I['s']; wroot = np.clip((s_ - 1.5) / 1.5, 0, 1)
+        Cn = np.c_[a + da * wroot, l, h + dhh * wroot]
+        I['Cn'] = Cn; I['wroot'] = wroot
+        if n.endswith('_L') and n[3:5] in ('06', '10', '14', '18'): panels.append((n, C, Cn))
+for n in (ribs if MODE != 'field' else []):
     I = info[n]; C = I['C']; a, l, h = C[:, 0], C[:, 1], C[:, 2]
     H = h.max()
     if H <= 0: continue
@@ -76,8 +118,11 @@ for n in ribs:
     if dm.sum() < 3 or vm.sum() < 3: continue
     kd_ = np.polyfit(h[dm], a[dm], 1); kv_ = np.polyfit(h[vm], a[vm], 1)
     k_d = np.tan(np.radians(LEAN)) if LEAN is not None else kd_[0]
+    if os.environ.get('RIB_DEBUG') and n[3:5] in ('04','05','06','07','08'): print('  ', n, '今の寝る角 %.0f°' % np.degrees(np.arctan(kd_[0])), '腹側 %.0f°' % np.degrees(np.arctan(kv_[0])), '深さ %.1f 曲がり目 %.2f' % (H, hk / H))
+    if DLEAN:   # --dlean: 今の寝る角に同じ角を足す（肋骨ごとに同じ角を指定すると、今の角の違いの分だけ動きがばらつき、前後で追い越した。記録 51）
+        k_d = np.tan(np.arctan(kd_[0]) + np.radians(DLEAN))
     # 後ろの肋骨（股関節の手前 t 0.7〜1.0）は今の傾きへ戻す（同じ角で寝かせると、最後の肋骨が骨盤の中まで尾へ伸びた）
-    tb = np.clip((I['t'] - 0.7) / 0.3, 0, 1); tb = tb * tb * (3 - 2 * tb); k_d = k_d + (kd_[0] - k_d) * tb
+    tb = np.clip((I['t'] - TB0) / (1.0 - TB0), 0, 1); tb = tb * tb * (3 - 2 * tb); k_d = k_d + (kd_[0] - k_d) * tb   # 戻す幅 TB0〜1（急に戻すと前の肋骨が追い越した）
     # 背側の線: 付け根から（a = k_d × h）。腹側の線: 今の傾きで、今の曲がり目（2 本の今の線の交点の深さ）で背側の線と交わる
     hk = np.clip((kv_[1] - kd_[1]) / (kd_[0] - kv_[0]), 0.2 * H, 0.9 * H) if kd_[0] != kv_[0] else 0.55 * H
     # 新しい深さ（お腹のふくらみ）
@@ -87,6 +132,9 @@ for n in ribs:
     a_d = k_d * h_new
     # 腹側の線: 新しい曲がり目から、今の腹の端の前後の位置へ（腹の端が尾へずれると、隣の肋骨や腹の正中の軟骨とずれる）
     a_tip = a[np.argmax(h)]; k_v = (a_tip - k_d * hk_n) / max(Hn - hk_n, 1e-6)
+    if VENTRAL == 'shift':
+        # 腹側も曲がり目と同じだけ尾へずらし、今の傾きのまま（寝る角を大きくしても、同じ深さでは隣の肋骨と同じだけ動くので追い越さない。記録 51）
+        k_v = kv_[0]
     a_v = k_d * hk_n + k_v * (h_new - hk_n)
     r = ROUND * Hn / 2.5                                                   # なめらかな最小の丸める幅は約 2.5r
     a_new = -smax(-a_d, -a_v, r)                                           # 2 本のうち前（a の小さい方）を、丸めて
@@ -97,12 +145,71 @@ for n in ribs:
     # 付け根から 1.5 mm（CT の単位は mm ÷ 0.104 ではなく、骨のファイルの長さの単位）は動かさない
     s = I['s']; wroot = np.clip((s - 1.5) / 1.5, 0, 1)
     Cn = np.c_[a + (a_new - a) * wroot, l, h + (h_new - h) * wroot]
-    disp_c = Cn - C
+    I['Cn'] = Cn; I['wroot'] = wroot
+    if n.endswith('_L') and n[3:5] in ('06', '10', '14', '18'): panels.append((n, C, Cn))
+
+# 同じ側の肋骨の間隔を保つ（記録 51、2026-10-22。プロデューサー「肋骨が前後の肋骨と重なっていたり、追い越してクロスしていたりなんておかしくない？」）:
+#   胴の中ほどの枠（体軸の向き Tm、背の向き Dm）で横から写し、同じ深さ（0.25 mm ごと）で、後ろの肋骨が前の肋骨より GAP 以上後ろにあるようにする。
+#   足りない分は前後に半分ずつ押し分け（付け根の近くは動かさない重み）、全体を 60 回くり返す。押した量は肋骨に沿って σ 1 mm でならす
+GAP = float(opts.get('gap', '2.0')); ITER = int(opts.get('iter', '200')); SIDEPASS = opts.get('side', '1') == '1'
+im_ = (i_sh + i_hp) // 2; Tm = T[im_]; Dm = -D[im_]
+for side in ('L', 'R'):
+    R_ = sorted([n for n in ribs if n.endswith('_' + side) and 'Cn' in info[n] and 3 <= int(n[3:5]) <= 21], key=lambda n: int(n[3:5]))
+    P_ = {n: info[n]['root'] + info[n]['Cn'] @ info[n]['fr'].T for n in R_}
+    P0 = {n: info[n]['root'] + info[n]['C'] @ info[n]['fr'].T for n in R_}       # 今の形（付け根の近くは前の肋骨と重なって並ぶので、要る間隔は今の間隔までにする）
+    # 3 次元で押し分ける（横から写した前後の位置だけで見ると、後ろの肋骨の腹側のように体軸に沿って寝た所では深さの向きに重なった）。
+    #   同じ側で 5 本先までの組について、b の芯の点から a の芯の線までの距離が要る距離より短ければ、離れる向きに半分ずつ押す。
+    #   要る距離 = min(GAP, 今の距離 × 0.8)（付け根の近くのように今も近い所は、今の近さまで許す）
+    from scipy.spatial import cKDTree as _K
+    def pass3d():
+        moved = 0.0
+        for ia in range(len(R_)):
+            for ib in range(ia + 1, min(ia + 6, len(R_))):
+                a_, b_ = R_[ia], R_[ib]
+                pa, pb = P_[a_], P_[b_]
+                dd, jj = _K(pa).query(pb); d0 = _K(P0[a_]).query(P0[b_])[0]
+                short = np.maximum(np.minimum(GAP, 0.8 * d0) - dd, 0)
+                if short.max() <= 1e-4: continue
+                vec = pb - pa[jj]; vec /= np.maximum(np.linalg.norm(vec, axis=1, keepdims=True), 1e-9)
+                push = gaussian_filter1d(short * 0.5, 1.5)[:, None] * vec
+                P_[b_] = pb + push * info[b_]['wroot'][:, None]
+                acc = np.zeros_like(pa); np.add.at(acc, jj, -push)
+                P_[a_] = pa + gaussian_filter1d(acc, 1.5, axis=0) * info[a_]['wroot'][:, None]
+                moved = max(moved, short.max())
+        return moved
+    def pass_side():
+        # 横から写して、同じ深さで後ろの肋骨が前の肋骨より前に出ないように（3 次元で離れていても、横へずれて追い越すことがあった）
+        moved = 0.0
+        for ia in range(len(R_)):
+            for ib in range(ia + 1, min(ia + 6, len(R_))):
+                a_, b_ = R_[ia], R_[ib]
+                pa, pb = P_[a_], P_[b_]; ha, hb = pa @ Dm, pb @ Dm; ga, gb = pa @ Tm, pb @ Tm
+                oa = np.argsort(ha); ga_at_b = np.interp(hb, ha[oa], ga[oa], left=np.nan, right=np.nan)
+                q0a, q0b = P0[a_], P0[b_]; h0a = q0a @ Dm; o0 = np.argsort(h0a)
+                orig = (q0b @ Tm) - np.interp(q0b @ Dm, h0a[o0], (q0a @ Tm)[o0], left=np.nan, right=np.nan)
+                need = np.where(np.isfinite(orig) & np.isfinite(ga_at_b), np.minimum(0.5 * GAP, np.where(orig > 0, 0.5 * orig, orig)), -1e9)
+                short = np.maximum(np.nan_to_num(ga_at_b + need - gb, nan=-1), 0)
+                if short.max() <= 1e-4: continue
+                push_b = gaussian_filter1d(short * 0.5, 1.5) * info[b_]['wroot']
+                ob = np.argsort(hb); push_a = gaussian_filter1d(np.interp(ha, hb[ob], (short * 0.5)[ob], left=0, right=0), 1.5) * info[a_]['wroot']
+                P_[b_] = pb + push_b[:, None] * Tm; P_[a_] = pa - push_a[:, None] * Tm
+                moved = max(moved, short.max())
+        return moved
+    it = -1; moved = 0.0
+    for it in range(ITER):
+        moved = max(pass3d(), pass_side() if SIDEPASS else 0.0)
+        if moved < 0.02: break
+    print(side, '間隔を保つ: くり返し %d 回、最後の不足 %.3f' % (it + 1, moved))
+    for n in R_: info[n]['Cn'] = (P_[n] - info[n]['root']) @ info[n]['fr']
+
+for n in ribs:
+    I = info[n]
+    if 'Cn' not in I: continue
+    disp_c = I['Cn'] - I['C']; s = I['s']
     disp = np.c_[[np.interp(I['g'], s, disp_c[:, j]) for j in range(3)]].T
     I['x_new'] = I['x'] + disp @ I['fr'].T
     d[n + '__v'] = I['x_new'].astype(d[n + '__v'].dtype)
     I['disp_world'] = disp @ I['fr'].T
-    if n.endswith('_L') and n[3:5] in ('06', '10', '14', '18'): panels.append((n, C, Cn))
 # 肋骨の軟骨の端も、最も近い頂点の動きで
 for j in np.where(cm)[0]:
     n = cbone[j]
