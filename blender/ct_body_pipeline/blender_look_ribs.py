@@ -31,6 +31,7 @@ for n in bn:
     if n + '__v' not in d.files: continue
     if n.startswith('rib'):
         if pick != 'all' and n[3:5] not in pick.split(','): continue
+        if os.environ.get('RIB_SIDE') and not n.endswith('_' + os.environ['RIB_SIDE']): continue
         mesh(n, posed(n, d[n + '__v']), d[n + '__f'], (0.75, 0.1, 0.2, 1) if n.endswith('_L') else (0.2, 0.3, 0.8, 1))
     elif n[0] == 'v' and n[1:].isdigit() and int(n[1:]) <= 24:
         mesh(n, posed(n, d[n + '__v']), d[n + '__f'], (0.5, 0.5, 0.5, 1))
