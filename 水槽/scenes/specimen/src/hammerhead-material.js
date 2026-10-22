@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { chameleonOrgans } from "./chameleon-material.js";
-import { stainAbsorb, HH_YELLOW } from "./hammerhead-lightbox.js";
+import { stainAbsorb, HH_YELLOW, HH_CHANNELS, hhStainMix, hhColorLook } from "./hammerhead-lightbox.js";
 
 // The path materials for specimen_hammerhead.glb (blender/ct_hammerhead/a6a_export_gltf.py): each part is a
 // closed solid, and its path along the view ray is the depth of the faces turned away minus the depth of the
@@ -318,6 +318,33 @@ function visceraMaterial(reference, part, heartCentre) {
   });
 }
 
+// 2026-10-22 プロデューサー「案１を規定にするが、他のヒレ含めて、軟骨の色・濃さは編集パネルで調整できるようにして下さい」: ひれごとの軟骨の色。
+//  色の層（8 つ）はひれごとに分けられないので、ひれの軟骨は内臓と同じ「色をそのまま足す」描き方（organMaterial、合わせるときに吸い方として足す）で描く。
+//  吸い方 = その部品の染料の量（hhFinStain、null なら元の色の層の染料の量に従う）から、元の色の層と同じ式（hammerhead-lightbox.js の stainToChannel）で。
+//  染料の量が元の色の層と同じなら、前と同じ色になる。濃さは「部品ごとの濃さ」（hhPartLook）、にごり度は前と同じ（層 A の肉へ）
+export const FIN_COLOR_PARTS = { PectCartilage: "fin", Dorsal1Cartilage: "fin", Dorsal2Cartilage: "fin", AnalCartilage: "fin", PelvicCartilage: "pelvic", Cartilage: "fin", CaudalRay: "uncal" };
+export const hhFinStain = Object.fromEntries(Object.keys(FIN_COLOR_PARTS).map((k) => [k, null]));
+export const finStainOf = (part) => hhFinStain[part] ?? hhStainMix[FIN_COLOR_PARTS[part]] ?? [0, 1, 0, 0];
+function finAbsorb(part) {
+  const ch = HH_CHANNELS.find((c) => c.key === FIN_COLOR_PARTS[part]), w = part === "CaudalRay" ? CHANNEL.CaudalRay[1] : 1;
+  const k = w * hhColorLook[ch.key].density.value / ch.ref;
+  return stainAbsorb(finStainOf(part)).map((v) => v * k);
+}
+const finColorFragment = `
+uniform float partGain;
+uniform vec3 absorb;
+uniform float reference;
+varying vec3 vViewPosition;
+void main() {
+  float d = -vViewPosition.z - reference;
+  gl_FragColor = vec4(partGain * absorb * (gl_FrontFacing ? -d : d), 0.);
+}`;
+function finColorMaterial(reference, part) {
+  const v = new THREE.Vector3(); const absorb = { get value() { return v.set(...finAbsorb(part)); } };   // three.js は描くたびに value を読む
+  return new THREE.ShaderMaterial({ uniforms: { partGain: hhPartLook[part] ?? { value: 1 }, absorb, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg },
+    vertexShader: vertex, fragmentShader: finColorFragment, ...ADD });
+}
+
 export function applyHammerheadTissue(model, reference) {
   const found = new Set();
   model.traverse((o) => {
@@ -329,9 +356,11 @@ export function applyHammerheadTissue(model, reference) {
     const layer = LAYERS[part] ?? {};
     const partGain = hhPartLook[part] ?? { value: 1 };
     const pathMat = (w, haze = { value: 0 }, chan = null) => new THREE.ShaderMaterial({ uniforms: { channel: chan ?? { value: new THREE.Vector4(...(w ?? [0, 0, 0, 0])) }, partGain, haze, reference, asym: asymLook.amount, breath: organClock.breath, asymWingMM: asymLook.wingMM, asymFinDeg: asymLook.finDeg }, vertexShader: vertex, fragmentShader: fragment, ...ADD });
-    o.material = pathMat(layer.a, hhPartHaze[part], part === "Dorsal1Ray" ? rayChannel : null);
+    const finColor = part in FIN_COLOR_PARTS;
+    o.material = pathMat(finColor ? [0, 0, 0, 0] : layer.a, hhPartHaze[part], part === "Dorsal1Ray" ? rayChannel : null);   // ひれの軟骨は色の層に書かない（にごり度だけ）
     o.userData.pathMaterial = o.material;
-    o.userData.path2Material = layer.b ? pathMat(layer.b) : null;
+    o.userData.path2Material = layer.b && !finColor ? pathMat(layer.b) : null;
+    if (finColor) o.userData.organMaterial = finColorMaterial(reference, part);
     if (HH_SKIN_PARTS.includes(part)) { o.userData.filmMaterial = denticleMaterial(); o.userData.organMaterial = mottleMaterial(); }
     if (part === "Gill") o.userData.organMaterial = gillRayMaterial();
     if (["Viscera", "Liver", "Gut", "Spiral"].includes(part)) o.userData.organMaterial = visceraMaterial(reference, part);
