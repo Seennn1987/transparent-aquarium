@@ -74,7 +74,7 @@ if os.path.exists(f"{MESH}/HH_vert_arches.ply"):
     else:
         PARTS["Cartilage"] = (PARTS["Cartilage"][0] + ["HH_vert_arches"], 130000)
 # 2026-10-16 案: 肋骨と尾びれの鰭条（a8c_vertebrae.py の HH_VERT_RIBS・HH_VERT_RADIALS。CT に無く、文献と骨格標本の写真から作る）
-for _p, _f, _n in (("Rib", "HH_vert_ribs", 8000), ("CaudalRay", "HH_vert_radials", 12000)):
+for _p, _f, _n in (("Rib", "HH_vert_ribs", 8000), ("CaudalRay", "HH_vert_radials", 150000 if os.environ.get("HH_CAUDAL_PHOTO") == "1" else 12000)):   # 2026-10-22: 写真の棒（a8d_caudal_photo.py）は 0.25 mm の格子の面
     if os.path.exists(f"{MESH}/{_f}.ply"): PARTS[_p] = ([_f], _n)
 for _p, _f, _n in (("Liver", "HH_liver", 60000), ("Gut", "HH_gut", 60000), ("Spiral", "HH_spiral", 30000),   # 案 2（a8b_viscera_organs.py）
                    # B5 心臓（b5b_heart.py）。HeartLarge・HeartSmall は見比べの案（試しの glb だけ）
