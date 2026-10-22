@@ -184,6 +184,10 @@ HH_ORGANS=B HH_SPIRAL=bowl step py a8b_viscera_organs.py
 # 尾の骨（2026-10-17 プロデューサー「尾の骨を足す案にして、弓の色はひれの軟骨の半分の青で既定にしてください」）: 血道弓を高く、肋骨と尾びれの鰭条を足す
 export HH_VERT_HAEMAL=${HH_VERT_HAEMAL-1} HH_VERT_RIBS=${HH_VERT_RIBS-1} HH_VERT_RADIALS=${HH_VERT_RADIALS-1}
 HH_VERT_JITTER=2 HH_VERT_SOFT=1 HH_VERT_ARCHH=0.8 step py a8c_vertebrae.py
+# 2026-10-22 決定（プロデューサー「尾びれの軟骨を、ピサの骨格標本の写真と比べて直す案を…」→「尾びれはこの案を既定にしてください」）: 尾びれの鰭条の軟骨（部品 CaudalRay）を
+#  ピサの骨格標本の写真の棒の並びから作り直す（a8d_caudal_photo.py。写真は git に入れていないので、手元に無ければ止まる）。前の形は HH_CAUDAL_PHOTO=
+export HH_CAUDAL_PHOTO=${HH_CAUDAL_PHOTO-1}
+[[ $HH_CAUDAL_PHOTO == 1 ]] && step py a8d_caudal_photo.py
 export HH_VERT_CENTRA_PART=Centrum HH_VERT_ARCH_PART=Arch   # 弓も別の部品（2026-10-15 H1）
 # A6 glb に書き出す（Blender）
 step py b5b_heart.py   # B5 心臓（案「実物に近い大きさ」、2026-10-15 決定）
