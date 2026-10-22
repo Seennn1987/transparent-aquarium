@@ -151,6 +151,10 @@ export HH_PECT_PHOTO=${HH_PECT_PHOTO-1}
 #  「既定にする前に、ひれの先の鰭条を薄く描く案も作って…」→「強で規定にした上で後で色を調整できるように編集パネルに機能追加して」）: 第 1 背びれの軟骨を
 #  ピサの骨格標本の放射軟骨の帯＋体の中の CT にし（a5h_dfin1_photo.py）、鰭条を別の部品（Dorsal1Ray、左右 ±1.0 mm の細い帯）にする。前の形は HH_DFIN1_PHOTO= HH_DFIN1_RAYS=
 export HH_DFIN1_PHOTO=${HH_DFIN1_PHOTO-1} HH_DFIN1_RAYS=${HH_DFIN1_RAYS-1.0}
+# 2026-10-22 決定（プロデューサー「案１を規定にするが…」）: 第 1 背びれの軟骨を 3 段の放射軟骨（先の段まで。範囲は Mivart 1879 図 1、棒はピサの写真）にし、
+#  先の段の棒の左右の厚さを片側 1.2 mm 以上に。鰭条の部品は使わない（鰭条とした筋の多くは先の段の放射軟骨だった）。前の形は HH_DFIN1_DISTAL= HH_DFIN1_RAYS=1.0
+export HH_DFIN1_DISTAL=${HH_DFIN1_DISTAL-1} HH_DFIN1_DISTAL_T=${HH_DFIN1_DISTAL_T-1.2} HH_DFIN1_DISTAL_DIL=${HH_DFIN1_DISTAL_DIL-1}
+[[ $HH_DFIN1_DISTAL == 1 ]] && export HH_DFIN1_RAYS=${HH_DFIN1_RAYS_WITH_DISTAL-0}
 [[ $HH_DFIN1_PHOTO == 1 ]] && step py a5h_dfin1_photo.py
 # 2026-10-20 決定（プロデューサー「ヒレの形状はOK。規定にして。ただ軟骨は全然ダメ。作り直し。」）: 第 2 背びれの膜を Duane Raver の図の外形（hh_fins.py の RAVER_DFIN2）に。
 #  軟骨はいまの既定（CT の細かさ、a4d3 dfin2）のまま外形の中へ寄せる（作り直し中）。前の形は HH_DFIN2_OUTLINE=
