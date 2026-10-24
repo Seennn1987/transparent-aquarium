@@ -9,6 +9,8 @@
   Suckers  吸盤、Cirri 触毛
   Shell    殻（ひれの支え。a2_parts.py の a2_shell.obj）
   Beak     顎板（上と下。a2_beak_upper.obj・a2_beak_lower.obj）
+  中の部品（2026-10-24 手順 A5、b6_organs.py の b6_<部品>.obj。面を 0.35 倍に減らす）:
+  HeadCartilage 頭の軟骨、Statolith 平衡石、Gut 消化管、DigestiveGland 消化腺、Gill 鰓、Heart 心臓、BranchialHeart 鰓心臓
 大きさ: 横幅 W = 1 の面を 0.138 倍して、メートル（成熟した雄で横幅 約 138 mm）。glTF は +Y が背、+Z が前、+X が体の左。
 各部品は閉じた面で、符号つき体積が正（外向き）であることを書き出す前に確かめる。
 """
@@ -23,6 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 OUT = sys.argv[sys.argv.index("--") + 1]
 SCALE = 0.138
+ORGANS = ["HeadCartilage", "Statolith", "Gut", "DigestiveGland", "Gill", "Heart", "BranchialHeart"]
 
 
 def import_obj(name):
@@ -71,6 +74,14 @@ def main():
     bpy.context.view_layer.objects.active = up
     bpy.ops.object.join()
     up["md_part"] = "Beak"
+    for name in ORGANS:
+        o = import_obj(f"b6_{name}.obj")
+        o["md_part"] = name
+        if len(o.data.polygons) > 4000:
+            dec = o.modifiers.new("dec", "DECIMATE")
+            dec.ratio = 0.35
+            bpy.context.view_layer.objects.active = o
+            bpy.ops.object.modifier_apply(modifier=dec.name)
     for o in list(bpy.data.objects):        # 名前を変えると一覧の並びが変わるので、先に固定する（同じ部品を 2 度縮めた）
         o.name = o["md_part"]
         if o["md_part"] != "Body":

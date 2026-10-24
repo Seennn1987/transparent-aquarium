@@ -6,7 +6,7 @@ import { applyMendakoTissue, createMendakoLightbox, mdLook } from "./mendako-mat
 // メンダコの透明標本を、器なしでライトボックスの上に描く（2026-10-24、手順 A4）。
 // 形: blender/mendako/（b0〜b4。外の形は第 12 版、2026-10-24 プロデューサー「外の形はこの第 12 版でよい」）。
 // glTF: +Y が背、+Z が前、+X が体の左。メートル（横幅 約 0.138 m）。
-// ?view=front（生体の正面の写真 Sunshine2 と同じ低い前から）・oblique（斜め前の上から）・top（背中から、前が上）・oral（口側から、前が上）。
+// ?view=front（生体の正面の写真 Sunshine2 と同じ低い前から）・oblique（斜め前の上から）・top（背中から、前が上）・oral（口側から、前が上）・side（体の左から）。
 //  指定なしは斜め前の上から（display）。?ss=<n> 細かさ（既定 2）
 const query = new URLSearchParams(location.search);
 const URL_GLB = new URL("../assets/specimen_mendako.glb", import.meta.url).href;
@@ -37,6 +37,7 @@ async function start() {
     oblique: new THREE.Vector3(-0.55, 0.3, 0.8),
     top: new THREE.Vector3(0, 1, 0.0001),
     oral: new THREE.Vector3(0, -1, 0.0001),
+    side: new THREE.Vector3(1, 0.02, 0.0001),     // 体の左から（前が画面の左）
     display: new THREE.Vector3(-0.45, 0.6, 0.75),
   };
   const dir = (dirs[view] ?? dirs.display).clone().normalize();
@@ -66,7 +67,7 @@ async function start() {
     lightbox.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  if (view !== "top" && view !== "oral") orbit.update();
+  if (view !== "top" && view !== "oral" && view !== "side") orbit.update();
   frame();
   status.textContent = `${lightbox.precision} · ${view}`;
   document.body.dataset.ready = "1";
