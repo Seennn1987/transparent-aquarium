@@ -127,8 +127,9 @@ void main() {
 /** createLightbox（chameleon-material.js）と同じ使い方。部品は pathMaterial（層 A）・path2Material（層 B）・filmMaterial・organMaterial を持つ。 */
 export function createHammerheadLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, supersample = 2 } = {}) {
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
-  // 2026-10-24（プロデューサーの Chrome で FPS 3.6、描く先 3840 × 1746）: 重さを切り分ける指定。?msaa=（描く先の重ね塗りの数、既定 4）、?half=1（16 bit の小数）
-  const _q = new URLSearchParams(location.search), MSAA = Number(_q.get("msaa") ?? 4), HALF = _q.get("half") === "1";
+  // 2026-10-24（プロデューサーの Chrome で FPS 3.6、描く先 3840 × 1746）: MSAA を外し、描く先を 16 bit の小数にしたのを既定にした（FPS 10.6、見た目の差は 0〜255 で平均 0.21）。
+  //   プロデューサー「MSAA を外し、描く先を 16 bit にする（msaa=0 と half=1）を既定にしてください」。前の描き方は ?msaa=4&half=0
+  const _q = new URLSearchParams(location.search), MSAA = Number(_q.get("msaa") ?? 0), HALF = _q.get("half") !== "0";
   const rt = () => new THREE.WebGLRenderTarget(1, 1, { type: float && !HALF ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: MSAA });
   const target = rt(), target2 = rt(), filmTarget = rt(), organTarget = rt();
   for (const [name, abs] of Object.entries(K.organs ?? {})) (chameleonOrgans[name] ??= { value: new THREE.Vector3() }).value.set(...abs);
@@ -152,7 +153,7 @@ export function createHammerheadLightbox(renderer, { linear = false, alphaScale 
   const flat = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const g = (c) => hhColorLook[c.key].gain.value * hhColorLook[c.key].density.value;
   return {
-    precision: float ? "float32" : "float16",
+    precision: float && !HALF ? "float32" : "float16",
     target, target2, filmTarget, organTarget, organs: true,
     size: { width: 1, height: 1 }, supersample, material,
     setSize(w, h) {
