@@ -155,7 +155,13 @@ export HH_DFIN1_PHOTO=${HH_DFIN1_PHOTO-1} HH_DFIN1_RAYS=${HH_DFIN1_RAYS-1.0}
 #  先の段の棒の左右の厚さを片側 1.2 mm 以上に。鰭条の部品は使わない（鰭条とした筋の多くは先の段の放射軟骨だった）。前の形は HH_DFIN1_DISTAL= HH_DFIN1_RAYS=1.0
 export HH_DFIN1_DISTAL=${HH_DFIN1_DISTAL-1} HH_DFIN1_DISTAL_T=${HH_DFIN1_DISTAL_T-1.2} HH_DFIN1_DISTAL_DIL=${HH_DFIN1_DISTAL_DIL-1}
 [[ $HH_DFIN1_DISTAL == 1 ]] && export HH_DFIN1_RAYS=${HH_DFIN1_RAYS_WITH_DISTAL-0}
+# 2026-10-24 決定（プロデューサー「Thacher の図 31…第 2 背びれの軟骨を作り直す案を…」→「まだヒレの一部が空白…調査した上で作り直し」→「第 2 背びれはこの案を既定にしてください」）:
+#  第 2 背びれの軟骨を Thacher 1877 図版 LIV 図 31（シロシュモクザメ）の 14 本・3 片の放射軟骨から作る（a5i_dfin2_thacher.py。図は git に入れていないので、手元に無ければ止まる）。
+#  棒は外形の高さの 0.97 まで、根元の片は体の線の 10 mm 下まで。a6a は体軸の伸び縮みだけ（HH_DFIN2_PHOTO=1）。前の形は HH_DFIN2_SRC= HH_DFIN2_PHOTO=
+export HH_DFIN2_SRC=${HH_DFIN2_SRC-thacher}
+[[ $HH_DFIN2_SRC == thacher ]] && export HH_DFIN2_PHOTO=${HH_DFIN2_PHOTO-1}
 [[ $HH_DFIN1_PHOTO == 1 ]] && step py a5h_dfin1_photo.py
+[[ $HH_DFIN2_SRC == thacher ]] && step py a5i_dfin2_thacher.py
 # 2026-10-20 決定（プロデューサー「ヒレの形状はOK。規定にして。ただ軟骨は全然ダメ。作り直し。」）: 第 2 背びれの膜を Duane Raver の図の外形（hh_fins.py の RAVER_DFIN2）に。
 #  軟骨はいまの既定（CT の細かさ、a4d3 dfin2）のまま外形の中へ寄せる（作り直し中）。前の形は HH_DFIN2_OUTLINE=
 export HH_DFIN2_OUTLINE=${HH_DFIN2_OUTLINE-raver}

@@ -43,7 +43,8 @@ X0, X1 = fd['o'] * TLm - 5, fd['o'] * TLm + s_rear * Lb + 5; Z0, Z1 = -BELOW - 2
 #    Thacher 1877 p. 285「棒は背の正中の縦の靭帯（神経弓の上）に届かないのがふつうで、Eulamia の第 1 背びれでは前の端で 1.5 cm、後ろの端で 3.5 cm 離れる」、
 #    この CT 標本の第 2 背びれも体の線の 9.8 mm 下まで写る。根元の片は体の中へ、神経弓の上の HH_DFIN2_T_GAP（2 mm）上まで伸ばす（付け根の後ろの端 658 mm から細い後端までは体の線へ戻す）
 DEPTH = os.environ.get('HH_DFIN2_T_DEPTH', 'fig'); GAP = float(os.environ.get('HH_DFIN2_T_GAP', 2.0))
-keep_ = np.load('tail_keep_v.npy'); off_ = np.load('tail_bend_offset_mm.npy'); vinfo = json.load(open('a8_vertebrae.json'))
+vinfo = json.load(open('a8_vertebrae.json')) if DEPTH == 'arch' else None   # a8c（背骨）は a5 の後に作るので、通しの手順では 'arch' は使えない
+keep_ = np.load('tail_keep_v.npy'); off_ = np.load('tail_bend_offset_mm.npy')
 vc_ = lambda z: np.interp(z * 2, np.arange(len(keep_)), keep_) - np.interp(z, np.arange(len(off_)), off_)
 Rv = lambda z: np.interp(z, [float(q) for q in vinfo['radius_mm']], list(vinfo['radius_mm'].values()))
 _arch_top = lambda z: -vc_(z) + 1.55 * Rv(z)                                # Blender の z（背 +）。a8c の背の弓: 椎体の中心から 0.75 r + 0.8 r（HH_VERT_ARCHH 0.8）
