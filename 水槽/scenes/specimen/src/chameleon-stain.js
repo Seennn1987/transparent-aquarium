@@ -282,3 +282,20 @@ export const LOOK_06 = {
   organBase: { hyoid_cartilage: [21.598, 3.41, 1.36] },
 };
 STAINS["06"].look = LOOK_06;
+
+// Looks to call up with one click (C record 55, 2026-10-24, the producer: 「それを「参考画像：体青・骨赤」という名称で保存して１クリックで
+// 呼び出せるボタンを画面上に作って」「今の規定版は「規定1024」としてこれも１クリックで呼び出せるようにして」). For the "06" page (the
+// strengths multiply "06"'s fitted gains). "規定1024" is LOOK_06 above, the page's start.
+// "参考画像：体青・骨赤": the jar photo 01 (01-user-jar-diaphonized.jpg, the blue body and red bone). Begun from the colours fitted on
+// that photo ("01" above), put on "06"'s gains: bone 30.23 / BONE_GAIN 70 = 0.432, the cleared tissue 0.1061 / SKIN_GAIN 0.455
+// = 0.233, the surface layer as "01" (the "06" page draws "01"'s layer); then set by eye against the photo on the page (C record 55):
+// the photo's body is a cyan (the layer takes red away more than "01"'s fit: 1 / 0.35 / 0.2, strength 1.8), its bone a clear crimson
+// (red taken away less: 0.25 / 1 / 0.7), its belly milky and cream (the cleared tissue 0.5, haze 0.25) and its organs pale brown (0.8).
+export const LOOK_REF01 = {
+  haze: 0.25, hazeLength: 1.429, blur: 3, hazeBrightness: 1,
+  skin: 0.5, film: 1.8, bone: 0.45, cartilage: 0, organs: 0.8, eyeRing: 0.45,
+  spectra: { bone: [0.25, 1, 0.7], ring: [0.25, 1, 0.7], cartilage: [0, 0.89, 0.68], skin: [0, 0.422, 1], film: [1, 0.35, 0.2] },
+  organStrength: {},
+  organBase: {},
+};
+export const LOOKS = [["規定1024", LOOK_06], ["参考画像：体青・骨赤", LOOK_REF01]];

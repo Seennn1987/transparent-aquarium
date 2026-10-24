@@ -1,4 +1,5 @@
-import { chameleonLook, chameleonOrgans, chameleonOrganLook } from "./chameleon-material.js";
+import { chameleonLook, chameleonOrgans, chameleonOrganLook, setChameleonLook } from "./chameleon-material.js";
+import { LOOKS } from "./chameleon-stain.js";
 
 // The chameleon page's adjustment panel (C record 44, 2026-10-20, the producer: 「Bで進めて規定にするが、パネルで後から調整
 // できるようにして」). Moving a control writes chameleonLook in place; the next frame reads it. Nothing is saved: "設定をコピー"
@@ -108,6 +109,11 @@ const CSS = `
 #ch-tune .wide { display: block; width: 100%; margin-top: 8px; }
 #ch-tune button:hover, #ch-tune-open:hover { background: #eee; }
 @media (max-width: 600px) { #ch-tune { top: auto; bottom: 40px; max-height: 45dvh; } }
+#ch-look { position: fixed; z-index: 4; top: 12px; left: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: calc(100vw - 110px);
+  padding: 6px 8px; background: rgba(250, 250, 250, 0.92); border: 1px solid #bbb; border-radius: 6px; font: 12px/1.4 system-ui, sans-serif; color: #222; }
+#ch-look button { min-height: 28px; padding: 0 10px; border: 1px solid #aaa; border-radius: 4px; background: #fff; color: #222; cursor: pointer; }
+#ch-look button:hover { background: #eee; }
+#ch-look button[aria-pressed="true"] { border-color: #444; background: #333; color: #fff; }
 `;
 
 function addSlider(parent, label, holder, min, max) {
@@ -150,7 +156,8 @@ function addColour(parent, label, holder) {
   return refresh;
 }
 
-export function installChameleonTune() {
+/** `stain`: the page's colour pattern. The saved looks (chameleon-stain.js LOOKS) are for "06" and shown only there. */
+export function installChameleonTune(stain = "06") {
   if (new URLSearchParams(location.search).get("tune") === "0") return;
   const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
   const parts = groups();
@@ -199,8 +206,29 @@ export function installChameleonTune() {
     setTimeout(() => { copy.textContent = "設定をコピー"; }, 1600);
   });
   const reset = document.createElement("button"); reset.type = "button"; reset.className = "wide"; reset.textContent = "初期値に戻す";
-  reset.addEventListener("click", () => { holders.forEach((hd, i) => { hd.value = structuredClone(defaults[i]); }); refreshers.forEach((r) => r()); });
+  reset.addEventListener("click", () => {
+    holders.forEach((hd, i) => { hd.value = structuredClone(defaults[i]); }); refreshers.forEach((r) => r());
+    // The start is the first saved look ("規定1024").
+    document.querySelectorAll("#ch-look button").forEach((x, i) => x.setAttribute("aria-pressed", String(i === 0)));
+  });
   panel.append(copy, reset);
+
+  // The saved looks, one click each (C record 55), along the top left.
+  if (stain === "06") {
+    const looks = document.createElement("div"); looks.id = "ch-look"; looks.setAttribute("aria-label", "保存した見え方");
+    const label = document.createElement("span"); label.textContent = "見え方"; looks.append(label);
+    const buttons = LOOKS.map(([name, look], i) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = name; b.setAttribute("aria-pressed", String(i === 0));
+      b.addEventListener("click", () => {
+        setChameleonLook(look); refreshers.forEach((r) => r());
+        for (const other of buttons) other.setAttribute("aria-pressed", String(other === b));
+      });
+      looks.append(b);
+      return b;
+    });
+    looks.addEventListener("keydown", (e) => e.stopPropagation());
+    document.body.append(looks);
+  }
 
   const open = document.createElement("button"); open.type = "button"; open.id = "ch-tune-open"; open.textContent = "調整";
   open.setAttribute("aria-controls", "ch-tune");

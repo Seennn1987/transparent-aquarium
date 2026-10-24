@@ -324,6 +324,28 @@ void main() {
  * two cancel (measured on chameleon.html?stain=01, ct_body_pipeline/README.md).
  */
 /** The most pixels a fine pass buffer may have (4096 × 3072; 2048 × 1536 at supersample 2 drew). */
+/**
+ * Puts a whole look on the page (C records 54–55; chameleon-stain.js LOOK_06 and LOOKS): the cloudiness, each tissue's strength
+ * (× the pattern's fitted gain) and colour (spectrum), and each organ's strength × base (the fitted base unless `organBase`
+ * names another). Values the look leaves out stay as they are. Call after createLightbox has set the organs up.
+ */
+export function setChameleonLook(look) {
+  for (const key of ["haze", "hazeLength", "blur", "skin", "film", "bone", "cartilage", "organs", "eyeRing"]) {
+    if (look[key] !== undefined) chameleonLook[key].value = look[key];
+  }
+  if (look.hazeBrightness !== undefined) {
+    const v = look.hazeBrightness; chameleonLook.hazeColor.value.set(0.93 * v, 0.92 * v, 0.88 * v);
+  }
+  const sp = look.spectra ?? {};
+  const spectra = { bone: "boneSpectrum", ring: "ringSpectrum", cartilage: "cartSpectrum", skin: "skinSpectrum", film: "filmSpectrum" };
+  for (const [key, name] of Object.entries(spectra)) if (sp[key]) chameleonLook[name].value.set(...sp[key]);
+  for (const [name, o] of Object.entries(chameleonOrganLook)) {
+    o.strength = look.organStrength?.[name] ?? 1;
+    o.base = [...(look.organBase?.[name] ?? o.fitted)];
+    organUniform(name).value.set(...o.base).multiplyScalar(o.strength);
+  }
+}
+
 const FINE_PIXELS = 4096 * 3072;
 
 export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06", supersample = 2 } = {}) {
@@ -348,20 +370,10 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
   // (CARTILAGE_GAIN) from 0, so it can be brought back.
   const cartBase = k.cartilage.gain > 0 ? k.cartilage.gain : CARTILAGE_GAIN;
   if (!(k.cartilage.gain > 0)) chameleonLook.cartilage.value = 0;
+  for (const [name, abs] of Object.entries(k.organs ?? {})) chameleonOrganLook[name] = { strength: 1, base: [...abs], fitted: [...abs] };
   // The producer's look for this pattern (chameleon-stain.js LOOK_06, C record 54), on top of the fitted values.
-  const look = k.look;
-  if (look) {
-    for (const key of ["haze", "hazeLength", "blur", "skin", "film", "bone", "cartilage", "organs", "eyeRing"]) chameleonLook[key].value = look[key];
-    chameleonLook.hazeColor.value.set(0.93 * look.hazeBrightness, 0.92 * look.hazeBrightness, 0.88 * look.hazeBrightness);
-    const sp = look.spectra;
-    chameleonLook.boneSpectrum.value.set(...sp.bone); chameleonLook.ringSpectrum.value.set(...sp.ring);
-    chameleonLook.cartSpectrum.value.set(...sp.cartilage); chameleonLook.skinSpectrum.value.set(...sp.skin);
-    chameleonLook.filmSpectrum.value.set(...sp.film);
-  }
-  for (const [name, abs] of Object.entries(k.organs ?? {})) {
-    const o = chameleonOrganLook[name] = { strength: look?.organStrength?.[name] ?? 1, base: [...(look?.organBase?.[name] ?? abs)] };
-    organUniform(name).value.set(...o.base).multiplyScalar(o.strength);
-  }
+  if (k.look) setChameleonLook(k.look);
+  else for (const name of Object.keys(chameleonOrganLook)) organUniform(name).value.set(...chameleonOrganLook[name].base);
   const organs = Object.keys(k.organs ?? {}).length > 0;
   const organTarget = new THREE.WebGLRenderTarget(1, 1, {
     type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4,

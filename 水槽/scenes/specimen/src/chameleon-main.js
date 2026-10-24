@@ -11,6 +11,7 @@ import { installChameleonRotate } from "./chameleon-rotate.js";
 // kept out of git: blender/export_chameleon_gltf.py writes it to assets/private/.
 const CHAMELEON_URL = new URL("../assets/private/specimen_chameleon.glb", import.meta.url).href;
 const CLIP = "CH_Hover";
+const PHOTO01_TURN = [0, 0, 20];
 
 const canvas = document.querySelector("#scene");
 const status = document.querySelector("#status");
@@ -61,6 +62,10 @@ async function start() {
   const radius = box.getSize(new THREE.Vector3()).length() / 2;
   // The specimen hangs from a pivot at its centre, so the rotation bars (chameleon-rotate.js) turn it in place.
   const pivot = new THREE.Group(); pivot.position.copy(centre);
+  // Without `view`, the start is turned to lie as in the jar photo 01 (C record 55, 2026-10-24, the producer: 「添付画像の向きを
+  // 規定にして」): degrees about the screen's X, Y, Z (Rz · Ry · Rx), on top of the jar pose. `?rot=x,y,z` tries others.
+  const rot = (query.get("rot") ?? (photo06 ? "0,0,0" : PHOTO01_TURN.join(","))).split(",").map((v) => THREE.MathUtils.degToRad(Number(v) || 0));
+  pivot.quaternion.setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], "ZYX"));
   const inner = new THREE.Group(); inner.position.copy(centre).negate();
   scene.remove(holder); inner.add(holder); pivot.add(inner); scene.add(pivot);
   scene.updateMatrixWorld(true);
@@ -73,6 +78,8 @@ async function start() {
   camera.position.copy(centre).add(new THREE.Vector3(0, 0, distance));
   const orbit = createOrbit(camera, canvas, {
     target: centre.clone(),
+    // Dragging turns the specimen (chameleon-rotate.js), not the camera; the wheel still zooms.
+    rotateSpeed: 0,
     minDistance: distance * 0.15,
     maxDistance: distance * 2,
     minPolar: 0.05,
@@ -108,14 +115,14 @@ async function start() {
   orbit.update();
   frame();
   status.textContent = `${lightbox.precision} · stain ${stain}`;
-  installChameleonTune();
-  installChameleonRotate(pivot, camera);
+  installChameleonTune(stain);
+  installChameleonRotate(pivot, canvas);
   document.body.dataset.ready = "1";
 
   // For measuring the screen against the photo: sRGB 0–255 at canvas pixels (from the top-left).
   window.chameleonPage = {
     look: chameleonLook,
-    renderer, lightbox, camera, model, orbit,
+    renderer, lightbox, camera, model, orbit, pivot,
     /** Path lengths (bone, cartilage, skin films) over the whole canvas, bottom row first. */
     paths() {
       const t = lightbox.target;
