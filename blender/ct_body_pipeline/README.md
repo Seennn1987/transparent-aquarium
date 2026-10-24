@@ -194,3 +194,4 @@
 - 書き出し: `chameleon_body_soft.npz` を `blender/private/` に置いてから、リポジトリ直下で `/Applications/Blender.app/Contents/MacOS/Blender -b -P blender/export_chameleon_gltf.py -- <出力.glb>`（約 1 分）。今の素材からの書き出しは、今の glb とバイト単位で同じだった
 - 標本ページを撮る: `page_check/`（Mac の Chrome と共有の 8080 の配信）。4 方向（横・背中・腹・正面）は `page_check/views.py <URL> <接頭辞>`
 - 2026-10-24（記録 56）から、`chameleon.html` の指定なしの向きは写真 06 の向き（前の `?view=photo06`）。それまで指定なしで測った値（瓶の姿勢、写真 01 の色の当て直しなど）と比べるときは `?view=photo01&rot=0,0,0` を付ける
+- 2026-10-24（記録 58）から、`chameleon.html` は描く先を重ね塗りなし・16 bit で描く。通り道を読み出して測る道具（paths3.py、organcal.py、fit_*.py に渡す数を書き出すもの）には `&msaa=4&half=0` を付けて前の描き方で測る

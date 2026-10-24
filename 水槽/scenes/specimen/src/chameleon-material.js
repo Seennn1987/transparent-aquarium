@@ -350,12 +350,18 @@ const FINE_PIXELS = 4096 * 3072;
 
 export function createLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, stain = "06", supersample = 2 } = {}) {
   const k = stainOf(stain);
-  const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
+  // C record 58 (2026-10-24, the producer's Chrome: FPS 6.2, pass buffers 3840 × 1626): no multisampling and 16-bit floats by
+  // default, as on the hammerhead page. In the page-checking Chrome at 1920 × 813: FPS 5 → 20; the still picture differs by 0.12 on
+  // average over the specimen (0–255), 13 pixels by more than 40 (edges). The passes are still drawn at `supersample` times the size,
+  // which smooths the edges. ?msaa=4&half=0 draws as before (the calibration tools, which read the buffers, use it).
+  const query = new URLSearchParams(location.search);
+  const MSAA = Number(query.get("msaa") ?? 0), HALF = query.get("half") !== "0";
+  const float = !HALF && renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
   const target = new THREE.WebGLRenderTarget(1, 1, {
     type: float ? THREE.FloatType : THREE.HalfFloatType,
     format: THREE.RGBAFormat,
     depthBuffer: false,
-    samples: 4,
+    samples: MSAA,
   });
   const film = k.film && k.film.gain > 0 ? k.film : null;
   chameleonLook.boneSpectrum.value.set(...k.bone.spectrum);
@@ -376,10 +382,10 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
   else for (const name of Object.keys(chameleonOrganLook)) organUniform(name).value.set(...chameleonOrganLook[name].base);
   const organs = Object.keys(k.organs ?? {}).length > 0;
   const organTarget = new THREE.WebGLRenderTarget(1, 1, {
-    type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4,
+    type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: MSAA,
   });
   const filmTarget = new THREE.WebGLRenderTarget(1, 1, {
-    type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4,
+    type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: MSAA,
   });
   const material = new THREE.ShaderMaterial({
     uniforms: {
