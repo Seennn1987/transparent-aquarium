@@ -4,6 +4,7 @@ import { createOrbit } from "./orbit.js";
 import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock, chameleonOrgans, calibrateOrgans } from "./chameleon-material.js";
 import { stainOf } from "./chameleon-stain.js";
 import { installChameleonTune } from "./chameleon-tune.js";
+import { installChameleonRotate } from "./chameleon-rotate.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
@@ -58,6 +59,11 @@ async function start() {
   const box = new THREE.Box3().setFromObject(model, true);
   const centre = box.getCenter(new THREE.Vector3());
   const radius = box.getSize(new THREE.Vector3()).length() / 2;
+  // The specimen hangs from a pivot at its centre, so the rotation bars (chameleon-rotate.js) turn it in place.
+  const pivot = new THREE.Group(); pivot.position.copy(centre);
+  const inner = new THREE.Group(); inner.position.copy(centre).negate();
+  scene.remove(holder); inner.add(holder); pivot.add(inner); scene.add(pivot);
+  scene.updateMatrixWorld(true);
   const camera = new THREE.PerspectiveCamera(20, 1, radius * 0.1, radius * 20);
   // In the photo the animal spans about 0.75 of the frame's width.
   const size = box.getSize(new THREE.Vector3());
@@ -103,6 +109,7 @@ async function start() {
   frame();
   status.textContent = `${lightbox.precision} · stain ${stain}`;
   installChameleonTune();
+  installChameleonRotate(pivot, camera);
   document.body.dataset.ready = "1";
 
   // For measuring the screen against the photo: sRGB 0–255 at canvas pixels (from the top-left).

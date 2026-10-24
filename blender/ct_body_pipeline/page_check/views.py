@@ -35,7 +35,7 @@ async def main(url, pre):
         b = await browser.launch(p)
         pg = await b.new_page(viewport={'width': 800, 'height': 956}); msgs = []; pg.on('pageerror', lambda e: msgs.append(str(e)))
         await pg.goto(url); await pg.wait_for_function('document.body.dataset.ready || document.body.dataset.error', timeout=300000)
-        await pg.add_style_tag(content='#status,.home-link,#ch-tune,#ch-tune-open{visibility:hidden!important}')
+        await pg.add_style_tag(content='#status,.home-link,#ch-tune,#ch-tune-open,#ch-rot{visibility:hidden!important}')
         await pg.wait_for_timeout(3000)
         for name, (d, up) in VIEWS.items():
             info = await pg.evaluate(SET, [d, up])
