@@ -8,9 +8,10 @@ Diaz & Trainor 2015、ct_body_pipeline/foot_bundles.py）。いままで手・�
 骨（手・足ごとに、束ごとに）:
   <手足>_med1・<手足>_med2・<手足>_med_end（内側の束）、<手足>_lat1・<手足>_lat2・<手足>_lat_end（外側の束）
   1 は束の付け根から半ばまで、2 は半ばから指先まで、_end は指先の点（重みなし。ページで向きを取るため）。親は手・足の骨
-束と位置は ct_body_pipeline/digit_labels.py の印（work/digits_h33.npz: 頂点ごとの指 1〜5、指ごとの束、指先までの面に沿った距離 tip）から:
-  付け根 = その束の頂点のうち tip が大きい方 15% の重心、指先 = tip が小さい方 5% の重心、半ば = その間の BEND_AT
-重み: 束の頂点は、付け根→指先の向きに測った割合 f で、付け根の手前（f < 0.1）は手・足の骨へなめらかに戻し、
+束と位置は ct_body_pipeline/digit_labels.py の印（work/digits_h33.npz: 頂点ごとの指 1〜5、指ごとの束、指先までの面に沿った距離 tip）から。
+  f = 1 − tip / その指の tip の最大（面に沿って、分かれ目 0 → 指先 1。記録 64）。付け根 = f < 0.05 の頂点の重心、半ば = f が BEND_AT ± 0.05 の重心、
+  指先 = 指ごとの先の頂点の平均
+重み: 束の頂点は f で、付け根のそば（f < 0.1）は手・足の骨へなめらかに戻し、
   BEND_AT のまわり ±BEND_SOFT で 1 から 2 へ移す。膜と爪の鞘は、静止の位置で最も近い骨の頂点と同じ割り振り（手・足の骨にかかっていた重みだけを分ける）
 """
 import os
@@ -52,11 +53,18 @@ def plan(d, k, labels_path):
             digits = [i for i in range(1, 6) if bmap[i] == b]
             side = ("med" if len(digits) == 2 else "lat") if hind else ("med" if len(digits) == 3 else "lat")
             q = np.isin(lab, digits)
-            t = tip[q]
-            base = V[q][t >= np.percentile(t, 85)].mean(0); end = V[q][t <= np.percentile(t, 5)].mean(0)
-            mid = base + BEND_AT * (end - base)
-            ax = end - base
-            f = (V[q] - base) @ ax / (ax @ ax)
+            # f: how far along its own digit each vertex lies, by the distance over the surface from the digit's tip (0 at the
+            # fork, 1 at the tip). C record 64: the share along the straight line from base to tip made the right foot's medial
+            # bundle, whose two digits are curled and fanned in the CT, 3.3 mm long; along the surface it follows the curl.
+            f = np.zeros(q.sum())
+            tq, lq = tip[q], lab[q]
+            for i in digits:
+                s_ = lq == i
+                f[s_] = 1.0 - tq[s_] / tq[s_].max()
+            Vq = V[q]
+            base = Vq[f < 0.05].mean(0)
+            mid = Vq[np.abs(f - BEND_AT) < 0.05].mean(0)
+            end = np.mean([Vq[lq == i][np.argmin(tq[lq == i])] for i in digits], axis=0)
             w_limb = 1.0 - _smooth(f, -0.1, 0.1)
             w2 = _smooth(f, BEND_AT - BEND_SOFT, BEND_AT + BEND_SOFT) * (1.0 - w_limb)
             w1 = 1.0 - w_limb - w2
