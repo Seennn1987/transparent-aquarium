@@ -15,8 +15,8 @@ for (const t of [0.005, 0.05, 0.3]) {
   const a = transmitted({ bone: t }).map((v) => -Math.log(v));
   a.forEach((v, i) => assert.ok(Math.abs(v / a[1] - BONE_SPECTRUM[i]) < 1e-9));
 }
-// The neck, about 0.792 model units of tissue side-on (skinbody.py after C records 21–34, 2026-10-19; was 0.627).
-near(transmitted({ skin: 0.792 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
+// The neck, about 0.817 model units of tissue side-on (skinbody.py after C records 21–52, 2026-10-24; was 0.627).
+near(transmitted({ skin: 0.817 }), [0.90, 0.87, 0.69], 0.03, "首の組織");
 // The viscera at its thickest side-on, behind the skin: the jar photo 01's brown mass, blue 0.38.
 assert.ok(Math.abs(transmitted({ viscera: 0.15, skin: 0.45 })[2] - 0.38) < 0.06, "内臓の褐色が瓶写真 01 と合わない");
 near(transmitted({}), [1, 1, 1], 1e-9, "空");
@@ -28,22 +28,22 @@ near(transmitted({}), [1, 1, 1], 1e-9, "空");
 // ribcage and the smoothed skin, the limbs' stance, the rib heads, the hyoid 1.2 times, the eyes and the opened hands (C records 21–29, 2026-10-18).
 const ab = (t) => t.map((v) => -Math.log(v));
 const nearA = (got, want, tol, what) => near(ab(got), want, tol, what);
-nearA(transmitted({ film: 2.6709, skin: 0.6797 }, { stain: "01" }), [0.315, 0.241, 0.175], 0.02, "01 の青（輪郭）");
-nearA(transmitted({ film: 2.1888, skin: 0.9178 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
-nearA(transmitted({ bone: 0.1366, film: 2.2298, skin: 0.9005 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
+nearA(transmitted({ film: 2.8618, skin: 0.7466 }, { stain: "01" }), [0.315, 0.241, 0.175], 0.02, "01 の青（輪郭）");
+nearA(transmitted({ film: 2.2173, skin: 0.9075 }, { stain: "01" }), [0.251, 0.202, 0.175], 0.02, "01 の淡い所");
+nearA(transmitted({ bone: 0.1363, film: 2.2252, skin: 0.9035 }, { stain: "01" }), [0.868, 1.46, 1.178], 0.05, "01 の骨（赤）");
 // "01" draws the organs instead of the one mass: the patches they were fitted on (C over the liver, A and B over the gut).
-nearA(transmitted({ organs: { liver_r: 0.2380 } }, { stain: "01" }), [0.150, 0.231, 0.415], 0.01, "01 の肝臓（C）");
-nearA(transmitted({ organs: { intestine: 0.1499 } }, { stain: "01" }), [0.494, 0.599, 0.746], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
+nearA(transmitted({ organs: { liver_r: 0.2412 } }, { stain: "01" }), [0.150, 0.231, 0.415], 0.01, "01 の肝臓（C）");
+nearA(transmitted({ organs: { intestine: 0.1542 } }, { stain: "01" }), [0.494, 0.599, 0.746], 0.01, "01 の腸（A と B の平均を、画面の腸の通り道の中央値で）");
 // The eye: half photo 01's ring (0.677 / 0.769 / 0.936) over the median eye path, as the producer chose (C record 26,
 // "眼窩を埋めて淡く").
-nearA(transmitted({ organs: { eye_r: 0.2859 } }, { stain: "01" }), [0.339, 0.385, 0.468], 0.01, "01 の目（写真 01 の輪の半分の濃さ）");
+nearA(transmitted({ organs: { eye_r: 0.2856 } }, { stain: "01" }), [0.339, 0.385, 0.468], 0.01, "01 の目（写真 01 の輪の半分の濃さ）");
 near(transmitted({ viscera: 0.2 }, { stain: "01" }), [1, 1, 1], 1e-12, "01 では内臓の一塊を描かない");
 // The film is blue in "01" (red taken most); the skin is yellowish in "06" (blue taken most).
 const s1 = transmitted({ film: 4 }, { stain: "01" }), s6 = transmitted({ skin: 0.3 });
 assert.ok(s1[0] < s1[2] && s6[2] < s6[0], `皮膚の色の向きが違う: 01 ${s1}, 06 ${s6}`);
 // The hyoid cartilage (an organ, so that it has its own strength): photo 06's throat patch less the screen's tissue there,
-// over the median hyoid path (0.0328; 0.0390 after C records 21–34). The rib-gap cartilage is not drawn by default (C record 40).
-nearA(transmitted({ organs: { hyoid_cartilage: 0.0390 } }), [0.393, 0.135, 0.054], 0.005, "06 の舌骨の軟骨");
+// over the median hyoid path (0.0328; 0.0395 after C records 21–52). The rib-gap cartilage is not drawn by default (C record 40).
+nearA(transmitted({ organs: { hyoid_cartilage: 0.0395 } }), [0.393, 0.135, 0.054], 0.005, "06 の舌骨の軟骨");
 nearA(transmitted({ cartilage: 0.0379 }), [0, 0, 0], 1e-9, "肋骨の途切れの軟骨（既定では描かない）");
 // "06" stays as it was when no stain is named.
 near(transmitted({ skin: 0.627 }, { stain: "06" }), transmitted({ skin: 0.627 }), 1e-12, "06 の既定");
