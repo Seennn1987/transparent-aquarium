@@ -105,6 +105,15 @@ const PRESET_REF = {
   organMix: { Liver: [0, 0, 0.3, 4], Gut: [0, 0, 0.2, 3.5], Spiral: [0, 0, 0.3, 3], Heart: [0.15, 0, 0.3, 1], HeartLarge: [0.15, 0, 0.3, 1], HeartSmall: [0.15, 0, 0.3, 1] },
   finStain: { CaudalRay: [0.05, 0.4, 0.3, 0] },
 };
+// 2026-10-24 プロデューサー「成熟個体の色を作って、別ボタンで呼び出せるように保存して下さい」（その前「若い個体ではなく成熟した個体として考えた時に各パーツはおおよそ何色になりますか？」）。
+//  成魚のサメの透明標本の写真は見つからなかったので、骨格のつくりと染色のしくみからの目安: 歯・椎体は濃い赤紫（芯まで石灰化）、弓は椎体より薄い赤紫、
+//  頭骨・顎は紫（石灰化した小板が厚くなり、芯の軟骨の青に赤紫が重なる）、エラの骨は頭骨より青い青紫（細く小板が薄い）、ひれの軟骨は青紫、肉は透明に近い淡い濁り、内臓は黄〜黄褐色。
+//  赤紫と青を同じくらい混ぜると、どの色の光も吸って暗い青緑にくすむ（頭 0.25 / 0.6）。赤紫を多めにし（頭 0.35 / 0.25）、上に重なる肉の黄ばみを 0.1 にすると紫に見えた
+const PRESET_ADULT = {
+  mix: { spine: [0.5, 0.1, 0, 0.3], teeth: [0.7, 0, 0, 0], head: [0.35, 0.25, 0, 0], gill: [0.2, 0.35, 0, 0], fin: [0.12, 0.25, 0, 0], pelvic: [0.12, 0.25, 0, 0], uncal: [0.35, 0.3, 0, 0.1], skin: [0, 0.02, 0.4, 0.1] },
+  organMix: { Liver: [0.05, 0, 0.4, 4.5], Gut: [0.05, 0, 0.3, 3], Spiral: [0.05, 0, 0.4, 3], Heart: [0.15, 0, 0.3, 1], HeartLarge: [0.15, 0, 0.3, 1], HeartSmall: [0.15, 0, 0.3, 1] },
+  finStain: { CaudalRay: [0.08, 0.3, 0, 0] },
+};
 
 /** 欄を出さずに、ブラウザが覚えている値だけを当てる（ギャラリーの器の中のシュモクザメ。2026-10-17 から） */
 export function applySavedHammerheadTune() {
@@ -292,7 +301,7 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
   btns.append(b1, b2); panel.append(btns, out);
   // 呼び出しのボタン（画面の右上、「調整」の左）。押すと既定に戻してから、その組の値を重ねる
   const presets = document.createElement("div"); presets.id = "hh-preset";
-  const pbtns = [["規定：1024", {}], ["参考：体青・骨赤・内臓黄", PRESET_REF]].map(([label, over]) => {
+  const pbtns = [["規定：1024", {}], ["参考：体青・骨赤・内臓黄", PRESET_REF], ["成熟：頭紫・骨赤紫・内臓黄", PRESET_ADULT]].map(([label, over]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.onclick = () => { restore(DEFAULTS); restore(over); save(); refreshAll(); };
     presets.append(b); return [b, over];
