@@ -117,9 +117,11 @@ const PRESET_ADULT = {
   finStain: { CaudalRay: [0.08, 0.3, 0, 0] },
 };
 
-/** 欄を出さずに、ブラウザが覚えている値だけを当てる（ギャラリーの器の中のシュモクザメ。2026-10-17 から） */
+/** 欄を出さずに、ブラウザが覚えている値だけを当てる（ギャラリーの器の中のシュモクザメ。2026-10-17 から）。
+ *  覚えている値が無いときは「成熟：頭紫・骨赤紫・内臓黄」の組を当てる（2026-10-24 プロデューサー「先程作成した成熟個体(体が青、頭部が赤系)を水槽における規定値に設定した上で」。
+ *  標本ページの既定は「規定：1024」のまま） */
 export function applySavedHammerheadTune() {
-  try { const saved = JSON.parse(localStorage.getItem(STORE) ?? "null"); if (saved) restore(saved); return Boolean(saved); } catch { return false; }
+  try { const saved = JSON.parse(localStorage.getItem(STORE) ?? "null"); restore(saved ?? PRESET_ADULT); return Boolean(saved); } catch { restore(PRESET_ADULT); return false; }
 }
 
 // 2026-10-17 直し（プロデューサー「色の調整をしたいので、以前作った色のパネルを表示して。必要であればパネルの機能改善もして」）:

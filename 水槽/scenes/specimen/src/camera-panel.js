@@ -6,7 +6,10 @@ import * as THREE from "three";
 
 const deg = THREE.MathUtils.radToDeg, rad = THREE.MathUtils.degToRad;
 /** コードの既定（標本ごと。無い標本は部屋の既定の視点 DEFAULT_VIEW のまま）。値は { yaw, pitch, height, distance }（度・度・部屋の単位・部屋の単位） */
-export const CAMERA_DEFAULTS = {};
+export const CAMERA_DEFAULTS = {
+  // 2026-10-24 プロデューサーがこの欄で決め、「値をコピー」で渡した値（X 投稿用の動画の位置）
+  hammerhead: { yaw: 23.3, pitch: 14.3, height: -0.84, distance: 3.6 },
+};
 
 const storeKey = (kind) => `gallery-camera-default-${kind}`;
 function savedDefault(kind) {
