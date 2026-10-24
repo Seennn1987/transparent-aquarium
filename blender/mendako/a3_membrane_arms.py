@@ -37,6 +37,8 @@ import a2_parts as A  # noqa: E402
 
 ARM_DEG = {"I": 13.0, "II": 51.0, "III": 95.0, "IV": 143.0}
 FREE_TIP = 0.2          # 腕の長さのうち膜の無い先の割合
+CURL_ANGLE = 1.5 * np.pi   # 先が背へ巻く角度
+CURL_STRAIGHT = 0.0        # 膜の無い先のうち、巻く前にまっすぐ伸ばす割合
 N_SUCKERS = 50
 BIG = range(4, 19)      # 0 始まりで 5〜19 番目
 D_BIG, D_SMALL = 0.053, 0.02
@@ -202,9 +204,15 @@ def arm_path(body, deg, n=120):
         pts.append(p)
     # 先: 外へ出ながら背へ巻く（半径 = 自由な長さ / (1.5π)、約 270°）
     Lf = L - L_web
-    rc = Lf / (1.5 * np.pi)
-    for a in np.linspace(0, 1.5 * np.pi, n - n_web):
-        pts.append(edge + out * rc * np.sin(a) + np.array([0, 1.0, 0]) * rc * (1 - np.cos(a)))
+    Ls = Lf * CURL_STRAIGHT
+    rc = (Lf - Ls) / CURL_ANGLE
+    n_free = n - n_web
+    n_s = int(n_free * CURL_STRAIGHT)
+    for k in range(n_s):
+        pts.append(edge + out * Ls * k / max(n_s, 1))
+    start = edge + out * Ls
+    for a in np.linspace(0, CURL_ANGLE, n_free - n_s):
+        pts.append(start + out * rc * np.sin(a) + np.array([0, 1.0, 0]) * rc * (1 - np.cos(a)))
     pts = np.array(pts)
     return pts, n_web / n, L
 
