@@ -40,6 +40,15 @@ export const chameleonLook = {
   ringSpectrum: { value: new THREE.Vector3() },
 };
 const EYE_RING_REACH = 1.2;
+// The eyes' turning, shared by every material that moves with them (chameleon-walk.js sets turn0/turn1; identity = at rest).
+// centres/radius/frame are set by applyChameleonTissue: the eyes' centres (first = eye_l), the larger eye's radius, and the head's
+// axes in bind space (lateral: right eye → left eye; forward: from the head bone's origin toward the eyes; dorsal = forward × lateral).
+export const chameleonEyes = {
+  turn0: { value: new THREE.Matrix3() }, turn1: { value: new THREE.Matrix3() },
+  centres: [], radius: 0, frame: null,
+};
+// Within these × the eye's radius the bone (scleral ring) and the skin (the turret) turn with the eye, fading out to the second number.
+const EYE_TURN_BONE = [1.02, 1.08], EYE_TURN_SKIN = [1.05, 1.45];
 
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
 // blender/ct_body_pipeline/organs.py) has a buffer of its own: each organ adds its own colour of absorbance.
@@ -65,6 +74,17 @@ uniform float uHeartPeriod;
 uniform vec3 uEye0, uEye1;
 uniform float uEyeR;
 uniform float uEyeJoint;
+// The eyes turning (chameleon-walk.js, C record 59): about each eye's centre by uEyeTurn0/1, in bind space before skinning.
+// uEyeMove 0: not moved; 1: the whole mesh with the nearer eye (eyeball, lens); 2: within uEyeIn of a centre fully, fading out
+// to uEyeOut (the scleral ring in the bone, the eyelid's turret in the skin).
+uniform mat3 uEyeTurn0, uEyeTurn1;
+uniform float uEyeMove, uEyeIn, uEyeOut;
+float eyeWeight(out vec3 c, out mat3 R) {
+  float d0 = distance(position, uEye0), d1 = distance(position, uEye1);
+  bool first = d0 < d1;
+  c = first ? uEye0 : uEye1; R = first ? uEyeTurn0 : uEyeTurn1;
+  return uEyeMove > 1.5 ? 1. - smoothstep(uEyeIn, uEyeOut, min(d0, d1)) : 1.;
+}
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
 varying float vEyeRing;
@@ -77,9 +97,12 @@ void main() {
   #endif
   #include <skinbase_vertex>
   #include <beginnormal_vertex>
+  vec3 eyeC; mat3 eyeR; float eyeW = uEyeMove > 0. ? eyeWeight(eyeC, eyeR) : 0.;
+  if (eyeW > 0.) objectNormal = normalize(mix(objectNormal, eyeR * objectNormal, eyeW));
   #include <skinnormal_vertex>
   #include <defaultnormal_vertex>
   #include <begin_vertex>
+  if (eyeW > 0.) transformed = eyeC + mix(transformed - eyeC, eyeR * (transformed - eyeC), eyeW);
   // The heart's beat: the viscera squeeze in toward the heart, strongest at it (uHeartAmp 0 elsewhere).
   if (uHeartAmp > 0.) {
     vec3 d = transformed - uHeart;
@@ -192,12 +215,27 @@ export function applyChameleonTissue(model, reference) {
   // The eyes' centres and radius in the meshes' bind space (the bone and the organs share it), for the eye-ring channel.
   const eyes = [];
   model.traverse((o) => { if (o.isMesh && /^eye_[lr]$/.test(o.userData.chameleon_organ ?? "")) eyes.push(o); });
+  eyes.sort((x, y) => (x.userData.chameleon_organ < y.userData.chameleon_organ ? -1 : 1));   // eye_l first
   const eyeC = eyes.map(meshCentre);
   let eyeR = 0;
   for (const [i, m] of eyes.entries()) {
     const pos = m.geometry.getAttribute("position"), p = new THREE.Vector3();
     for (let k = 0; k < pos.count; k++) eyeR = Math.max(eyeR, p.fromBufferAttribute(pos, k).distanceTo(eyeC[i]));
   }
+  chameleonEyes.centres = eyeC; chameleonEyes.radius = eyeR;
+  if (eyeC.length === 2 && eyes[0].isSkinnedMesh) {
+    const sk = eyes[0].skeleton, hi = sk.bones.findIndex((b) => b.name === "head");
+    const headAt = new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[hi].clone().invert()).applyMatrix4(eyes[0].bindMatrixInverse);
+    const mid = eyeC[0].clone().add(eyeC[1]).multiplyScalar(0.5);
+    const lateral = eyeC[0].clone().sub(eyeC[1]).normalize();
+    const forward = mid.clone().sub(headAt); forward.addScaledVector(lateral, -forward.dot(lateral)).normalize();
+    chameleonEyes.frame = { lateral, forward, dorsal: forward.clone().cross(lateral).normalize() };
+  }
+  // The eye-turning uniforms for one material: `move` 0, 1 or 2 (see pathVertex), `reach` [in, out] × the eye's radius.
+  const eyeTurn = (move, reach = [0, 0]) => ({
+    uEyeTurn0: chameleonEyes.turn0, uEyeTurn1: chameleonEyes.turn1, uEyeMove: { value: eyeC.length === 2 ? move : 0 },
+    uEyeIn: { value: reach[0] * eyeR }, uEyeOut: { value: reach[1] * eyeR },
+  });
   model.traverse((object) => {
     if (!object.isMesh) return;
     const part = object.userData.chameleon_part;
@@ -207,6 +245,9 @@ export function applyChameleonTissue(model, reference) {
     const organ = part === "Organ" ? object.userData.chameleon_organ : null;
     if (part === "Organ" && !organ) throw new Error(`specimen_chameleon.glb の臓器 ${object.name} に名前（chameleon_organ）がありません`);
     const heart = part === "Viscera" ? heartCentre(object) : null;
+    const turnMove = /^(eye|lens)_[lr]$/.test(organ ?? "") ? 1 : part === "Bone" || part === "Skin" ? 2 : 0;
+    const turnReach = part === "Bone" ? EYE_TURN_BONE : EYE_TURN_SKIN;
+    const eyeAt = turnMove ? { uEye0: { value: eyeC[0] ?? new THREE.Vector3() }, uEye1: { value: eyeC[1] ?? eyeC[0] ?? new THREE.Vector3() } } : {};
     object.material = new THREE.ShaderMaterial({
       uniforms: {
         channel: { value: channelVector(part) }, reference,
@@ -218,6 +259,7 @@ export function applyChameleonTissue(model, reference) {
         uEye0: { value: eyeC[0] ?? new THREE.Vector3() }, uEye1: { value: eyeC[1] ?? eyeC[0] ?? new THREE.Vector3() },
         uEyeR: { value: part === "Bone" && eyeC.length ? eyeR * EYE_RING_REACH : 0 },
         uEyeJoint: { value: object.skeleton?.bones.findIndex((b) => b.name === "head") ?? -1 },
+        ...eyeTurn(turnMove, turnReach),
       },
       vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD,
     });
@@ -232,13 +274,15 @@ export function applyChameleonTissue(model, reference) {
         uHeartAmp: organHeart ? chameleonLook.heartAmp : { value: 0 },
         uHeartPeriod: { value: HEART_PERIOD },
         uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 },
+        ...eyeAt, ...eyeTurn(turnMove, turnReach),
       },
       vertexShader: pathVertex, fragmentShader: organFragment, ...ADD,
     }) : null;
     object.userData.filmMaterial = part === "Skin" ? new THREE.ShaderMaterial({
       uniforms: { filmMinCos: chameleonFilm.minCos, uTime: chameleonClock, uHeart: { value: new THREE.Vector3() },
         uHeartRadius: { value: 1 }, uHeartAmp: { value: 0 }, uHeartPeriod: { value: 1 },
-        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 } },
+        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 },
+        ...eyeAt, ...eyeTurn(turnMove, turnReach) },
       vertexShader: pathVertex, fragmentShader: filmFragment, ...ADD,
     }) : null;
   });
@@ -266,6 +310,7 @@ uniform vec2 tap;
 uniform vec2 px;
 uniform float haze, hazeLength, blur;
 uniform vec3 hazeColor;
+uniform float overBackdrop;
 varying vec2 vUv;
 // The signed paths, averaged over the output pixel's fine texels and the ring round them
 // (weights 1-3-3-1), before anything is clamped.
@@ -308,6 +353,7 @@ void main() {
   }
   T = mix(T, hazeColor, veil);
   if (linearOut > .5) gl_FragColor = vec4(pow(T, vec3(2.2)), alphaScale * (p.r + p.g + p.b + p.a));
+  else if (overBackdrop > .5) gl_FragColor = vec4(T, 1.);
   else gl_FragColor = vec4(lightbox * T, 1.);
 }`;
 
@@ -396,6 +442,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       filmGain: { value: film ? film.gain : 0 },
       filmSpectrum: chameleonLook.filmSpectrum,
       lightbox: { value: new THREE.Vector3(...k.lightbox) },
+      overBackdrop: { value: 0 },
       boneGain: { value: k.bone.gain },
       boneT0: chameleonLook.boneT0,
       cartGain: { value: cartBase },
@@ -451,7 +498,9 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       if (supersample > 1) material.uniforms.tap.value.set(0.75 / W, 0.75 / H); else material.uniforms.tap.value.set(0, 0);
     },
     material,
-    render(scene, camera, output = null) {
+    /** `backdrop`: an opaque scene drawn first on the lightbox (the branch, chameleon-walk.js); the specimen's light let through
+     *  then multiplies it, as if the whole specimen lay in front of it. */
+    render(scene, camera, output = null, backdrop = null) {
       material.uniforms.boneGain.value = k.bone.gain * chameleonLook.bone.value;
       material.uniforms.cartGain.value = cartBase * chameleonLook.cartilage.value;
       material.uniforms.skinGain.value = k.skin.gain * chameleonLook.skin.value;
@@ -483,7 +532,21 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       scene.background = background;
       renderer.setClearColor(clear, clearAlpha);
       renderer.setRenderTarget(output);
-      renderer.render(screen, flat);
+      if (backdrop) {
+        renderer.setClearColor(new THREE.Color().setRGB(...k.lightbox, THREE.SRGBColorSpace), 1);
+        renderer.clear();
+        renderer.render(backdrop, camera);
+        renderer.setClearColor(clear, clearAlpha);
+        material.uniforms.overBackdrop.value = 1;
+        material.blending = THREE.CustomBlending; material.blendEquation = THREE.AddEquation;
+        material.blendSrc = THREE.DstColorFactor; material.blendDst = THREE.ZeroFactor;
+        const auto = renderer.autoClear; renderer.autoClear = false;
+        renderer.render(screen, flat);
+        renderer.autoClear = auto;
+      } else {
+        material.uniforms.overBackdrop.value = 0; material.blending = THREE.NoBlending;
+        renderer.render(screen, flat);
+      }
     },
   };
 }

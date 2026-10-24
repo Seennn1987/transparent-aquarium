@@ -6,6 +6,7 @@ import { stainOf } from "./chameleon-stain.js";
 import { installChameleonTune } from "./chameleon-tune.js";
 import { installChameleonRotate } from "./chameleon-rotate.js";
 import { createChameleonFps } from "./chameleon-fps.js";
+import { createChameleonWalk } from "./chameleon-walk.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
@@ -54,6 +55,7 @@ async function start() {
   const scene = new THREE.Scene();
   scene.add(holder);
 
+  const walking = query.get("walk") === "1";
   const mixer = new THREE.AnimationMixer(model);
   const action = mixer.clipAction(clip);
   action.play();
@@ -72,6 +74,9 @@ async function start() {
   const inner = new THREE.Group(); inner.position.copy(centre).negate();
   scene.remove(holder); inner.add(holder); pivot.add(inner); scene.add(pivot);
   scene.updateMatrixWorld(true);
+  // ?walk=1: walking along a branch (chameleon-walk.js, C record 59), from CH_Hover's pose at t = 0.
+  const walk = walking ? createChameleonWalk(model, holder) : null;
+  if (walk) { walk.branchFrame.matrixAutoUpdate = false; walk.update(0); scene.updateMatrixWorld(true); }
   const camera = new THREE.PerspectiveCamera(20, 1, radius * 0.1, radius * 20);
   // In the photo the animal spans about 0.75 of the frame's width.
   const size = box.getSize(new THREE.Vector3());
@@ -106,16 +111,18 @@ async function start() {
   // ?fps=1: the frame rate at the top left (chameleon-fps.js, C record 57).
   const fpsBox = query.get("fps") === "1" ? createChameleonFps(renderer, model, lightbox) : null;
   const clock = new THREE.Clock();
+  let walkTime = Number(query.get("t") ?? 0);
   const view = new THREE.Vector3();
   function frame() {
     const dt = clock.getDelta();
-    if (!paused) mixer.update(dt);
-    chameleonClock.value = action.time;
+    if (walk) { if (!paused) walkTime += dt; walk.update(walkTime); chameleonClock.value = walkTime; }
+    else { if (!paused) mixer.update(dt); chameleonClock.value = action.time; }
     // The plane the solid paths are measured from: through the body's centre.
     view.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -view.z;
     const t0 = performance.now();
-    lightbox.render(scene, camera);
+    if (walk) { scene.updateMatrixWorld(); walk.branchFrame.matrix.copy(holder.matrixWorld); }
+    lightbox.render(scene, camera, null, walk?.backdrop ?? null);
     fpsBox?.tick(t0, performance.now() - t0);
     requestAnimationFrame(frame);
   }
@@ -162,6 +169,8 @@ async function start() {
       return { width: t.width, height: t.height, data: out };
     },
     setPaused(v) { paused = Boolean(v); },
+    /** ?walk=1: jump the walk to `t` seconds. */
+    walkTo(t) { walkTime = t; },
     seek(t) { mixer.setTime(t); },
   };
 }
