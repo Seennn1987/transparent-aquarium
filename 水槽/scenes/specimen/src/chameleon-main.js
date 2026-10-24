@@ -171,6 +171,8 @@ async function start() {
     setPaused(v) { paused = Boolean(v); },
     /** ?walk=1: jump the walk to `t` seconds. */
     walkTo(t) { walkTime = t; },
+    /** ?walk=1: pose the walk at `t` now and return each foot's place on the branch (chameleon-walk.js feet). */
+    walkFeet(t) { walk.update(t); return walk.feet(); },
     seek(t) { mixer.setTime(t); },
   };
 }

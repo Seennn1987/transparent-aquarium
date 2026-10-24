@@ -20,8 +20,8 @@
 //   hindfoot stays down about 3 s while the animal walks on a deck, as slow as this.
 // - The rocking: no measured study found. Described as rocking back and forth between spells of ordinary walking (Chameleo, ACM 2021,
 //   "walk like a chameleon detection with AI"), triggered by a moving plant or wind (La Trobe animal behaviour group, 2017, one
-//   veiled chameleon). Here: after every ROCK_EVERY strides it stops with the right forefoot in the air and rocks forward and back
-//   ROCK_TIMES times; the size and pace are set by eye.
+//   veiled chameleon). Here: after every ROCK_EVERY strides it stops with all four feet gripping and rocks forward and back
+//   ROCK_TIMES times over them (size and pace from a video, below; docs/カメレオン_歩き方の言語化_v1.0.md).
 // - The eyes: each eye turns on its own, over 180° across and 80° up and down (magnetic search coils; "Visual and vestibular
 //   reflexes that stabilize gaze in the chameleon", Visual Neuroscience), in quick saccades between still spells.
 // Set by eye: the swing's lift, the tail, the body's height.
@@ -37,9 +37,23 @@ const DUTY = 0.6555;
 const STRIDE = 98 * MM;                 // 9.8 cm (4.4 units)
 // When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
 const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
-// The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE model units at ROCK_HZ, the right forefoot held up.
-const ROCK_EVERY = 2, ROCK_TIMES = 2, ROCK_HZ = 0.8, ROCK_SIZE = 0.18;
-const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.55);   // set by eye
+// The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE at ROCK_HZ, all four feet gripping (the body moves over
+// them; C record 61). Read off a video of a veiled chameleon swaying (YouTube Dy8AagHk-k8, Plantasia
+// Tropical Zoo, 0–4 s, frames every 0.25 s read by eye against fixed lines): the eye goes forward and back by about 22% of the head's
+// length (snout to the casque's back) peak to peak, about once a second (forward at 1.5, 2.75 and 3.5 s), while the forefoot on the
+// twig stays put. This head is 42.5 mm long that way (the head bone's vertices along the head's forward axis), so ±4.7 mm at 0.9 Hz.
+// ?rockMM= ?rockHz= ?rockTimes= to try others.
+const _r = new URLSearchParams(location.search);
+const ROCK_EVERY = 2, ROCK_TIMES = Number(_r.get("rockTimes") ?? 3), ROCK_HZ = Number(_r.get("rockHz") ?? 0.9);
+const ROCK_SIZE = Number(_r.get("rockMM") ?? 4.7) * MM;
+// The wrist/ankle behind the sole's grip (the foot's length to the grip): Higham & Jayne's heel to the base of the 4th toe, 1.1 cm, × 11 / 18.1 = 6.7 mm.
+const HEEL = 6.7 * MM;
+// The hips' height over the perch's top as a share of femur + tibia: Higham & Jayne Fig. 6B, read off the axis as about 0.3–0.4 on the
+// perch (lower than on the treadmill). ?low= to try others; the shoulders BODY_LOW + 0.05 of the forelimb's (as in the photo).
+// The foot's angle up from the branch: flat in the grip, the heel raised at lift-off (Higham & Jayne: the knee straightest at the
+// end of stance, the foot pushing off). The 80° is set so the hind feet reach (below).
+const HEEL_DOWN = THREE.MathUtils.degToRad(15), HEEL_UP = THREE.MathUtils.degToRad(80);
+const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.45);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 const PELVIS_YAW = THREE.MathUtils.degToRad(20), SHOULDER_YAW = THREE.MathUtils.degToRad(12);
 const _q = new URLSearchParams(location.search);
@@ -69,8 +83,7 @@ export function createChameleonWalk(model, holder) {
     const a = inHolder(upper).distanceTo(inHolder(lower)), b = inHolder(lower).distanceTo(inHolder(tip));
     limbs[key] = { upper, lower, tip, a, b, hind: key[0] === "h", left: key[1] === "L" };
   }
-  // Where the body sits over the branch: the hips and shoulders at BODY_LOW and BODY_LOW + 0.05 of their limbs' reach above its top
-  // (the belly low over the branch, the elbows and knees well bent, as in the photo).
+  // Where the body sits over the branch: the hips and shoulders at BODY_LOW and BODY_LOW + 0.05 of their limbs' reach above its top.
   const mid = (p, q) => p.clone().add(q).multiplyScalar(0.5);
   const hip = mid(inHolder(limbs.hL.upper), inHolder(limbs.hR.upper));
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
@@ -114,7 +127,10 @@ export function createChameleonWalk(model, holder) {
     return branchCentre.clone().addScaledVector(UP, BRANCH_RADIUS * 0.95).addScaledVector(LEFT, side).addScaledVector(FORWARD, along);
   };
   // Each foot's landing spot ahead of its girdle at rest (Higham & Jayne: well in front of the hip at footfall).
-  const girdleAlong = (limb) => inHolder(limb.upper).applyQuaternion(bodyTurn).dot(FORWARD);
+  // C record 61 (the producer: 「揺れの時は足を軸にして動きます。足が木をスライドするように滑るような動きをするわけないでしょ」): this was
+  // read from the girdle's position in every frame, so the landing spot — and with it every planted foot — moved with the body's
+  // rocking and the girdles' turning, and the feet slid on the branch. It is the girdle's place in the base pose, fixed.
+  const girdleRest = Object.fromEntries(Object.entries(limbs).map(([key, limb]) => [key, inHolder(limb.upper).applyQuaternion(bodyTurn).dot(FORWARD)]));
 
   // Eyes: each one's own target and saccade.
   const eyes = [0, 1].map((i) => ({ yaw: 0, pitch: 0, fromYaw: 0, fromPitch: 0, toYaw: 0, toPitch: 0, start: 0, next: 0.5 + i * 0.8 }));
@@ -153,12 +169,14 @@ export function createChameleonWalk(model, holder) {
 
   function update(t) {
     for (const [b, r] of base) b.quaternion.copy(r);
-    // Walking time g stops during the rocking pauses; the pause falls at the phase where the right forefoot is mid-swing.
+    // Walking time g stops during the rocking pauses.
     const T = STRIDE / SPEED, walkSpan = ROCK_EVERY * T, pause = ROCK_TIMES / ROCK_HZ;
     const n = Math.floor(t / (walkSpan + pause)), r = t - n * (walkSpan + pause);
     const g = n * walkSpan + Math.min(r, walkSpan);
-    const swingMid = (LIFT.fR - (1 - DUTY) / 2 + 1) % 1;   // LIFT is the touchdown, so mid-swing is half a swing before it
-    const phase = (g / T + swingMid) % 1;
+    // The pause falls where all four feet grip (the swaying video YT: no foot raised): with these touchdowns and DUTY that is from the
+    // right hind's touchdown (0.5) to the right fore's lift-off (0.9407 + DUTY − 1 = 0.596); its middle.
+    const allDown = (LIFT.hR + (LIFT.fR + DUTY - 1)) / 2;
+    const phase = (g / T + allDown) % 1;
     const slide = g * SPEED;   // how far the branch has slid back
     const rockT = Math.max(0, r - walkSpan);
     const rock = rockT > 0 ? ROCK_SIZE * Math.sin(2 * Math.PI * ROCK_HZ * rockT) * Math.sin(Math.PI * rockT / pause) : 0;
@@ -190,21 +208,29 @@ export function createChameleonWalk(model, holder) {
       let u = (phase - LIFT[key] - DUTY + 2) % 1;   // 0 at lift-off
       const swing = 1 - DUTY;
       // Landing spot: as far ahead of the girdle as the foot ends behind it (Higham & Jayne), half the stance's travel.
-      const reach = girdleAlong(limb) + DUTY * STRIDE / 2;
-      let along, lift = 0, out = 0;
+      const reach = girdleRest[key] + DUTY * STRIDE / 2;
+      let along, lift = 0, out = 0, heel = HEEL_DOWN;
+      const ramp = (x, lo, hi) => { const k = Math.min(1, Math.max(0, (x - lo) / (hi - lo))); return k * k * (3 - 2 * k); };
       if (u < swing) {
         const s = u / swing, e = 0.5 - 0.5 * Math.cos(Math.PI * s);
+        heel = HEEL_UP + (HEEL_DOWN - HEEL_UP) * ramp(s, 0, 0.5);   // the heel, up at lift-off, comes down for the next grip
         along = reach - DUTY * STRIDE + e * DUTY * STRIDE;   // forward against the body by the stance's travel
         lift = Math.sin(Math.PI * s) * SWING_LIFT; out = Math.sin(Math.PI * s) * SWING_OUT;
       } else {
         const s = (u - swing) / DUTY;
+        heel = HEEL_DOWN + (HEEL_UP - HEEL_DOWN) * ramp(s, 0.65, 1);   // late in stance the heel rises, the sole rolling onto the toes
         along = reach - s * DUTY * STRIDE;   // planted: slides back with the branch, SPEED × the stance's time
       }
-      const target = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
+      footState[key] = { stance: u >= swing, slide, u };
+      // The sole's grip on the branch; the wrist/ankle sits HEEL behind it and a little above (the foot lies along the branch).
+      const contact = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
+      const target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel));
       // Two bones to the wrist/ankle, the elbow/knee out to the side and up.
       const root = holder.worldToLocal(limb.upper.getWorldPosition(new THREE.Vector3()));
       const span = target.clone().sub(root); let d = span.length();
-      const { a, b } = limb; d = Math.min(d, (a + b) * 0.999); span.setLength(d);
+      const { a, b } = limb;
+      footState[key].over = Math.max(0, d - (a + b) * 0.999);   // how far out of reach (the foot would leave its grip by this much)
+      d = Math.min(d, (a + b) * 0.999); span.setLength(d);
       const end = root.clone().add(span);
       const axis = span.clone().normalize();
       const pole = new THREE.Vector3().addScaledVector(LEFT, limb.left ? 1 : -1).addScaledVector(UP, 0.6).addScaledVector(FORWARD, limb.hind ? 0.3 : -0.3);
@@ -213,9 +239,12 @@ export function createChameleonWalk(model, holder) {
       const joint = root.clone().addScaledVector(axis, x).addScaledVector(pole, h);
       aim(limb.upper, limb.lower.getWorldPosition(v), toWorld(joint));
       aim(limb.lower, limb.tip.getWorldPosition(w), toWorld(end));
+      // For checking: the grip in the branch's frame, and how far the wrist/ankle ended from where it was sent.
+      footState[key].grip = contact.clone().addScaledVector(FORWARD, slide).toArray();
+      footState[key].miss = inHolder(limb.tip).distanceTo(target);
       // The hand/foot along the branch, fingers forward, gripping its top.
       const tipNow = limb.tip.localToWorld(new THREE.Vector3(0, 0.3, 0));
-      aim(limb.tip, tipNow, toWorld(end.clone().addScaledVector(FORWARD, 0.25).addScaledVector(UP, -0.12)));
+      aim(limb.tip, tipNow, toWorld(contact.clone().addScaledVector(FORWARD, 0.1)));
     }
 
     // Eyes: independent saccades — a quick turn (0.12 s) to a new direction, then still for 0.4–2.2 s.
@@ -237,5 +266,14 @@ export function createChameleonWalk(model, holder) {
       }
     }
   }
-  return { backdrop, branchFrame, update };
+  const footState = {};
+  /** For checking: each foot's grip on the branch in the branch's frame, whether it is planted, and how far the wrist/ankle missed its place. */
+  function feet() {
+    model.updateMatrixWorld(true);
+    return Object.fromEntries(Object.entries(limbs).map(([key, limb]) => {
+      const f = footState[key] ?? {};
+      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip }];
+    }));
+  }
+  return { backdrop, branchFrame, update, feet };
 }
