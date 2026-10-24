@@ -1,90 +1,114 @@
-import { chameleonLook, chameleonOrgans } from "./chameleon-material.js";
+import { chameleonLook, chameleonOrgans, chameleonOrganLook } from "./chameleon-material.js";
 
 // The chameleon page's adjustment panel (C record 44, 2026-10-20, the producer: 「Bで進めて規定にするが、パネルで後から調整
-// できるようにして」). Moving a slider writes chameleonLook in place; the next frame reads it. Nothing is saved: "設定をコピー"
+// できるようにして」). Moving a control writes chameleonLook in place; the next frame reads it. Nothing is saved: "設定をコピー"
 // copies the values to put back in the code, "初期値に戻す" puts the shipped values back. The panel starts folded to a button;
 // ?tune=0 leaves it out (the page-checking tools hide it).
+// C record 54 (2026-10-24, the producer: 「各パーツごとの色は「濃さ」と「…規定パレットと色を自由に選べるもの」で構成して…「赤を
+// 吸う」みたいなのか意味わからないから不要」「眼球周辺のパーツはそれ単体で色とこさが編集できるように」): each part has its
+// strength and a colour, picked from the palette or freely (the system's picker, with its eyedropper).
 const OPEN_KEY = "chameleon-tune-open";
+
+// A part's colour is what it lets through at strength 1 over COLOUR_DEPTH of its absorbance: shown = exp(−COLOUR_DEPTH × a).
+// Picking a colour sets a = −ln(colour) / COLOUR_DEPTH (colours darker than MIN_LIGHT are taken as MIN_LIGHT), so a pale
+// colour makes a faint part, a deep one a dark part. Organs keep their own scale: a = base / unit, unit the largest of the
+// shipped base (1 when it is 0).
+const COLOUR_DEPTH = 1.5;
+const MIN_LIGHT = 0.02;
+// Colours a cleared-and-stained specimen can show (alizarin red on bone, alcian blue on cartilage, the cleared tissue, bile,
+// pigment), as the light let through.
+const PALETTE = [
+  ["骨の赤紫", "#b83a6e"], ["濃い赤", "#8e1e3c"], ["淡い桃", "#e7a3b8"], ["アルシアンの青", "#3e8ec4"],
+  ["淡い水色", "#9fd3e6"], ["紺", "#2e4a8a"], ["透けた組織の黄", "#e9dda8"], ["琥珀", "#c89a4b"],
+  ["褐色", "#7b5b3e"], ["灰褐", "#5a5048"], ["黄緑（胆汁）", "#a7b45a"], ["乳白", "#eceae2"],
+];
+
+const toSrgb = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const hexOf = (a) => "#" + a.map((v) => Math.round(255 * Math.min(1, Math.max(0, toSrgb(Math.exp(-COLOUR_DEPTH * v)))))
+  .toString(16).padStart(2, "0")).join("");
+const absOf = (hex) => [1, 3, 5].map((i) => -Math.log(Math.max(MIN_LIGHT, toLinear(parseInt(hex.slice(i, i + 2), 16) / 255))) / COLOUR_DEPTH);
+
 const hazeBrightness = {
   get value() { return chameleonLook.hazeColor.value.x / 0.93; },
   set value(v) { chameleonLook.hazeColor.value.set(0.93 * v, 0.92 * v, 0.88 * v); },
 };
-const SLIDERS = [
-  ["曇り", [
-    ["曇りの強さ", chameleonLook.haze, 0, 1],
-    ["曇る厚さ", chameleonLook.hazeLength, 0.3, 4],
-    ["奥のぼけ", chameleonLook.blur, 0, 30],
-    ["曇りの明るさ", hazeBrightness, 0.8, 1.08],
-  ]],
-  // The strengths together at the top, as the panel had them (C record 47, the producer: 「なんでさっきのパネルを消したの？
-  // 全部を１つのパネルに統合してよ」). Colours are below, every section open in the one panel.
-  ["濃さ", [
-    ["体の組織（膜の中）", chameleonLook.skin, 0, 6],
-    ["膜の表面の層", chameleonLook.film, 0, 6],
-    ["骨", chameleonLook.bone, 0, 3],
-    ["軟骨（肋骨の先）", chameleonLook.cartilage, 0, 2],
-    ["臓器（全体）", chameleonLook.organs, 0, 3],
-  ]],
+const HAZE = [
+  ["曇りの強さ", chameleonLook.haze, 0, 1],
+  ["曇る厚さ", chameleonLook.hazeLength, 0.3, 4],
+  ["奥のぼけ", chameleonLook.blur, 0, 30],
+  ["曇りの明るさ", hazeBrightness, 0.8, 1.08],
 ];
-// Each tissue (C record 46, the producer: 「パネルについて骨や全ての組織について色や濃さを編集できるようにして」): its strength
-// (× the shipped value; the rib-gap cartilage and, in "06", the surface layer start at 0 = not drawn) and its colour (the share of
-// red, green and blue it takes away).
-const TISSUES = [
-  ["骨", chameleonLook.bone, 3, chameleonLook.boneSpectrum],
-  ["軟骨（肋骨の先）", chameleonLook.cartilage, 2, chameleonLook.cartSpectrum],
-  ["体の組織（膜の中）", chameleonLook.skin, 6, chameleonLook.skinSpectrum],
-  ["膜の表面の層", chameleonLook.film, 6, chameleonLook.filmSpectrum],
-];
-function tissueRows() {
-  return TISSUES.map(([label, strength, maxStrength, spectrum]) => {
-    const top = Math.max(1.5, 2 * Math.max(...spectrum.value.toArray()));
-    const comp = (i) => ({ get value() { return spectrum.value.getComponent(i); }, set value(v) { spectrum.value.setComponent(i, v); } });
-    return [label, [["赤を吸う割合", comp(0), 0, top], ["緑を吸う割合", comp(1), 0, top], ["青を吸う割合", comp(2), 0, top]]];
-  });
+
+// A tissue drawn from the path buffer: its strength (× the fitted gain) and its spectrum (the absorbance's colour).
+const tissue = (label, strength, max, spectrum) => ({
+  label, strength, max,
+  colour: { get value() { return spectrum.value.toArray(); }, set value(a) { spectrum.value.set(...a); } },
+});
+// An organ (paired ones together): the uniform is strength × base.
+function organ(label, names) {
+  const looks = names.map((n) => chameleonOrganLook[n]).filter(Boolean);
+  if (!looks.length) return null;
+  const apply = () => { for (const n of names) if (chameleonOrganLook[n]) chameleonOrgans[n].value.set(...looks[0].base).multiplyScalar(looks[0].strength); };
+  const unit = Math.max(...looks[0].base) || 1;
+  return {
+    label, max: 3,
+    strength: { get value() { return looks[0].strength; }, set value(v) { for (const o of looks) o.strength = v; apply(); } },
+    colour: {
+      get value() { return looks[0].base.map((v) => v / unit); },
+      set value(a) { for (const o of looks) o.base = a.map((v) => v * unit); apply(); },
+    },
+  };
+}
+
+function groups() {
+  const organs = (list) => list.map(([label, names]) => organ(label, names)).filter(Boolean);
+  return [
+    ["組織", [
+      tissue("骨", chameleonLook.bone, 3, chameleonLook.boneSpectrum),
+      tissue("軟骨（肋骨の先）", chameleonLook.cartilage, 2, chameleonLook.cartSpectrum),
+      tissue("体の組織（膜の中）", chameleonLook.skin, 6, chameleonLook.skinSpectrum),
+      tissue("膜の表面の層", chameleonLook.film, 6, chameleonLook.filmSpectrum),
+    ]],
+    ["目のまわり", [
+      ...organs([["眼球", ["eye_r", "eye_l"]], ["水晶体", ["lens_r", "lens_l"]]]),
+      tissue("目のまわりの骨（強膜輪・眼窩の縁）", chameleonLook.eyeRing, 3, chameleonLook.ringSpectrum),
+    ]],
+    ["臓器", organs([
+      ["肝臓", ["liver_r", "liver_l"]], ["胆嚢", ["gallbladder"]], ["胃", ["stomach"]], ["腸", ["intestine"]], ["結腸", ["colon"]],
+      ["消化管の中身", ["contents"]], ["心臓", ["heart"]], ["脂肪体", ["fat_r", "fat_l"]], ["腎臓", ["kidney_r", "kidney_l"]],
+      ["舌骨の軟骨", ["hyoid_cartilage"]], ["爪の鞘", ["claw"]],
+    ])],
+  ];
 }
 
 const CSS = `
-#ch-tune, #ch-tune-open { position: fixed; z-index: 3; top: 12px; right: 12px; font: 12px/1.4 system-ui, sans-serif; color: #222; }
+#ch-tune, #ch-tune-open { position: fixed; z-index: 4; top: 12px; right: 12px; font: 12px/1.4 system-ui, sans-serif; color: #222; }
 #ch-tune { width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 10px 12px;
-  background: rgba(250, 250, 250, 0.92); border: 1px solid #bbb; border-radius: 6px; }
+  background: rgba(250, 250, 250, 0.94); border: 1px solid #bbb; border-radius: 6px; }
 #ch-tune[hidden], #ch-tune-open[hidden] { display: none; }
 #ch-tune .head { display: flex; justify-content: space-between; align-items: center; }
 #ch-tune h2, #ch-tune h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
-#ch-tune h3 { margin-top: 10px; color: #666; }
+#ch-tune h3 { margin-top: 12px; color: #666; }
 #ch-tune p { margin: 0 0 4px; color: #666; }
-#ch-tune label { display: grid; grid-template-columns: 9.5em 1fr 2.8em; gap: 6px; align-items: center; margin: 3px 0; }
+#ch-tune label { display: grid; grid-template-columns: 5.5em 1fr 2.8em; gap: 6px; align-items: center; margin: 3px 0; }
 #ch-tune input[type="range"] { width: 100%; }
-#ch-tune .group { margin: 4px 0 6px 6px; } #ch-tune h4 { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: #333; }
+#ch-tune .part { margin: 4px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e2e2e2; }
+#ch-tune h4 { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: #333; }
 #ch-tune .value { text-align: right; font-variant-numeric: tabular-nums; }
+#ch-tune .colours { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+#ch-tune .now { flex: none; width: 40px; height: 40px; border: 1px solid #888; border-radius: 4px; }
+#ch-tune .palette { display: grid; grid-template-columns: repeat(6, 18px); gap: 3px; }
+#ch-tune .swatch { width: 18px; height: 18px; min-height: 0; padding: 0; border: 1px solid rgba(0, 0, 0, 0.25); border-radius: 3px; }
+#ch-tune .swatch:hover { outline: 2px solid #555; background-clip: padding-box; }
+#ch-tune .more { position: relative; display: inline-flex; align-items: center; min-height: 28px; padding: 0 8px; border: 1px solid #aaa; border-radius: 4px; background: #fff; font-size: 11px; white-space: nowrap; cursor: pointer; }
+#ch-tune .more:hover { background: #eee; }
+#ch-tune .more input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 #ch-tune button, #ch-tune-open { min-height: 28px; padding: 0 10px; border: 1px solid #aaa; border-radius: 4px; background: #fff; color: #222; cursor: pointer; }
 #ch-tune .wide { display: block; width: 100%; margin-top: 8px; }
 #ch-tune button:hover, #ch-tune-open:hover { background: #eee; }
 @media (max-width: 600px) { #ch-tune { top: auto; bottom: 40px; max-height: 45dvh; } }
 `;
-
-// Each organ (paired ones together): its strength (× the shipped absorbance) and its colour (the absorbance of red, green and
-// blue light per model unit; higher = that colour taken away more, so a high red reads blue-green). C record 45.
-const ORGANS = [
-  ["肝臓", ["liver_r", "liver_l"]], ["胆嚢", ["gallbladder"]], ["胃", ["stomach"]], ["腸", ["intestine"]], ["結腸", ["colon"]],
-  ["消化管の中身", ["contents"]], ["心臓", ["heart"]], ["脂肪体", ["fat_r", "fat_l"]], ["腎臓", ["kidney_r", "kidney_l"]],
-  ["目", ["eye_r", "eye_l"]], ["水晶体", ["lens_r", "lens_l"]], ["舌骨の軟骨", ["hyoid_cartilage"]], ["爪の鞘", ["claw"]],
-];
-function organRows() {
-  const out = [];
-  for (const [label, names] of ORGANS) {
-    const us = names.map((n) => chameleonOrgans[n]).filter(Boolean);
-    if (!us.length) continue;
-    const base = us[0].value.toArray(); let strength = 1;
-    const apply = () => { for (const u of us) u.value.set(base[0] * strength, base[1] * strength, base[2] * strength); };
-    const top = Math.max(0.5, 3 * Math.max(...base));
-    const comp = (i) => ({ get value() { return base[i]; }, set value(v) { base[i] = v; apply(); } });
-    out.push([label, [
-      ["濃さ", { get value() { return strength; }, set value(v) { strength = v; apply(); } }, 0, 3],
-      ["赤を吸う", comp(0), 0, top], ["緑を吸う", comp(1), 0, top], ["青を吸う", comp(2), 0, top],
-    ]]);
-  }
-  return out;
-}
 
 function addSlider(parent, label, holder, min, max) {
   const row = document.createElement("label");
@@ -100,14 +124,41 @@ function addSlider(parent, label, holder, min, max) {
   return refresh;
 }
 
+// The part's colour now, the palette, and "その他の色…" (the system's picker).
+function addColour(parent, label, holder) {
+  const row = document.createElement("div"); row.className = "colours";
+  const now = document.createElement("span"); now.className = "now"; now.setAttribute("role", "img");
+  const more = document.createElement("label"); more.className = "more"; more.textContent = "その他の色…";
+  const pick = document.createElement("input"); pick.type = "color"; pick.setAttribute("aria-label", `${label}の色を自由に選ぶ`);
+  more.append(pick);
+  const refresh = () => {
+    const hex = hexOf(holder.value);
+    now.style.background = hex; now.setAttribute("aria-label", `${label}のいまの色 ${hex}`); pick.value = hex;
+  };
+  const set = (hex) => { holder.value = absOf(hex); refresh(); };
+  const palette = document.createElement("div"); palette.className = "palette";
+  row.append(now, palette);
+  for (const [name, hex] of PALETTE) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "swatch"; b.style.background = hex;
+    b.title = name; b.setAttribute("aria-label", `${label}を${name}に`);
+    b.addEventListener("click", () => set(hex));
+    palette.append(b);
+  }
+  pick.addEventListener("input", () => set(pick.value));
+  row.append(more); parent.append(row);
+  refresh();
+  return refresh;
+}
+
 export function installChameleonTune() {
   if (new URLSearchParams(location.search).get("tune") === "0") return;
   const style = document.createElement("style"); style.textContent = CSS; document.head.append(style);
-  const organs = organRows();
-  const tissues = tissueRows();
-  const rows = [...SLIDERS, ...tissues.map(([t, list]) => ["色 " + t, list]), ...organs.map(([t, list]) => ["臓器 " + t, list])]
-    .flatMap(([title, list]) => list.map(([label, holder, min, max]) => ({ title, label, holder, min, max })));
-  const defaults = rows.map((r) => r.holder.value);
+  const parts = groups();
+  const holders = [
+    ...HAZE.map(([, h]) => h), chameleonLook.organs,
+    ...parts.flatMap(([, list]) => list.flatMap((p) => [p.strength, p.colour])),
+  ];
+  const defaults = holders.map((h) => structuredClone(h.value));
 
   const panel = document.createElement("aside"); panel.id = "ch-tune"; panel.setAttribute("aria-label", "見た目の調整");
   const head = document.createElement("div"); head.className = "head";
@@ -117,32 +168,27 @@ export function installChameleonTune() {
   const note = document.createElement("p"); note.textContent = "この画面だけ。決めた値はコピーしてコードに戻す。";
   panel.append(head, note);
   const refreshers = [];
-  for (const [title, list] of SLIDERS) {
-    const block = document.createElement("section");
-    const h3 = document.createElement("h3"); h3.textContent = title; block.append(h3);
-    for (const [label, holder, min, max] of list) refreshers.push(addSlider(block, label, holder, min, max));
-    panel.append(block);
-  }
-  const tissueHead = document.createElement("h3"); tissueHead.textContent = "組織の色"; panel.append(tissueHead);
-  for (const [title, list] of tissues) {
-    const box = document.createElement("div"); box.className = "group";
-    const sum = document.createElement("h4"); sum.textContent = title; box.append(sum);
-    for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
-    panel.append(box);
-  }
-  const organHead = document.createElement("h3"); organHead.textContent = "臓器ごとの濃さと色"; panel.append(organHead);
-  for (const [title, list] of organs) {
-    const box = document.createElement("div"); box.className = "group";
-    const sum = document.createElement("h4"); sum.textContent = title; box.append(sum);
-    for (const [label, holder, min, max] of list) refreshers.push(addSlider(box, label, holder, min, max));
-    panel.append(box);
+  const section = (title) => { const h3 = document.createElement("h3"); h3.textContent = title; panel.append(h3); };
+  section("曇り");
+  for (const [label, holder, min, max] of HAZE) refreshers.push(addSlider(panel, label, holder, min, max));
+  for (const [title, list] of parts) {
+    section(title);
+    if (title === "臓器") refreshers.push(addSlider(panel, "全体の濃さ", chameleonLook.organs, 0, 3));
+    for (const p of list) {
+      const box = document.createElement("div"); box.className = "part";
+      const h4 = document.createElement("h4"); h4.textContent = p.label; box.append(h4);
+      refreshers.push(addSlider(box, "濃さ", p.strength, 0, p.max), addColour(box, p.label, p.colour));
+      panel.append(box);
+    }
   }
   const copy = document.createElement("button"); copy.type = "button"; copy.className = "wide"; copy.textContent = "設定をコピー";
   copy.addEventListener("click", async () => {
-    const lines = ["カメレオンの調整値"]; let section = "";
-    for (const r of rows) {
-      if (r.title !== section) { section = r.title; lines.push("", `【${section}】`); }
-      lines.push(`${r.label}: ${Number(r.holder.value).toFixed(3)}`);
+    const f = (v) => Number(v).toFixed(3);
+    const lines = ["カメレオンの調整値", "", "【曇り】", ...HAZE.map(([label, hd]) => `${label}: ${f(hd.value)}`),
+      `臓器の全体の濃さ: ${f(chameleonLook.organs.value)}`];
+    for (const [title, list] of parts) {
+      lines.push("", `【${title}】`);
+      for (const p of list) lines.push(`${p.label}: 濃さ ${f(p.strength.value)} 色 ${hexOf(p.colour.value)}（${p.colour.value.map(f).join(" / ")}）`);
     }
     let ok = false;
     try { await navigator.clipboard.writeText(lines.join("\n")); ok = true; } catch {
@@ -153,7 +199,7 @@ export function installChameleonTune() {
     setTimeout(() => { copy.textContent = "設定をコピー"; }, 1600);
   });
   const reset = document.createElement("button"); reset.type = "button"; reset.className = "wide"; reset.textContent = "初期値に戻す";
-  reset.addEventListener("click", () => { rows.forEach((r, i) => { r.holder.value = defaults[i]; }); refreshers.forEach((f) => f()); });
+  reset.addEventListener("click", () => { holders.forEach((hd, i) => { hd.value = structuredClone(defaults[i]); }); refreshers.forEach((r) => r()); });
   panel.append(copy, reset);
 
   const open = document.createElement("button"); open.type = "button"; open.id = "ch-tune-open"; open.textContent = "調整";

@@ -264,3 +264,21 @@ export const HEART_RADIUS_MM = 2;
 export const HEART_AMP = 0.12;
 // Model units: the skull, 23.1 mm in the CT, is 1.04 units.
 export const MODEL_UNITS_PER_MM = 1.04 / 23.1;
+
+// The look the producer set on the panel for "06" (C record 54, 2026-10-24, the producer: 「以下を規定値に設定した上で」, values
+// pasted from the panel's copy). Applied on top of the fitted values above (createLightbox), which stay as measured: strengths
+// multiply the fitted gains, the spectra replace the fitted ones, and each organ's absorbance is its strength × its base.
+// The bone round the eyes (eyeRing) starts as the bone: same strength and colour.
+export const LOOK_06 = {
+  haze: 0.34, hazeLength: 1.429, blur: 6.9, hazeBrightness: 1,
+  skin: 1.38, film: 0.06, bone: 0.6, cartilage: 0, organs: 0.42, eyeRing: 0.6,
+  spectra: { bone: [0.26, 0.72, 0.54], ring: [0.26, 0.72, 0.54], cartilage: [0, 0.89, 0.68], skin: [0.28, 0.48, 0.5], film: [0.76, 0.7, 0.67] },
+  organStrength: {
+    liver_r: 2.4, liver_l: 2.4, gallbladder: 2.31, stomach: 1.5, intestine: 0.975, colon: 1, contents: 1, heart: 1.8,
+    fat_r: 1.77, fat_l: 1.77, kidney_r: 1, kidney_l: 1, eye_r: 1, eye_l: 1, lens_r: 1, lens_l: 1,
+    hyoid_cartilage: 0.48, claw: 1.095,
+  },
+  // Bases changed on the panel: the hyoid cartilage's red 9.93 → 21.598.
+  organBase: { hyoid_cartilage: [21.598, 3.41, 1.36] },
+};
+STAINS["06"].look = LOOK_06;

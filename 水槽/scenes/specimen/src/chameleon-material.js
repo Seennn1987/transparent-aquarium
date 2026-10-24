@@ -33,7 +33,13 @@ export const chameleonLook = {
   cartSpectrum: { value: new THREE.Vector3() },
   skinSpectrum: { value: new THREE.Vector3() },
   filmSpectrum: { value: new THREE.Vector3() },
+  // The bone round the eyes (scleral ring and the orbit's rim; C record 54, the producer: 「眼球周辺のパーツはそれ単体で色とこさが
+  // 編集できるように」): the part of the Bone mesh within EYE_RING_REACH × the eye's radius of either eye's centre is drawn in the
+  // path buffer's 4th channel with its own strength and colour (the same as the bone's by default).
+  eyeRing: { value: 1 },
+  ringSpectrum: { value: new THREE.Vector3() },
 };
+const EYE_RING_REACH = 1.2;
 
 // Where each part's path goes in the path buffer. Organ (the organs of the body cavity, one mesh each,
 // blender/ct_body_pipeline/organs.py) has a buffer of its own: each organ adds its own colour of absorbance.
@@ -45,6 +51,8 @@ const REQUIRED = ["Bone", "Cartilage", "Skin"];
 // Set from the colour pattern (chameleon-stain.js STAINS[...].organs) by createLightbox.
 export const chameleonOrgans = {};
 const organUniform = (name) => (chameleonOrgans[name] ??= { value: new THREE.Vector3() });
+// Each organ's strength and base absorbance (the uniform is strength × base), for the panel (chameleon-tune.js).
+export const chameleonOrganLook = {};
 
 const pathVertex = `
 #include <common>
@@ -54,9 +62,19 @@ uniform vec3 uHeart;
 uniform float uHeartRadius;
 uniform float uHeartAmp;
 uniform float uHeartPeriod;
+uniform vec3 uEye0, uEye1;
+uniform float uEyeR;
+uniform float uEyeJoint;
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
+varying float vEyeRing;
 void main() {
+  vEyeRing = uEyeR > 0. ? 1. - step(uEyeR, min(distance(position, uEye0), distance(position, uEye1))) : 0.;
+  #ifdef USE_SKINNING
+  // Only what the head carries: in the resting pose the tail's coil also lies near an eye.
+  vec4 onHead = step(abs(skinIndex - uEyeJoint), vec4(.5));
+  vEyeRing *= step(.5, dot(onHead, skinWeight));
+  #endif
   #include <skinbase_vertex>
   #include <beginnormal_vertex>
   #include <skinnormal_vertex>
@@ -81,9 +99,10 @@ const solidFragment = `
 uniform vec4 channel;
 uniform float reference;
 varying vec3 vViewPosition;
+varying float vEyeRing;
 void main() {
   float d = -vViewPosition.z - reference;
-  gl_FragColor = channel * (gl_FrontFacing ? -d : d);
+  gl_FragColor = mix(channel, vec4(0., 0., 0., 1.), step(.5, vEyeRing)) * (gl_FrontFacing ? -d : d);
 }`;
 
 // The blue film of the "01" pattern (chameleon-stain.js STAINS["01"].film): a thin stained layer at the
@@ -170,6 +189,15 @@ function heartCentre(mesh) {
 
 export function applyChameleonTissue(model, reference) {
   const found = new Set();
+  // The eyes' centres and radius in the meshes' bind space (the bone and the organs share it), for the eye-ring channel.
+  const eyes = [];
+  model.traverse((o) => { if (o.isMesh && /^eye_[lr]$/.test(o.userData.chameleon_organ ?? "")) eyes.push(o); });
+  const eyeC = eyes.map(meshCentre);
+  let eyeR = 0;
+  for (const [i, m] of eyes.entries()) {
+    const pos = m.geometry.getAttribute("position"), p = new THREE.Vector3();
+    for (let k = 0; k < pos.count; k++) eyeR = Math.max(eyeR, p.fromBufferAttribute(pos, k).distanceTo(eyeC[i]));
+  }
   model.traverse((object) => {
     if (!object.isMesh) return;
     const part = object.userData.chameleon_part;
@@ -187,6 +215,9 @@ export function applyChameleonTissue(model, reference) {
         uHeartRadius: { value: HEART_RADIUS_MM * MODEL_UNITS_PER_MM },
         uHeartAmp: heart ? chameleonLook.heartAmp : { value: 0 },
         uHeartPeriod: { value: HEART_PERIOD },
+        uEye0: { value: eyeC[0] ?? new THREE.Vector3() }, uEye1: { value: eyeC[1] ?? eyeC[0] ?? new THREE.Vector3() },
+        uEyeR: { value: part === "Bone" && eyeC.length ? eyeR * EYE_RING_REACH : 0 },
+        uEyeJoint: { value: object.skeleton?.bones.findIndex((b) => b.name === "head") ?? -1 },
       },
       vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD,
     });
@@ -200,12 +231,14 @@ export function applyChameleonTissue(model, reference) {
         uHeartRadius: { value: ORGAN_HEART_RADIUS_MM * MODEL_UNITS_PER_MM },
         uHeartAmp: organHeart ? chameleonLook.heartAmp : { value: 0 },
         uHeartPeriod: { value: HEART_PERIOD },
+        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 },
       },
       vertexShader: pathVertex, fragmentShader: organFragment, ...ADD,
     }) : null;
     object.userData.filmMaterial = part === "Skin" ? new THREE.ShaderMaterial({
       uniforms: { filmMinCos: chameleonFilm.minCos, uTime: chameleonClock, uHeart: { value: new THREE.Vector3() },
-        uHeartRadius: { value: 1 }, uHeartAmp: { value: 0 }, uHeartPeriod: { value: 1 } },
+        uHeartRadius: { value: 1 }, uHeartAmp: { value: 0 }, uHeartPeriod: { value: 1 },
+        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 } },
       vertexShader: pathVertex, fragmentShader: filmFragment, ...ADD,
     }) : null;
   });
@@ -226,6 +259,8 @@ uniform float alphaScale;
 uniform float pathScale;
 uniform float boneGain, boneT0, cartGain, skinGain;
 uniform float visceraGain;
+uniform float ringGain;
+uniform vec3 ringSpectrum;
 uniform vec3 boneSpectrum, cartSpectrum, skinSpectrum, visceraSpectrum;
 uniform vec2 tap;
 uniform vec2 px;
@@ -243,7 +278,7 @@ vec4 signedAt(sampler2D t) { return signedAtUV(t, vUv); }
 vec3 innerAt(vec2 uv) {
   vec4 m = max(signedAtUV(tPath, uv), 0.) * pathScale;
   return boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum + cartGain * m.g * cartSpectrum
-    + visceraGain * m.a * visceraSpectrum + organGain * max(signedAtUV(tOrgan, uv).rgb * pathScale, 0.);
+    + ringGain * boneT0 * (1. - exp(-m.a / boneT0)) * ringSpectrum + organGain * max(signedAtUV(tOrgan, uv).rgb * pathScale, 0.);
 }
 void main() {
   vec4 p = max(signedAt(tPath), 0.);
@@ -252,7 +287,8 @@ void main() {
   vec3 a = boneGain * boneT0 * (1. - exp(-m.r / boneT0)) * boneSpectrum
     + cartGain * m.g * cartSpectrum
     + skinGain * m.b * skinSpectrum
-    + visceraGain * m.a * visceraSpectrum
+    // The 4th channel is the bone round the eyes (C record 54); the one viscera mass that used it is no longer exported.
+    + ringGain * boneT0 * (1. - exp(-m.a / boneT0)) * ringSpectrum
     + filmGain * max(signedAt(tFilm).r, 0.) * filmSpectrum
     + organGain * max(signedAt(tOrgan).rgb * pathScale, 0.);
   // In the jar the image is a linear light let through over white (jar-optics.js looks it up and the
@@ -301,6 +337,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
   });
   const film = k.film && k.film.gain > 0 ? k.film : null;
   chameleonLook.boneSpectrum.value.set(...k.bone.spectrum);
+  chameleonLook.ringSpectrum.value.set(...k.bone.spectrum);
   chameleonLook.cartSpectrum.value.set(...k.cartilage.spectrum);
   chameleonLook.skinSpectrum.value.set(...k.skin.spectrum);
   // A pattern without the film ("06") gets "01"'s film at strength 0, so the panel can turn one on (C record 46).
@@ -311,7 +348,20 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
   // (CARTILAGE_GAIN) from 0, so it can be brought back.
   const cartBase = k.cartilage.gain > 0 ? k.cartilage.gain : CARTILAGE_GAIN;
   if (!(k.cartilage.gain > 0)) chameleonLook.cartilage.value = 0;
-  for (const [name, abs] of Object.entries(k.organs ?? {})) organUniform(name).value.set(...abs);
+  // The producer's look for this pattern (chameleon-stain.js LOOK_06, C record 54), on top of the fitted values.
+  const look = k.look;
+  if (look) {
+    for (const key of ["haze", "hazeLength", "blur", "skin", "film", "bone", "cartilage", "organs", "eyeRing"]) chameleonLook[key].value = look[key];
+    chameleonLook.hazeColor.value.set(0.93 * look.hazeBrightness, 0.92 * look.hazeBrightness, 0.88 * look.hazeBrightness);
+    const sp = look.spectra;
+    chameleonLook.boneSpectrum.value.set(...sp.bone); chameleonLook.ringSpectrum.value.set(...sp.ring);
+    chameleonLook.cartSpectrum.value.set(...sp.cartilage); chameleonLook.skinSpectrum.value.set(...sp.skin);
+    chameleonLook.filmSpectrum.value.set(...sp.film);
+  }
+  for (const [name, abs] of Object.entries(k.organs ?? {})) {
+    const o = chameleonOrganLook[name] = { strength: look?.organStrength?.[name] ?? 1, base: [...(look?.organBase?.[name] ?? abs)] };
+    organUniform(name).value.set(...o.base).multiplyScalar(o.strength);
+  }
   const organs = Object.keys(k.organs ?? {}).length > 0;
   const organTarget = new THREE.WebGLRenderTarget(1, 1, {
     type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4,
@@ -337,6 +387,8 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       skinSpectrum: chameleonLook.skinSpectrum,
       visceraGain: { value: k.viscera.gain },
       visceraSpectrum: { value: new THREE.Vector3(...k.viscera.spectrum) },
+      ringGain: { value: k.bone.gain },
+      ringSpectrum: chameleonLook.ringSpectrum,
       linearOut: { value: linear ? 1 : 0 },
       alphaScale: { value: alphaScale },
       pathScale: { value: pathScale },
@@ -386,6 +438,7 @@ export function createLightbox(renderer, { linear = false, alphaScale = 0, pathS
       material.uniforms.cartGain.value = cartBase * chameleonLook.cartilage.value;
       material.uniforms.skinGain.value = k.skin.gain * chameleonLook.skin.value;
       material.uniforms.visceraGain.value = k.viscera.gain * chameleonLook.viscera.value;
+      material.uniforms.ringGain.value = k.bone.gain * chameleonLook.eyeRing.value;
       material.uniforms.filmGain.value = filmRef.gain * chameleonLook.film.value;
       material.uniforms.organGain.value = organs ? chameleonLook.organs.value : 0;
       const clear = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
