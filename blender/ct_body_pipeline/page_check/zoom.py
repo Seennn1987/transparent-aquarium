@@ -12,7 +12,7 @@ async def main():
     async with async_playwright() as p:
         b = await browser.launch(p); pg = await b.new_page(viewport={'width': 800, 'height': 956})
         await pg.goto(url); await pg.wait_for_function('document.body.dataset.ready || document.body.dataset.error', timeout=300000)
-        await pg.add_style_tag(content='#status,.home-link,#ch-tune,#ch-tune-open,#ch-rot,#ch-look{visibility:hidden!important}')
+        await pg.add_style_tag(content='#status,.home-link,#ch-tune,#ch-tune-open,#ch-rot,#ch-look,#ch-fps{visibility:hidden!important}')
         if os.environ.get('PAGE_JS'): await pg.evaluate(os.environ['PAGE_JS'])   # 試しの設定（例: 臓器の吸光度）
         await pg.evaluate(JS, [c, d, up, k]); await pg.wait_for_timeout(3000); await pg.screenshot(path=out); await b.close()
 asyncio.run(main())

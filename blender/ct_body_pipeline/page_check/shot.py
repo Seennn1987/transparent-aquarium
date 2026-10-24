@@ -14,7 +14,7 @@ async def main():
         try:
             await pg.get_by_text('閉じる').click(timeout=5000)
         except Exception as e: print('noclose')
-        await pg.add_style_tag(content='#tune,#tune-open,#ch-tune,#ch-tune-open,#ch-rot,#ch-look,.controls,#controls,[class*=control],.home-link{visibility:hidden!important}')
+        await pg.add_style_tag(content='#tune,#tune-open,#ch-tune,#ch-tune-open,#ch-rot,#ch-look,#ch-fps,.controls,#controls,[class*=control],.home-link{visibility:hidden!important}')
         await pg.wait_for_timeout(wait*1000)
         info = await pg.evaluate('({J: window.specimenDebug?.specimen.jarScale, size: window.specimenDebug?.specimen.size})')
         await pg.screenshot(path=out, timeout=400000)

@@ -5,6 +5,7 @@ import { applyChameleonTissue, createLightbox, chameleonLook, chameleonClock, ch
 import { stainOf } from "./chameleon-stain.js";
 import { installChameleonTune } from "./chameleon-tune.js";
 import { installChameleonRotate } from "./chameleon-rotate.js";
+import { createChameleonFps } from "./chameleon-fps.js";
 
 // The chameleon as a finished cleared-and-stained specimen, on a lightbox, without its jar.
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
@@ -102,6 +103,8 @@ async function start() {
     if (e.code === "Space") { paused = !paused; e.preventDefault(); }
   });
 
+  // ?fps=1: the frame rate at the top left (chameleon-fps.js, C record 57).
+  const fpsBox = query.get("fps") === "1" ? createChameleonFps(renderer, model, lightbox) : null;
   const clock = new THREE.Clock();
   const view = new THREE.Vector3();
   function frame() {
@@ -111,7 +114,9 @@ async function start() {
     // The plane the solid paths are measured from: through the body's centre.
     view.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -view.z;
+    const t0 = performance.now();
     lightbox.render(scene, camera);
+    fpsBox?.tick(t0, performance.now() - t0);
     requestAnimationFrame(frame);
   }
   orbit.update();

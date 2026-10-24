@@ -13,7 +13,7 @@ const OPEN_KEY = "chameleon-tune-open";
 // A part's colour is what it lets through at strength 1 over COLOUR_DEPTH of its absorbance: shown = exp(−COLOUR_DEPTH × a).
 // Picking a colour sets a = −ln(colour) / COLOUR_DEPTH (colours darker than MIN_LIGHT are taken as MIN_LIGHT), so a pale
 // colour makes a faint part, a deep one a dark part. Organs keep their own scale: a = base / unit, unit the largest of the
-// shipped base (1 when it is 0).
+// fitted base (1 when it is 0).
 const COLOUR_DEPTH = 1.5;
 const MIN_LIGHT = 0.02;
 // Colours a cleared-and-stained specimen can show (alizarin red on bone, alcian blue on cartilage, the cleared tissue, bile,
@@ -51,7 +51,7 @@ function organ(label, names) {
   const looks = names.map((n) => chameleonOrganLook[n]).filter(Boolean);
   if (!looks.length) return null;
   const apply = () => { for (const n of names) if (chameleonOrganLook[n]) chameleonOrgans[n].value.set(...looks[0].base).multiplyScalar(looks[0].strength); };
-  const unit = Math.max(...looks[0].base) || 1;
+  const unit = Math.max(...looks[0].fitted) || 1;   // the fitted base's largest, so a colour reads the same whatever the start look
   return {
     label, max: 3,
     strength: { get value() { return looks[0].strength; }, set value(v) { for (const o of looks) o.strength = v; apply(); } },

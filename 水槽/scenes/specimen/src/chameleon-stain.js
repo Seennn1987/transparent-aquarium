@@ -265,21 +265,20 @@ export const HEART_AMP = 0.12;
 // Model units: the skull, 23.1 mm in the CT, is 1.04 units.
 export const MODEL_UNITS_PER_MM = 1.04 / 23.1;
 
-// The look the producer set on the panel for "06" (C record 54, 2026-10-24, the producer: 「以下を規定値に設定した上で」, values
-// pasted from the panel's copy). Applied on top of the fitted values above (createLightbox), which stay as measured: strengths
-// multiply the fitted gains, the spectra replace the fitted ones, and each organ's absorbance is its strength × its base.
-// The bone round the eyes (eyeRing) starts as the bone: same strength and colour.
+// The look the producer set on the panel for "06": "規定1024" (C record 54, 2026-10-24, the producer: 「以下を規定値に設定した上で」;
+// replaced by C record 57, the same day, the producer: 「これを規定1024に。」, values pasted from the panel's copy). Applied on top of
+// the fitted values above (createLightbox, setChameleonLook), which stay as measured: strengths multiply the fitted gains, the
+// spectra replace the fitted ones, and each organ's absorbance is its strength × its base (the fitted base unless organBase names
+// another). The panel then copied an organ's colour as base / the largest of the base it started from, so the bases below are
+// those shares × that number: the hyoid cartilage 0.460 / 0.158 / 0.063 × 21.598 (C record 54's red), the lens (fitted 0, so × 1)
+// the palette's 骨の赤紫. The others came back as their fitted bases. Since C record 57 the panel divides by the fitted base's
+// largest instead (1 when it is 0), so the hyoid cartilage now reads 1.000 / 0.343 / 0.137 (#82cbe9) for the same absorbance.
 export const LOOK_06 = {
-  haze: 0.34, hazeLength: 1.429, blur: 6.9, hazeBrightness: 1,
-  skin: 1.38, film: 0.06, bone: 0.6, cartilage: 0, organs: 0.42, eyeRing: 0.6,
-  spectra: { bone: [0.26, 0.72, 0.54], ring: [0.26, 0.72, 0.54], cartilage: [0, 0.89, 0.68], skin: [0.28, 0.48, 0.5], film: [0.76, 0.7, 0.67] },
-  organStrength: {
-    liver_r: 2.4, liver_l: 2.4, gallbladder: 2.31, stomach: 1.5, intestine: 0.975, colon: 1, contents: 1, heart: 1.8,
-    fat_r: 1.77, fat_l: 1.77, kidney_r: 1, kidney_l: 1, eye_r: 1, eye_l: 1, lens_r: 1, lens_l: 1,
-    hyoid_cartilage: 0.48, claw: 1.095,
-  },
-  // Bases changed on the panel: the hyoid cartilage's red 9.93 → 21.598.
-  organBase: { hyoid_cartilage: [21.598, 3.41, 1.36] },
+  haze: 0.295, hazeLength: 1.429, blur: 7.05, hazeBrightness: 0.958,
+  skin: 2.25, film: 0, bone: 0.45, cartilage: 0, organs: 0.8, eyeRing: 0.45,
+  spectra: { bone: [0.25, 1, 0.7], ring: [0.25, 1, 0.7], cartilage: [0, 0.89, 0.68], skin: [1, 0.419, 0.351], film: [1, 0.35, 0.2] },
+  organStrength: { eye_r: 1.56, eye_l: 1.56, lens_r: 0.465, lens_l: 0.465 },
+  organBase: { hyoid_cartilage: [9.935, 3.412, 1.361], lens_r: [0.49, 2.108, 1.239], lens_l: [0.49, 2.108, 1.239] },
 };
 STAINS["06"].look = LOOK_06;
 
