@@ -37,21 +37,21 @@
   ]
  },
  "params": {
-  "Hs": 0.276,
-  "p": 1.0516,
-  "a": 0.32,
-  "c": 0.2676,
-  "zh": -0.0809,
-  "ytop": 0.4499,
-  "n": 2.5981,
-  "m": 0.7,
-  "Hs_fb": 0.4002
+  "Hs": 0.3,
+  "p": 1.7461,
+  "a": 0.3199,
+  "c": 0.2745,
+  "zh": -0.0721,
+  "ytop": 0.4057,
+  "n": 2.5998,
+  "m": 0.7506,
+  "Hs_fb": 0.45
  },
- "front_dev_max_mm": 5.5,
- "front_dev_rms_mm": 3.3,
- "eye_surface": 0.31,
- "skirt_at_eye_over_total": 0.9,
+ "front_dev_max_mm": 10.7,
+ "front_dev_rms_mm": 5.2,
+ "eye_surface": 0.288,
+ "skirt_at_eye_over_total": 0.829,
  "z_front": 0.46205,
  "z_back": -0.4981,
- "head_peak_from_front": 0.565
+ "head_peak_from_front": 0.556
 }

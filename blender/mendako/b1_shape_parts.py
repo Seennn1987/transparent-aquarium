@@ -35,7 +35,12 @@ import a3_membrane_arms as M  # noqa: E402
 from b0_fit_head_skirt import HeadSkirt  # noqa: E402
 
 RIDGE = dict(amp=0.006, width=0.08, start=0.45)   # 第 2 版（幅 0.04、高さ 0.008）はテントの折り目に見えた
-ORAL_LIFT = dict(amp=0.022, width_deg=9.0)
+ORAL_LIFT = dict(amp=0.022, width=0.05)    # 腕の道からの距離で、腕のあいだの口側を持ち上げる
+# 腕の弓なり（2026-10-24 第 12 版）: Verhoeff 2024 図 12 A（Sasaki 1929 の雄の口側、口 x 755・y 1000）の吸盤の列で、どの腕も口の近くでは
+#   後ろ寄りに出て、先が前へ曲がる（第 2 腕は横へ出て x 1200 で前へ、第 4 腕は後ろへ下りて外で前へ回り込む）。付け根の向きと弦のずれ
+#   約 10°（第 1 腕）・25°（第 2・3 腕）・40°（第 4 腕）から、膨らみ ≈ ずれ（rad）÷ 4
+ARM_BOW = {13.0: 0.04, 51.0: 0.10, 95.0: 0.10, 143.0: 0.15}
+RIM_ROLL = 0.12    # 縁から内へこの割合（ρ）で、上の面を口側の面へ丸く下ろして閉じる（第 11 版は厚み 0.045 を一定にして平らな帯が出た）
 EYE = dict(r=0.048, out=0.022, lid_r=0.03, lid_tube=0.005, dir=(0.62, 0.62, 0.48), ball_out=0.0058, ball_scale=0.90, lid=False)
 # 眼（第 11 版、2026-10-24）: Sunshine4 の左の眼の盛り上がりは x 1560〜1800 の約 240 px ÷ 横幅 2500 px = 径 0.096 W（第 10 版は 0.14 で大きすぎ）、
 #   開口は約 120 px = 0.048 W。眼球の出し量 0.0058 は、のぞく暗い丸の径が約 0.05 W になる値。まぶたの輪は融合するとボタンの突起に見えた（第 6・7 版）ので使わない
@@ -64,41 +69,62 @@ def ang_dist(a, b):
     return np.abs((a - b + np.pi) % (2 * np.pi) - np.pi)
 
 
+def arm_lines():
+    """腕の道（膜のある所）を上から見た折れ線 (x, z) にする。b1 の腕（arms()）と同じ道"""
+    M.ARM_BOW = ARM_BOW
+    body = A.Body(peak=0.0)
+    lines = []
+    for deg in M.ARM_DEG.values():
+        for side in (1, -1):
+            pts, web_frac, _ = M.arm_path(body, side * deg)
+            k = int(len(pts) * web_frac)
+            lines.append(pts[:k][:, [0, 2]])
+    return lines
+
+
+def dist_to_lines(P, lines):
+    """点 P (N, 2) から、折れ線の集まりまでの最短距離"""
+    best = np.full(len(P), np.inf)
+    for L in lines:
+        a, b = L[:-1], L[1:]
+        ab = b - a
+        for k in range(len(a)):
+            t = np.clip(((P - a[k]) @ ab[k]) / (ab[k] @ ab[k] + 1e-12), 0, 1)
+            d = np.hypot(*(P - (a[k] + t[:, None] * ab[k])).T)
+            best = np.minimum(best, d)
+    return best
+
+
 def body_volume(m, n_r=170, n_t=480):
     body = m.body
-    arms = arm_angles()
-    zm = (body.z_front + body.z_back) / 2
     rr = np.linspace(0, 1, n_r) ** 0.85
     tt = np.linspace(0, 2 * np.pi, n_t, endpoint=False)
-    top, bot = [], []
-    for t in tt:
-        Rt = float(body.Dc(np.array([t]))[0])
-        for rho in rr:
-            x, z = np.sin(t) * rho * Rt, np.cos(t) * rho * Rt
-            h = float(m.h(np.array([x]), np.array([z * 0.9999]))[0]) if rho < 1 else RIM_T
-            h = max(h, RIM_T)
-            phi = np.arctan2(x, z - zm)
-            dmin = ang_dist(phi, arms).min()
-            rm = np.hypot(x, z - zm)
-            perp = rm * np.sin(min(dmin, np.pi / 2))
-            ramp = np.clip((rho - RIDGE["start"]) / 0.25, 0, 1)
-            h += RIDGE["amp"] * ramp * np.exp(-(perp / (RIDGE["width"] / 2)) ** 2)
-            between = 1 - np.exp(-(np.degrees(dmin) / ORAL_LIFT["width_deg"]) ** 2)
-            b = ORAL_LIFT["amp"] * between * np.clip((rho - 0.3) / 0.7, 0, 1) ** 1.5
-            b = min(b, max(0.0, h - 0.015))
-            top.append((x, h, z))
-            bot.append((x, b, z))
-    verts = np.array(top + bot)
+    T, Rr = np.meshgrid(tt, rr, indexing="ij")
+    Rt = body.Dc(T.ravel()).reshape(T.shape)
+    X, Z = np.sin(T) * Rr * Rt, np.cos(T) * Rr * Rt
+    x, z, rho = X.ravel(), Z.ravel(), Rr.ravel()
+    h = np.where(rho < 1, m.h(x, z * 0.9999), m.h(x * 0.999, z * 0.999))
+    h = np.maximum(h, 0.03)
+    d = dist_to_lines(np.stack([x, z], 1), arm_lines())
+    ramp = np.clip((rho - RIDGE["start"]) / 0.25, 0, 1)
+    h = h + RIDGE["amp"] * ramp * np.exp(-(d / (RIDGE["width"] / 2)) ** 2)
+    between = 1 - np.exp(-(d / ORAL_LIFT["width"]) ** 2)
+    b = ORAL_LIFT["amp"] * between * np.clip((rho - 0.3) / 0.7, 0, 1) ** 1.5
+    b = np.minimum(b, np.maximum(0.0, h - 0.015))
+    # 縁: 内から RIM_ROLL の所から、上の面を口側の面へ丸く下ろす（縁で上と下が出会って閉じる）
+    sr = np.clip((rho - (1 - RIM_ROLL)) / RIM_ROLL, 0, 1)
+    h = b + (h - b) * np.sqrt(np.clip(1 - sr * sr, 0, 1))
+    top = np.stack([x, h, z], 1)
+    bot = np.stack([x, b, z], 1)
+    verts = np.vstack([top, bot])
     nb = len(top)
     faces = []
     for i in range(n_t):
         j = (i + 1) % n_t
         for k in range(n_r - 1):
-            a, b2, c, d = i * n_r + k, j * n_r + k, j * n_r + k + 1, i * n_r + k + 1
-            faces += [(a, c, b2), (a, d, c)]
-            faces += [(a + nb, b2 + nb, c + nb), (a + nb, c + nb, d + nb)]
-        a, b2 = i * n_r + n_r - 1, j * n_r + n_r - 1
-        faces += [(a, b2, b2 + nb), (a, b2 + nb, a + nb)]
+            a, b2, c, dd = i * n_r + k, j * n_r + k, j * n_r + k + 1, i * n_r + k + 1
+            faces += [(a, c, b2), (a, dd, c)]
+            faces += [(a + nb, b2 + nb, c + nb), (a + nb, c + nb, dd + nb)]
     v, f = M.weld(verts, np.array(faces))
     if A.signed_volume(v, f) < 0:
         f = f[:, ::-1]
@@ -214,6 +240,7 @@ def arms(m):
                                      # Taki の 1/5 は固定標本。第 5 版（1/5 の半分をまっすぐ）は縁から棘が突き出た
     M.CURL_ANGLE = np.radians(200)
     M.CURL_STRAIGHT = 0.0
+    M.ARM_BOW = ARM_BOW
     body = A.Body(peak=0.0)
     out = []
     for deg in M.ARM_DEG.values():

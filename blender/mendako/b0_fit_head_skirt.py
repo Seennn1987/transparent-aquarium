@@ -24,9 +24,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import a2_parts as A  # noqa: E402
 
 RIM = 0.045       # 縁の厚み（W）。Sunshine1 で縁は厚く丸まる
-K = 0.06          # smoothmax のなめらかさ（W）。第 3 版の 0.025 は傘と頭の境に帽子のつばのような折れ線が出た
+K = 0.06          # smoothmax のなめらかさ（W）。第 3 版の 0.025 は傘と頭の境に帽子のつばのような折れ線、第 11 版の 0.06 は眼の下から前の中央へ下りる逆 V の折れ目が出た
 # 当てはめの範囲（2026-10-24）。第 5 版は指数 n を自由にして 5.8（箱形の鍋）、n = 2・m = 1 に固定すると傘が消えて頭が前後に短い畝になった。
 # 形として無理のない範囲を先に決める: 傘の頂 0.15〜0.30、頭の横の半分 ≤ 0.32・前後の半分 ≥ 0.2、頭の頂は眼より後ろ、n 1.8〜2.6、m 0.7〜1.3
+# 第 12 版（2026-10-24）: 高い方を取る smoothmax では、傘と頭が切り替わる所に眼の下から前の中央へ下りる逆 V の折れ目が残り、
+# つなぎを広げると傘の円錐の頂が頭から棘になって出た。傘（頂を丸めた円錐）と頭（縁で傾き 0 の盛り上がり）を足し合わせる形にした。
+#   H = 傘(ρ, θ) + 頭(x, z)、傘 = rim + (Hs(θ) − rim)(1 − ρr)^p、ρr = (√(ρ² + ε²) − ε)/(√(1 + ε²) − ε)、頭 = ytop (1 − q^n)^m（n 2〜5 で上を平らに、m ≥ 1.5 で縁の傾き 0）
+ADDITIVE = False   # 足し合わせ（第 12 版の途中）は頭が尖った頭巾になり、前後の傘が横より低くなったので戻した
+DIR_DELTA = 0.15
+APEX_EPS = 0.2
 BOUNDS = dict(Hs=(0.15, 0.30), Hs_fb=(0.25, 0.45), p=(1.0, 3.0), a=(0.22, 0.32), c=(0.20, 0.36), ytop=(0.36, 0.45), n=(1.8, 2.6), m=(0.7, 1.3))
 HS_MAX = 0.30      # 傘の円錐の頂は頭より低く抑える（頂が頭を突き抜けて尖らないように。2026-10-24 第 2 版の絵で見つけた）
 EYE_TARGET = 0.31  # 眼の盛り上がりを除いた面の高さ。盛り上がり（約 0.02〜0.03）を足して開口 0.33〜0.34
@@ -48,7 +54,10 @@ class HeadSkirt:
     def skirt(self, x, z):
         rho, rl = self.body.rho(x, z)
         r = np.clip(rho, 0, 1)      # 縁の波は縁の近くだけ（第 3 版は rl を使い、腕のあいだが平らなテントの面になった）
-        c2 = np.cos(np.arctan2(x, z)) ** 2
+        r = (np.sqrt(r * r + APEX_EPS ** 2) - APEX_EPS) / (np.sqrt(1 + APEX_EPS ** 2) - APEX_EPS)   # 傘の頂を丸める
+        # 向きの効き目は中心で 0 にする（cos²θ のままだと、中心で向きごとに高さが違い、前後へ尾根が走った。
+        # 第 11 版の逆 V の折れ目、第 12 版の途中の頭の棘と背中の中央のへこみの原因）
+        c2 = z * z / (x * x + z * z + DIR_DELTA ** 2)
         hs = self.Hs + (self.Hs_fb - self.Hs) * c2
         return np.where(rl <= 1, RIM + (hs - RIM) * (1 - r) ** self.pw, 0.0)
 
@@ -59,7 +68,7 @@ class HeadSkirt:
     def h(self, x, z):
         s, hd = self.skirt(x, z), self.head(x, z)
         _, rl = self.body.rho(x, z)
-        return np.where(rl <= 1, smax(s, hd), 0.0)
+        return np.where(rl <= 1, s + hd if ADDITIVE else smax(s, hd), 0.0)
 
 
 def front_silhouette(m, xs, zs):
@@ -92,7 +101,7 @@ def main():
         e = float(m.h(np.array([0.155]), np.array([ze]))[0])
         sk = float(m.skirt(np.array([0.0]), np.array([ze]))[0])
         tot = float(m.h(np.array([0.0]), np.array([ze]))[0])
-        brim = max(0.0, 0.9 * tot - sk)
+        brim = max(0.0, (0.75 if ADDITIVE else 0.9) * tot - sk)
         return float(np.mean((f - target) ** 2)) + 4 * (e - EYE_TARGET) ** 2 + 4 * brim ** 2
 
     p0 = [0.26, 1.4, 0.28, 0.26, -0.08, 0.42, 2.2, 1.0, 0.38]

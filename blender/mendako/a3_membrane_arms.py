@@ -39,6 +39,7 @@ ARM_DEG = {"I": 13.0, "II": 51.0, "III": 95.0, "IV": 143.0}
 FREE_TIP = 0.2          # 腕の長さのうち膜の無い先の割合
 CURL_ANGLE = 1.5 * np.pi   # 先が背へ巻く角度
 CURL_STRAIGHT = 0.0        # 膜の無い先のうち、巻く前にまっすぐ伸ばす割合
+ARM_BOW = {}               # 腕の弓なりの膨らみ（弦の長さに対する比、後ろ側へ）。{角度の絶対値: 比}。既定はまっすぐ
 N_SUCKERS = 50
 BIG = range(4, 19)      # 0 始まりで 5〜19 番目
 D_BIG, D_SMALL = 0.053, 0.02
@@ -196,11 +197,17 @@ def arm_path(body, deg, n=120):
     d = edge - mouth
     L_web = np.linalg.norm(d)
     L = L_web / (1 - FREE_TIP)
-    out = d / L_web
+    bow = ARM_BOW.get(round(abs(deg), 1), 0.0)
+    perp = np.array([d[2], 0.0, -d[0]])
+    perp /= np.linalg.norm(perp)
+    if perp[2] > 0:                      # 後ろ（−z）側へ膨らませる
+        perp = -perp
+    out = d - perp * bow * L_web * 4     # 縁での向き（弓の先の接線）
+    out /= np.linalg.norm(out)
     pts = []
     n_web = int(n * (1 - FREE_TIP))
     for s in np.linspace(0, 1, n_web, endpoint=False):
-        p = mouth + d * s
+        p = mouth + d * s + perp * bow * L_web * 4 * s * (1 - s)
         pts.append(p)
     # 先: 外へ出ながら背へ巻く（半径 = 自由な長さ / (1.5π)、約 270°）
     Lf = L - L_web
