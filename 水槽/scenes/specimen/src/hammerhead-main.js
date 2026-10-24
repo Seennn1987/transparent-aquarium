@@ -85,12 +85,17 @@ async function start() {
   // B5 一時停止: スペースキーで止める・動かす（?still=1 で止めて始める）。止めている間は時計が進まず、うねり・口・心臓・エラが全部止まる
   let paused = query.get("still") === "1", last = performance.now();
   addEventListener("keydown", (e) => { if (e.code === "Space" && !e.target.closest?.("button")) { paused = !paused; e.preventDefault(); } });
+  // 2026-10-24 プロデューサー「まず標本ページに ?fps=1 で実際の FPS を表示する機能を足してください。自分の Chrome で測ります」:
+  //  左上に、1 秒ごとの FPS、直近 2 秒のコマの間隔（中央値・遅い方から 5%）、描く処理の時間（JS）、描く先の画素数、三角形の数、GPU の名前を出す
+  const fpsBox = query.get("fps") === "1" ? createFpsBox(renderer, model, lightbox) : null;
   function frame() {
     const now = performance.now(), dt = paused ? 0 : Math.min((now - last) / 1000, 0.1); last = now;
     swim?.update(dt);
     v.copy(centre).applyMatrix4(camera.matrixWorldInverse);
     reference.value = -v.z;
+    const t0 = performance.now();
     lightbox.render(scene, camera);
+    fpsBox?.tick(now, performance.now() - t0);
     requestAnimationFrame(frame);
   }
   if (view !== "top" && view !== "below") orbit.update();
@@ -185,5 +190,33 @@ function canvasShown(el) {
     const ro = new ResizeObserver(() => { if (el.clientWidth > 0 && el.clientHeight > 0) { ro.disconnect(); done(); } });
     ro.observe(el);
   });
+}
+function createFpsBox(renderer, model, lightbox) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;left:8px;top:8px;z-index:20;padding:6px 8px;background:rgba(0,0,0,.72);color:#fff;font:12px/1.45 ui-monospace,Menlo,monospace;border-radius:6px;pointer-events:none;white-space:pre";
+  document.body.append(el);
+  let tris = 0; model.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+  const gl = renderer.getContext(), ext = gl.getExtension("WEBGL_debug_renderer_info");
+  const gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "?";
+  const times = [], work = []; let prev = 0, count = 0, since = performance.now(), fps = 0;
+  const q = (a, f) => { if (!a.length) return 0; const b = [...a].sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * f))]; };
+  return {
+    tick(now, ms) {
+      if (prev) { times.push([now, now - prev]); work.push([now, ms]); }
+      prev = now; count++;
+      while (times.length && now - times[0][0] > 2000) times.shift();
+      while (work.length && now - work[0][0] > 2000) work.shift();
+      if (now - since >= 1000) {
+        fps = count * 1000 / (now - since); count = 0; since = now;
+        const d = times.map((x) => x[1]), w = work.map((x) => x[1]);
+        const t = lightbox.target, ss = lightbox.effectiveSupersample ?? 1;
+        el.textContent = `FPS ${fps.toFixed(1)}\n` +
+          `コマの間隔 中央 ${q(d, 0.5).toFixed(1)} ms・遅い 5% ${q(d, 0.95).toFixed(1)} ms\n` +
+          `描く処理（JS） 中央 ${q(w, 0.5).toFixed(1)} ms\n` +
+          `描く先 ${t.width}×${t.height}（細かさ ${ss.toFixed(2)}、画素 ${(t.width * t.height / 1e6).toFixed(1)} M × 4 枚）\n` +
+          `三角形 ${(tris / 1e6).toFixed(2)} M\n${gpu}`;
+      }
+    },
+  };
 }
 start().catch((error) => { status.textContent = String(error.message ?? error); document.body.dataset.error = "1"; console.error(error); });
