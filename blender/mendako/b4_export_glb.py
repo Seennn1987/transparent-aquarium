@@ -59,8 +59,12 @@ def check(o):
 def main():
     bpy.ops.wm.open_mainfile(filepath=os.path.join(WORK, "b2_mendako.blend"))
     keep = {"Mendako": "Body", "b1_eyeballs": "Eye", "b1_suckers": "Suckers", "b1_cirri": "Cirri"}
+    sp = import_obj("b1_spots.obj")      # 背の突起の中心の色素の名残（2026-10-24 手順 A6）
+    sp["md_part"] = "Spots"
     for o in list(bpy.data.objects):
         name = next((k for k in keep if o.name.startswith(k)), None)
+        if o.get("md_part") == "Spots":
+            continue
         if o.type != "MESH" or name is None:
             bpy.data.objects.remove(o, do_unlink=True)
         else:

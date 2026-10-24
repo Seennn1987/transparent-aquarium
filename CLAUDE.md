@@ -103,4 +103,5 @@
 - 種: *Exsuperoteuthis depressa*（旧名 *Opisthoteuthis depressa* Ijima & Ikeda, 1895）。硬い骨が無いので、イカと同じく写真・図・文献から作る（振り返り 第 4 節）。CT は形の正にしない
 - 参考画像: `docs/references/mendako/`（出典は `SOURCES.md`）。ライセンスを確かめていない画像と透かし入りの画像は git に入れない
 - 形のスクリプト: `blender/mendako/`（外の形は b0〜b2、glb の書き出しは `b4_export_glb.py`。中間の面は `blender/mendako/work/`、git に入れない）。ページは `水槽/scenes/specimen/mendako.html`（器なし、ライトボックス）、`src/mendako-*.js`。`?view=front|oblique|top|oral`。撮る道具は `blender/mendako/shoot_mendako.py`
+- 質感: 2026-10-24 プロデューサー「質感の修正を優先しましょう」。メンダコでは、上の「形と色の決まり」の「質感は後に回す」より、この言葉を正にする（計画書 第 7 節 A6）
 - 決まったこと（2026-10-17、計画書 第 3.2 節）: 姿勢は生きて海底で休む形、器はシュモクザメと同じ蓋のない低い器（手順書 第 8.1 節の例外）、色はイカと同じ空色、殻は上から Meyer 1906 の浅い弓形・後ろから Sasaki 1929 の鞍と反る翼。大きさは成熟した雄

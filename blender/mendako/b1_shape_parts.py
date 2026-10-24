@@ -42,6 +42,9 @@ ORAL_LIFT = dict(amp=0.022, width=0.05)    # 腕の道からの距離で、腕�
 #   後ろ寄りに出て、先が前へ曲がる（第 2 腕は横へ出て x 1200 で前へ、第 4 腕は後ろへ下りて外で前へ回り込む）。付け根の向きと弦のずれ
 #   約 10°（第 1 腕）・25°（第 2・3 腕）・40°（第 4 腕）から、膨らみ ≈ ずれ（rad）÷ 4
 ARM_BOW = {13.0: 0.04, 51.0: 0.10, 95.0: 0.10, 143.0: 0.15}
+# 背の突起（2026-10-24 手順 A6）: Meyer 1906 図 1 の 8 列の褐色の斑点（mac）。Sunshine4（約 18 px/mm）で径 40〜60 px（2.2〜3.3 mm）、
+#   間隔 250〜300 px（14〜16 mm）。腕の道の上（背の面）に、口から 0.12 W の所から 0.109 W（15 mm）おきに、半径 0.01 W・高さ 0.006 W
+PAPILLA = dict(start=0.12, step=0.109, radius=0.01, height=0.006, end_margin=0.03)
 RIM_ROLL = 0.12    # 縁から内へこの割合（ρ）で、上の面を口側の面へ丸く下ろして閉じる（第 11 版は厚み 0.045 を一定にして平らな帯が出た）
 EYE = dict(r=0.048, out=0.022, lid_r=0.03, lid_tube=0.005, dir=(0.62, 0.62, 0.48), ball_out=0.0058, ball_scale=0.90, lid=False)
 # 眼（第 11 版、2026-10-24）: Sunshine4 の左の眼の盛り上がりは x 1560〜1800 の約 240 px ÷ 横幅 2500 px = 径 0.096 W（第 10 版は 0.14 で大きすぎ）、
@@ -97,6 +100,26 @@ def dist_to_lines(P, lines):
     return best
 
 
+def papilla_points():
+    """腕の道に沿った突起の (x, z)"""
+    pts = []
+    for L in arm_lines():
+        seg = np.hypot(*np.diff(L, axis=0).T)
+        cum = np.concatenate([[0], np.cumsum(seg)])
+        d = PAPILLA["start"]
+        while d < cum[-1] - PAPILLA["end_margin"]:
+            pts.append((float(np.interp(d, cum, L[:, 0])), float(np.interp(d, cum, L[:, 1]))))
+            d += PAPILLA["step"]
+    return np.array(pts)
+
+
+def papilla_bump(x, z, pp):
+    out = np.zeros_like(x)
+    for px, pz in pp:
+        out += PAPILLA["height"] * np.exp(-((x - px) ** 2 + (z - pz) ** 2) / PAPILLA["radius"] ** 2)
+    return out
+
+
 def body_volume(m, n_r=170, n_t=480):
     body = m.body
     rr = np.linspace(0, 1, n_r) ** 0.85
@@ -110,6 +133,7 @@ def body_volume(m, n_r=170, n_t=480):
     d = dist_to_lines(np.stack([x, z], 1), arm_lines())
     ramp = np.clip((rho - RIDGE["start"]) / 0.25, 0, 1)
     h = h + RIDGE["amp"] * ramp * np.exp(-(d / (RIDGE["width"] / 2)) ** 2)
+    h = h + papilla_bump(x, z, papilla_points())
     between = 1 - np.exp(-(d / ORAL_LIFT["width"]) ** 2)
     b = ORAL_LIFT["amp"] * between * np.clip((rho - 0.3) / 0.7, 0, 1) ** 1.5
     b = np.minimum(b, np.maximum(0.0, h - 0.015))
@@ -260,6 +284,20 @@ def main():
     bv, bf = body_volume(m)
     print("体", len(bv), "頂点、開いた辺", M.open_edges(bf), "体積", round(A.signed_volume(bv, bf), 4))
     A.save_obj(os.path.join(A.WORK, "b1_body.obj"), bv, bf)
+    # 突起の中心の色素の名残（斑点）: 突起の頂の 0.005 下に、丸みのある楕円体（半径 0.007、厚み 0.008）
+    pp = papilla_points()
+    spots = []
+    for px, pz in pp:
+        x, z = np.array([px]), np.array([pz])
+        d = dist_to_lines(np.stack([x, z], 1), arm_lines())
+        rho = m.body.rho(x, z)[1]
+        top = m.h(x, z) + RIDGE["amp"] * np.clip((rho - RIDGE["start"]) / 0.25, 0, 1) * np.exp(-(d / (RIDGE["width"] / 2)) ** 2) + PAPILLA["height"]
+        # 2026-10-24: 平たい円盤（半径 0.008・厚み 0.002）は、前から浅い角度で灰色の横線に見えた。丸みのある粒に
+        spots.append(A.ellipsoid((px, float(top[0]) - 0.005, pz), (0.007, 0.004, 0.007), n=12))
+    sv, sf = M.merge(spots)
+    sv, sf = M.weld(sv, sf)
+    A.save_obj(os.path.join(A.WORK, "b1_spots.obj"), sv, sf)
+    print("突起と斑点", len(pp))
     bul, balls = eyes(m)
     A.save_obj(os.path.join(A.WORK, "b1_eyes_bulge.obj"), *M.merge(bul))
     A.save_obj(os.path.join(A.WORK, "b1_eyeballs.obj"), *M.merge(balls))
