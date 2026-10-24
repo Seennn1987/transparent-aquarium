@@ -6,7 +6,9 @@
 
 出力: docs/mendako/b0_head_skirt.json（大きさ）と、正面の輪郭の当てはまりの数
 高さ H(x, z) = smoothmax( 傘(ρ), 頭(x, z) )。ρ は上から見た輪郭（膜の縁の波）に対する割合（a2_parts.Body.rho、頂のずらし 0）。
-  傘(ρ)  = rim + (Hs − rim) · (1 − ρ)^p
+  傘(ρ, θ) = rim + (Hs(θ) − rim) · (1 − ρ)^p、Hs(θ) = Hs_lat + (Hs_fb − Hs_lat) · cos²θ（θ = 0 が前）
+    2026-10-24 第 11 版: 写真（Sunshine1・2・4）では前と後ろの傘が頭へ向かって高く立ち上がり、頭のつばが無い。
+    横（ひれの向き）は決めた正面の線のまま。前の傘が眼の根元まで届くこと（眼の位置で 傘 ≥ 0.9 × 全体）を当てはめの条件に足した
   頭(x,z) = ytop · (1 − q^n)^m（m ≥ 1 で縁が寝て傘へつながる。第 4 版の (1 − q^n)^(1/n) は縁が垂直で段になった）、q = √((x/a)² + ((z − zh)/c)²)（q ≥ 1 で 0）
 正面の輪郭 = 各 x で z について H の最大。決めた正面の線 v(u)（u = x ÷ 0.5）と比べる。
 """
@@ -25,24 +27,30 @@ RIM = 0.045       # 縁の厚み（W）。Sunshine1 で縁は厚く丸まる
 K = 0.06          # smoothmax のなめらかさ（W）。第 3 版の 0.025 は傘と頭の境に帽子のつばのような折れ線が出た
 # 当てはめの範囲（2026-10-24）。第 5 版は指数 n を自由にして 5.8（箱形の鍋）、n = 2・m = 1 に固定すると傘が消えて頭が前後に短い畝になった。
 # 形として無理のない範囲を先に決める: 傘の頂 0.15〜0.30、頭の横の半分 ≤ 0.32・前後の半分 ≥ 0.2、頭の頂は眼より後ろ、n 1.8〜2.6、m 0.7〜1.3
-BOUNDS = dict(Hs=(0.15, 0.30), p=(1.0, 3.0), a=(0.22, 0.32), c=(0.20, 0.36), ytop=(0.36, 0.45), n=(1.8, 2.6), m=(0.7, 1.3))
+BOUNDS = dict(Hs=(0.15, 0.30), Hs_fb=(0.25, 0.45), p=(1.0, 3.0), a=(0.22, 0.32), c=(0.20, 0.36), ytop=(0.36, 0.45), n=(1.8, 2.6), m=(0.7, 1.3))
 HS_MAX = 0.30      # 傘の円錐の頂は頭より低く抑える（頂が頭を突き抜けて尖らないように。2026-10-24 第 2 版の絵で見つけた）
 EYE_TARGET = 0.31  # 眼の盛り上がりを除いた面の高さ。盛り上がり（約 0.02〜0.03）を足して開口 0.33〜0.34
 
 
 def smax(a, b, k=K):
-    return k * np.logaddexp(a / k, b / k)
+    """多項式のなめらかな最大。同じ高さの所の盛り上がりは最大 k/4（第 11 版の logaddexp は k·log2 ≈ 0.04 盛り上げ、頭が 8 mm 高くなった）"""
+    h = np.clip(k - np.abs(a - b), 0, None) / k
+    return np.maximum(a, b) + h * h * k / 4
 
 
 class HeadSkirt:
     def __init__(self, p):
-        self.Hs, self.pw, self.a, self.c, self.zh, self.ytop, self.n, self.m = p
+        if len(p) == 8:
+            p = list(p) + [p[0]]
+        self.Hs, self.pw, self.a, self.c, self.zh, self.ytop, self.n, self.m, self.Hs_fb = p
         self.body = A.Body(peak=0.0)
 
     def skirt(self, x, z):
         rho, rl = self.body.rho(x, z)
         r = np.clip(rho, 0, 1)      # 縁の波は縁の近くだけ（第 3 版は rl を使い、腕のあいだが平らなテントの面になった）
-        return np.where(rl <= 1, RIM + (self.Hs - RIM) * (1 - r) ** self.pw, 0.0)
+        c2 = np.cos(np.arctan2(x, z)) ** 2
+        hs = self.Hs + (self.Hs_fb - self.Hs) * c2
+        return np.where(rl <= 1, RIM + (hs - RIM) * (1 - r) ** self.pw, 0.0)
 
     def head(self, x, z):
         q = np.sqrt((x / self.a) ** 2 + ((z - self.zh) / self.c) ** 2)
@@ -73,7 +81,7 @@ def main():
         return list(p)
 
     def loss(p):
-        names = ["Hs", "p", "a", "c", "zh", "ytop", "n", "m"]
+        names = ["Hs", "p", "a", "c", "zh", "ytop", "n", "m", "Hs_fb"]
         for nm, val in zip(names, p):
             if nm in BOUNDS and not (BOUNDS[nm][0] <= val <= BOUNDS[nm][1]):
                 return 1e3
@@ -82,19 +90,23 @@ def main():
         m = HeadSkirt(p)
         f = front_silhouette(m, xs, zs)
         e = float(m.h(np.array([0.155]), np.array([ze]))[0])
-        return float(np.mean((f - target) ** 2)) + 4 * (e - EYE_TARGET) ** 2
+        sk = float(m.skirt(np.array([0.0]), np.array([ze]))[0])
+        tot = float(m.h(np.array([0.0]), np.array([ze]))[0])
+        brim = max(0.0, 0.9 * tot - sk)
+        return float(np.mean((f - target) ** 2)) + 4 * (e - EYE_TARGET) ** 2 + 4 * brim ** 2
 
-    p0 = [0.26, 1.4, 0.30, 0.28, -0.08, 0.42, 2.2, 1.0]
+    p0 = [0.26, 1.4, 0.28, 0.26, -0.08, 0.42, 2.2, 1.0, 0.38]
     r = minimize(loss, p0, method="Nelder-Mead", options=dict(maxiter=4000, xatol=1e-4, fatol=1e-8))
     p = np.array(full(r.x))
     m = HeadSkirt(p)
     f = front_silhouette(m, xs, zs)
     e = float(m.h(np.array([0.155]), np.array([ze]))[0])
-    names = ["Hs", "p", "a", "c", "zh", "ytop", "n", "m"]
+    names = ["Hs", "p", "a", "c", "zh", "ytop", "n", "m", "Hs_fb"]
     out = dict(date="2026-10-24", rim=RIM, k=K, bounds=BOUNDS, params=dict(zip(names, [round(float(x), 4) for x in p])),
                front_dev_max_mm=round(float(np.abs(f - target).max()) * A.W_MM, 1),
                front_dev_rms_mm=round(float(np.sqrt(np.mean((f - target) ** 2))) * A.W_MM, 1),
-               eye_surface=round(e, 3), z_front=b.z_front, z_back=b.z_back,
+               eye_surface=round(e, 3),
+               skirt_at_eye_over_total=round(float(m.skirt(np.array([0.0]), np.array([ze]))[0] / m.h(np.array([0.0]), np.array([ze]))[0]), 3), z_front=b.z_front, z_back=b.z_back,
                head_peak_from_front=round(float((b.z_front - p[4]) / (b.z_front - b.z_back)), 3))
     print(json.dumps(out, ensure_ascii=False, indent=1))
     for x, t, g in zip(xs[::5], target[::5], f[::5]):

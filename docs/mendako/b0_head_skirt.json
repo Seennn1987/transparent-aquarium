@@ -7,6 +7,10 @@
    0.15,
    0.3
   ],
+  "Hs_fb": [
+   0.25,
+   0.45
+  ],
   "p": [
    1.0,
    3.0
@@ -33,18 +37,20 @@
   ]
  },
  "params": {
-  "Hs": 0.3,
-  "p": 1.3931,
-  "a": 0.3199,
-  "c": 0.2882,
-  "zh": -0.0807,
-  "ytop": 0.425,
-  "n": 2.6,
-  "m": 0.7115
+  "Hs": 0.276,
+  "p": 1.0516,
+  "a": 0.32,
+  "c": 0.2676,
+  "zh": -0.0809,
+  "ytop": 0.4499,
+  "n": 2.5981,
+  "m": 0.7,
+  "Hs_fb": 0.4002
  },
- "front_dev_max_mm": 7.4,
- "front_dev_rms_mm": 3.2,
- "eye_surface": 0.312,
+ "front_dev_max_mm": 5.5,
+ "front_dev_rms_mm": 3.3,
+ "eye_surface": 0.31,
+ "skirt_at_eye_over_total": 0.9,
  "z_front": 0.46205,
  "z_back": -0.4981,
  "head_peak_from_front": 0.565

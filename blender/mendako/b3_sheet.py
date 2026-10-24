@@ -1,7 +1,7 @@
 """
 メンダコ: 参考の写真・前の版（A3 の単純な部品）・今の版（Blender で融合した形）を同じ向きで 1 枚に並べる（2026-10-24）。
 
-  .venv/bin/python -I blender/mendako/b3_sheet.py <今の版の名前（例 v10）>
+  .venv/bin/python -I blender/mendako/b3_sheet.py <今の版の名前（例 v11）> [前の版の名前（例 v10。省くと A3）]
 
 出力: docs/mendako/b3_compare_<名前>.jpg
 """
@@ -44,22 +44,27 @@ def fit(im, w=TW, h=TH, bg=(255, 255, 255)):
 
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "v10"
+    prev = sys.argv[2] if len(sys.argv) > 2 else None
     a3 = Image.open(os.path.join(OUT, "a3_parts.jpg")).convert("RGB")
     W = 300 + 3 * (TW + 16)
     H = 150 + len(ROWS) * (TH + 70)
     out = Image.new("RGB", (W, H), (248, 247, 244))
     dr = ImageDraw.Draw(out)
     dr.text((20, 16), f"メンダコ 外の形: 写真・前の版・今の版（2026-10-24、{name}）", font=font(38, True), fill=(20, 20, 20))
-    dr.text((20, 66), "前の版 = A3 の単純な部品（管・杯・板・球）を自作の描き方で描いた絵。今の版 = Blender で傘・頭・眼・ひれ・腕を 1 つの体に融合して"
-            "ならした形を、粘土色で描いた絵（色と透けはまだ）", font=font(20), fill=(60, 60, 60))
-    for k, t in enumerate(("参考", "前の版（A3）", f"今の版（{name}）")):
+    dr.text((20, 66), ("前の版 = A3 の単純な部品（管・杯・板・球）を自作の描き方で描いた絵。" if not prev else f"前の版 = {prev}。") +
+            "今の版 = Blender で傘・頭・眼・ひれ・腕を 1 つの体に融合してならした形を、粘土色で描いた絵（色と透けはまだ）", font=font(20), fill=(60, 60, 60))
+    for k, t in enumerate(("参考", f"前の版（{prev or 'A3'}）", f"今の版（{name}）")):
         dr.text((300 + k * (TW + 16), 110), t, font=font(26, True), fill=(20, 20, 20))
     y = 150
     for title, (ref, box), cap, view in ROWS:
         dr.text((20, y + 10), title, font=font(26, True), fill=(20, 20, 20))
         r = fit(Image.open(os.path.join(REF, ref)).crop(box))
-        x0, y0 = A3[view]
-        p = fit(a3.crop((x0, y0, x0 + 560, y0 + 560)))
+        if prev:
+            pp = os.path.join(OUT, f"b2_{prev}_{view}.png")
+            p = fit(Image.open(pp if os.path.exists(pp) else pp[:-4] + ".jpg"))
+        else:
+            x0, y0 = A3[view]
+            p = fit(a3.crop((x0, y0, x0 + 560, y0 + 560)))
         cp = os.path.join(OUT, f"b2_{name}_{view}.png")
         c = fit(Image.open(cp if os.path.exists(cp) else cp[:-4] + ".jpg"))
         for k, im in enumerate((r, p, c)):
