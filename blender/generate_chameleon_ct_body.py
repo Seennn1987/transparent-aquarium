@@ -34,7 +34,8 @@ try:
     HERE = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     HERE = "/Users/shoui/transparent-aquarium/transparent-aquarium/blender"
-DATA = os.path.join(HERE, "private", "chameleon_body_ct.npz")
+# CH_CT_NPZ: 案の骨（名前は chameleon_body_ct.npz のまま、同じフォルダの chameleon_body_soft.npz と _dec.npz を使う。記録 65）
+DATA = os.environ.get("CH_CT_NPZ") or os.path.join(HERE, "private", "chameleon_body_ct.npz")
 PREFIX = "CH_"
 FACES_TOTAL = int(os.environ.get("CH_FACES", "450000"))          # 全身の面数の目安（間引き後）
 SKULL_LENGTH_L = 1.04
