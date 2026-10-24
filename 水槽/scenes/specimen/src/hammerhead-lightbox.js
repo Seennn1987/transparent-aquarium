@@ -127,7 +127,9 @@ void main() {
 /** createLightbox（chameleon-material.js）と同じ使い方。部品は pathMaterial（層 A）・path2Material（層 B）・filmMaterial・organMaterial を持つ。 */
 export function createHammerheadLightbox(renderer, { linear = false, alphaScale = 0, pathScale = 1, supersample = 2 } = {}) {
   const float = renderer.extensions.has("EXT_color_buffer_float") && renderer.extensions.has("EXT_float_blend");
-  const rt = () => new THREE.WebGLRenderTarget(1, 1, { type: float ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: 4 });
+  // 2026-10-24（プロデューサーの Chrome で FPS 3.6、描く先 3840 × 1746）: 重さを切り分ける指定。?msaa=（描く先の重ね塗りの数、既定 4）、?half=1（16 bit の小数）
+  const _q = new URLSearchParams(location.search), MSAA = Number(_q.get("msaa") ?? 4), HALF = _q.get("half") === "1";
+  const rt = () => new THREE.WebGLRenderTarget(1, 1, { type: float && !HALF ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, samples: MSAA });
   const target = rt(), target2 = rt(), filmTarget = rt(), organTarget = rt();
   for (const [name, abs] of Object.entries(K.organs ?? {})) (chameleonOrgans[name] ??= { value: new THREE.Vector3() }).value.set(...abs);
   const spec = (c) => hhColorLook[c.key].spectrum;
@@ -158,7 +160,7 @@ export function createHammerheadLightbox(renderer, { linear = false, alphaScale 
       // 2026-10-18 プロデューサー「choromeで見えません」: 大きな画面（2000×980 の窓、画素の倍率 2 → 描く先 4000×1960）では、
       //  さらに 2 倍の細かさ（supersample）で 8000×3920 の 32 bit・4 倍の重ね塗りの描く先を 4 枚作れず、標本が描かれなかった（3200×1600 では描けた）。
       //  描く先の画素数を MAX_PIXELS まで、細かさを下げて抑える（1 より下げない）。テクスチャの大きさの上限も超えない
-      const MAX_PIXELS = 16e6, maxTex = renderer.capabilities.maxTextureSize || 8192;
+      const MAX_PIXELS = Number(_q.get("maxpx") ?? 16) * 1e6, maxTex = renderer.capabilities.maxTextureSize || 8192;
       const ss = Math.max(1, Math.min(supersample, Math.sqrt(MAX_PIXELS / Math.max(1, w * h)), maxTex / Math.max(w, h, 1)));
       this.effectiveSupersample = ss;
       const W = Math.max(1, Math.round(w * ss)), H = Math.max(1, Math.round(h * ss));
