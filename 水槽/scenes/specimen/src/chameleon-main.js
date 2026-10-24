@@ -176,6 +176,7 @@ async function start() {
     walkTo(t) { walkTime = t; },
     /** ?walk=1: pose the walk at `t` now and return each foot's place on the branch (chameleon-walk.js feet). */
     walkFeet(t) { walk.update(t); return walk.feet(); },
+    walkBelly(t) { walk.update(t); return walk.belly(); },
     seek(t) { mixer.setTime(t); },
   };
 }

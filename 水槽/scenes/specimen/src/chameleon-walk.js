@@ -50,18 +50,23 @@ const ROCK_EVERY = 2, ROCK_TIMES = Number(_r.get("rockTimes") ?? 3), ROCK_HZ = N
 const ROCK_SIZE = Number(_r.get("rockMM") ?? 4.7) * MM;
 // The wrist/ankle behind the sole's grip (the foot's length to the grip): Higham & Jayne's heel to the base of the 4th toe, 1.1 cm, × 11 / 18.1 = 6.7 mm.
 const HEEL = 6.7 * MM;
-// The hips' height over the perch's top as a share of femur + tibia: Higham & Jayne Fig. 6B, read off the axis as about 0.3–0.4 on the
-// perch (lower than on the treadmill). ?low= to try others; the shoulders BODY_LOW + 0.05 of the forelimb's (as in the photo).
+// The hips' height over the perch's top as a share of femur + tibia. Higham & Jayne Fig. 6B reads about 0.3–0.4 on the perch, but this
+// body is deep (the belly deepened in C record 52): at 0.45 the trunk's skin sank 4–5 mm into the 10 mm branch (C record 67). 0.6 is
+// the least that keeps it above the bark (0.8 mm). ?low= to try others; the shoulders BODY_LOW + 0.05 of the forelimb's.
 // The foot's angle up from the branch: flat in the grip, the heel raised at lift-off (Higham & Jayne: the knee straightest at the
-// end of stance, the foot pushing off). The 80° is set so the hind feet reach (below).
-const HEEL_DOWN = THREE.MathUtils.degToRad(15), HEEL_UP = THREE.MathUtils.degToRad(80);
+// end of stance, the foot pushing off). 90° (the foot upright on its toes at lift-off) is the least that lets the hind feet reach with
+// the body high enough to clear the branch (C record 67: at 80° they fell 0.94 mm short).
+const HEEL_DOWN = THREE.MathUtils.degToRad(15), HEEL_UP = THREE.MathUtils.degToRad(Number(new URLSearchParams(location.search).get("heelUp") ?? 90));
 // The grip (C record 62): the bundles hug the bark GRIP_GAP above it, reach at most GRIP_MAX round from the top, lean forward by
 // GRIP_AHEAD of their length, and open/close over GRIP_EASE of the swing at each end. Set by eye against photo 08 (?gripMax= in degrees).
 const GRIP_GAP = 0.6 * MM, GRIP_AHEAD = 0.25, GRIP_EASE = 0.25;
 const GRIP_MAX = THREE.MathUtils.degToRad(Number(new URLSearchParams(location.search).get("gripMax") ?? 150));
-const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.45);
+const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.6);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
-const PELVIS_YAW = THREE.MathUtils.degToRad(20), SHOULDER_YAW = THREE.MathUtils.degToRad(12);
+// The girdles' turn about the vertical, each way: the pelvis Higham & Jayne's 57° in all on the level (±28.5°, C record 67; it was ±20),
+// largest at footfall; the shoulders set by eye.
+const _y = new URLSearchParams(location.search);
+const PELVIS_YAW = THREE.MathUtils.degToRad(Number(_y.get("pelvisYaw") ?? 28.5)), SHOULDER_YAW = THREE.MathUtils.degToRad(Number(_y.get("shoulderYaw") ?? 12));
 const _q = new URLSearchParams(location.search);
 // degrees, degrees, the share of its length before it bends; set by eye (?tailStart= ?tailTurn= ?tailStraight= to try others)
 const TAIL_START = Number(_q.get("tailStart") ?? 230), TAIL_TURN = Number(_q.get("tailTurn") ?? 520), TAIL_STRAIGHT = Number(_q.get("tailStraight") ?? 0.4);
@@ -138,9 +143,12 @@ export function createChameleonWalk(model, holder) {
     return branchCentre.clone().addScaledVector(UP, BRANCH_RADIUS * 0.95).addScaledVector(LEFT, side).addScaledVector(FORWARD, along);
   };
   // Each foot's landing spot ahead of its girdle at rest (Higham & Jayne: well in front of the hip at footfall).
+  function girdleAlongOf(limb) { return inHolder(limb.upper).applyQuaternion(bodyTurn).dot(FORWARD); }
   // C record 61 (the producer: 「揺れの時は足を軸にして動きます。足が木をスライドするように滑るような動きをするわけないでしょ」): this was
   // read from the girdle's position in every frame, so the landing spot — and with it every planted foot — moved with the body's
   // rocking and the girdles' turning, and the feet slid on the branch. It is the girdle's place in the base pose, fixed.
+  // The trunk's span along the branch (between the hips and the shoulders), for belly().
+  const trunkBack = Math.min(girdleAlongOf(limbs.hL), girdleAlongOf(limbs.hR)) + 0.3, trunkFront = Math.max(girdleAlongOf(limbs.fL), girdleAlongOf(limbs.fR)) - 0.3;
   const girdleRest = Object.fromEntries(Object.entries(limbs).map(([key, limb]) => [key, inHolder(limb.upper).applyQuaternion(bodyTurn).dot(FORWARD)]));
 
   // Eyes: each one's own target and saccade.
@@ -324,5 +332,28 @@ export function createChameleonWalk(model, holder) {
       return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, grip: f.grip2 }];
     }));
   }
-  return { backdrop, branchFrame, update, feet };
+  /** For checking: how far the skin's lowest point (every `step`-th vertex, skinned) lies above the branch's top, in mm (< 0: sunk in). */
+  function belly(step = 7) {
+    model.updateMatrixWorld(true);
+    let skin = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") skin = o; });
+    const p = new THREE.Vector3(); let lowest = Infinity, along = 0; const prof = new Array(10).fill(Infinity);
+    const n = skin.geometry.getAttribute("position").count;
+    const SI = skin.geometry.getAttribute("skinIndex"), SW = skin.geometry.getAttribute("skinWeight"), sb = skin.skeleton.bones;
+    for (let i = 0; i < n; i += step) {
+      // only the trunk's skin (its main bone a vertebra or a rib), not the legs'
+      let best = 0, bi = 0;
+      for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } }
+      if (!/^(v\d|rib)/.test(sb[bi].name)) continue;
+      skin.getVertexPosition(i, p); skin.localToWorld(p); holder.worldToLocal(p);
+      const rel = p.clone().sub(branchCentre);
+      // only over the branch (within its radius sideways), and not the tail, feet or legs below the body (the trunk's span)
+      if (Math.abs(rel.dot(LEFT)) > BRANCH_RADIUS || rel.dot(FORWARD) < trunkBack || rel.dot(FORWARD) > trunkFront) continue;
+      const h = rel.dot(UP) - BRANCH_RADIUS;
+      if (h < lowest) { lowest = h; along = rel.dot(FORWARD); }
+      const bin = Math.floor((rel.dot(FORWARD) - trunkBack) / (trunkFront - trunkBack) * 10);
+      if (bin >= 0 && bin < 10) prof[bin] = Math.min(prof[bin], h);
+    }
+    return { lowestMM: lowest / MM, alongMM: along / MM, trunkMM: [trunkBack / MM, trunkFront / MM], profile: prof.map((x) => Math.round(x / MM * 10) / 10) };
+  }
+  return { backdrop, branchFrame, update, feet, belly };
 }
