@@ -2,27 +2,43 @@
 // です。…画面上にカメレオンが止まる枝を一本置いてそれを手足を使って歩くような動きをつけましょう」, with a photo of a veiled chameleon
 // on a twig). ?walk=1 on chameleon.html. A first trial: the bones are posed in the page each frame (no clip in the glb).
 //
-// Where the numbers come from:
-// - Higham & Jayne 2004 (J Exp Biol 207:233–248), C. calyptratus on a 2.4 cm dowel, SVL 18.1 cm: speed 17 cm/s, duty factor 63%,
-//   the foot well in front of the hip at footfall (the knee unusually extended), large pelvic rotation (57° on the level),
-//   the limb widest out to the side at mid-swing.
-// - Scaled to this animal: 1 model unit = 22.2 mm (chameleon-stain.js MODEL_UNITS_PER_MM), snout–vent about 5 units (11 cm), so
-//   × 11 / 18.1: the dowel 1.46 cm across (0.66 units), the speed 10 cm/s (4.5 units/s).
+// Where the numbers come from (C record 60, 2026-10-24, the producer: 「実際の動画や文献で歩き方（足を出す順・速さ・体の前後の揺れ）を
+// 確かめ、試作を合わせて下さい」):
+// - The order of the feet and the duty factor: Wimberly, Slater & Granatosky 2021 (Proc R Soc B 288:20210937), data on Zenodo
+//   (record 5168016, CC0, non_mammal_gait.txt), Chamaeleo calyptratus: duty factor 65.55%, phase 44.07% (the forefoot lands
+//   that share of a stride after the hindfoot of the same side), gait LSDC (lateral sequence, diagonal couplets): left hind 0,
+//   left fore 0.44, right hind 0.5, right fore 0.94.
+// - The speed: Krause & Fischer 2013 (J Exp Biol 216:1448–1457), C. calyptratus (snout–vent 19.5 and 21 cm) on a level 2 cm pole,
+//   mean 6.9 cm/s (3.0–12.8). Higham & Jayne 2004 (J Exp Biol 207:233–248) had 17 cm/s on a 2.4 cm dowel, faster than the animals
+//   chose for themselves on Krause & Fischer's pole.
+// - The stride: Krause & Fischer's hindlimb forward reach, 5.9 cm at level; Higham & Jayne: the foot goes as far behind the hip as in
+//   front (excursions nearly symmetric), the knee unusually extended at footfall, large pelvic rotation (57°), the limb widest out
+//   at mid-swing. So the foot travels 2 × 5.9 cm against the hip in stance, a stride of 2 × 5.9 / 0.6555 = 18 cm.
+// - Scaled to this animal: 1 model unit = 22.2 mm (chameleon-stain.js MODEL_UNITS_PER_MM), snout–vent about 11 cm, × 11 / 20.25:
+//   the speed 3.75 cm/s, the stride 9.8 cm (4.4 units), one stride 2.6 s. The branch stays Higham & Jayne's 2.4 cm × 11 / 18.1
+//   = 1.46 cm across (Krause & Fischer's 2 cm pole would be 1.1 cm). In the walking videos of the same data (Gait_Videos, Chamaeleo_calyptratus.mp4 and _2.mp4) a
+//   hindfoot stays down about 3 s while the animal walks on a deck, as slow as this.
+// - The rocking: no measured study found. Described as rocking back and forth between spells of ordinary walking (Chameleo, ACM 2021,
+//   "walk like a chameleon detection with AI"), triggered by a moving plant or wind (La Trobe animal behaviour group, 2017, one
+//   veiled chameleon). Here: after every ROCK_EVERY strides it stops with the right forefoot in the air and rocks forward and back
+//   ROCK_TIMES times; the size and pace are set by eye.
 // - The eyes: each eye turns on its own, over 180° across and 80° up and down (magnetic search coils; "Visual and vestibular
 //   reflexes that stabilize gaze in the chameleon", Visual Neuroscience), in quick saccades between still spells.
-// Not measured and set by eye here (to be checked against video): the order of the feet, the stride length, the swing's lift, the tail.
+// Set by eye: the swing's lift, the tail, the body's height.
 import * as THREE from "three";
 import { MODEL_UNITS_PER_MM } from "./chameleon-stain.js";
 import { chameleonEyes } from "./chameleon-material.js";
 
 const MM = MODEL_UNITS_PER_MM;
 const BRANCH_RADIUS = 14.6 / 2 * MM;
-// Higham & Jayne's 17 cm/s scaled is 10 cm/s (?speed=100, in mm/s); the default is a calm 4 cm/s (set by eye, to be checked on video).
-const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 40) * MM;   // model units per second
-const DUTY = 0.63;
-const STRIDE = 2.4;                     // model units (5.3 cm, about half the snout–vent); set by eye
-// The cycle phase at which each foot lifts (a lateral-sequence walk: left hind, left fore, right hind, right fore).
-const LIFT = { hL: 0, fL: 0.25, hR: 0.5, fR: 0.75 };
+// ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
+const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 37.5) * MM;   // model units per second
+const DUTY = 0.6555;
+const STRIDE = 98 * MM;                 // 9.8 cm (4.4 units)
+// When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
+const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
+// The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE model units at ROCK_HZ, the right forefoot held up.
+const ROCK_EVERY = 2, ROCK_TIMES = 2, ROCK_HZ = 0.8, ROCK_SIZE = 0.18;
 const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.55);   // set by eye
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 const PELVIS_YAW = THREE.MathUtils.degToRad(20), SHOULDER_YAW = THREE.MathUtils.degToRad(12);
@@ -137,11 +153,18 @@ export function createChameleonWalk(model, holder) {
 
   function update(t) {
     for (const [b, r] of base) b.quaternion.copy(r);
-    const phase = (t * SPEED / STRIDE) % 1;
-    const slide = t * SPEED;   // how far the branch has slid back
-    // The body: pitched to the branch, with a small rise and fall.
+    // Walking time g stops during the rocking pauses; the pause falls at the phase where the right forefoot is mid-swing.
+    const T = STRIDE / SPEED, walkSpan = ROCK_EVERY * T, pause = ROCK_TIMES / ROCK_HZ;
+    const n = Math.floor(t / (walkSpan + pause)), r = t - n * (walkSpan + pause);
+    const g = n * walkSpan + Math.min(r, walkSpan);
+    const swingMid = (LIFT.fR - (1 - DUTY) / 2 + 1) % 1;   // LIFT is the touchdown, so mid-swing is half a swing before it
+    const phase = (g / T + swingMid) % 1;
+    const slide = g * SPEED;   // how far the branch has slid back
+    const rockT = Math.max(0, r - walkSpan);
+    const rock = rockT > 0 ? ROCK_SIZE * Math.sin(2 * Math.PI * ROCK_HZ * rockT) * Math.sin(Math.PI * rockT / pause) : 0;
+    // The body: pitched to the branch, with a small rise and fall, and the rocking forward and back.
     model.quaternion.copy(bodyTurn);
-    model.position.set(0, 0, 0).addScaledVector(UP, 0.03 * Math.sin(4 * Math.PI * phase));
+    model.position.set(0, 0, 0).addScaledVector(UP, 0.03 * Math.sin(4 * Math.PI * phase)).addScaledVector(FORWARD, rock);
     // Girdles turn about the vertical, out of phase (the pelvis with the hind feet, the shoulders with the fore feet).
     const yaw = Math.sin(2 * Math.PI * (phase - LIFT.hL - 0.25));
     model.updateMatrixWorld(true);
@@ -163,17 +186,19 @@ export function createChameleonWalk(model, holder) {
 
     for (const [key, limb] of Object.entries(limbs)) {
       // Where this foot is in its cycle: stance (planted, sliding back with the branch) or swing (to the next spot).
-      let u = (phase - LIFT[key] + 1) % 1;   // 0 at lift-off
+      // LIFT holds the touchdown phase; the foot lifts DUTY later.
+      let u = (phase - LIFT[key] - DUTY + 2) % 1;   // 0 at lift-off
       const swing = 1 - DUTY;
-      const reach = girdleAlong(limb) + STRIDE * (limb.hind ? 0.55 : 0.45);   // landing spot, ahead of the girdle
+      // Landing spot: as far ahead of the girdle as the foot ends behind it (Higham & Jayne), half the stance's travel.
+      const reach = girdleAlong(limb) + DUTY * STRIDE / 2;
       let along, lift = 0, out = 0;
       if (u < swing) {
         const s = u / swing, e = 0.5 - 0.5 * Math.cos(Math.PI * s);
-        along = reach - STRIDE + e * STRIDE;
+        along = reach - DUTY * STRIDE + e * DUTY * STRIDE;   // forward against the body by the stance's travel
         lift = Math.sin(Math.PI * s) * SWING_LIFT; out = Math.sin(Math.PI * s) * SWING_OUT;
       } else {
         const s = (u - swing) / DUTY;
-        along = reach - s * STRIDE;
+        along = reach - s * DUTY * STRIDE;   // planted: slides back with the branch, SPEED × the stance's time
       }
       const target = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
       // Two bones to the wrist/ankle, the elbow/knee out to the side and up.
