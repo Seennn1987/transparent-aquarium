@@ -94,6 +94,17 @@ function restore(s) {
   for (const [k, m] of Object.entries(s.finStain ?? {})) if (k in hhFinStain) hhFinStain[k] = m ? [...m] : null;
 }
 const DEFAULTS = {};   // 欄を作るときの値（既定）
+// 2026-10-24 プロデューサー「添付画像を参照して、あなた自身で各パーツの色付け、濃さ設定、濁り具合の設定をして下さい。骨、肉、軟骨、内臓で色や濃さを分けることがポイント」
+//  「１クリックで呼び出せるよう画面上に「参考：体青・骨赤・内臓黄」という名称のボタンを作ってください。今の規定は「規定：1024」の名称でおなじくボタンを作って」。
+//  参考の写真（市販の魚の透明標本、830 × 648 px）の透過（背景 189 / 212 / 235 で割る）: 背骨 x 480・y 360 で 0.56 / 0.41 / 0.27（赤茶）、
+//  頭 x 350・y 560 で 0.49 / 0.77 / 0.86（青）、腹の肉 x 530・y 385 で 0.58 / 0.79 / 0.63、内臓 x 465・y 420 で 0.46 / 0.58 / 0.41（黄緑）、背びれ x 625・y 320 で 0.83 / 0.98 / 0.97。
+//  サメに当てはめ: 体の膜と肉 = 淡い青（青 0.3）、背骨と歯 = 赤紫と黄ばみで赤茶、弓・肋骨 = 薄い赤茶、頭骨・エラ = 濃い青だけ（赤紫を混ぜると灰色にくすむ）、
+//  ひれの軟骨 = 体より少し濃い青、内臓 = 黄ばみ。濃さ・にごり度の倍率は既定のまま（量で濃さを決めた）。値は既定の上に重ねる
+const PRESET_REF = {
+  mix: { spine: [0.4, 0, 0, 1.2], teeth: [0.5, 0, 0, 0.5], head: [0, 2.5, 0, 0], gill: [0, 2, 0, 0], fin: [0.05, 0.4, 0.3, 0], pelvic: [0.05, 0.4, 0.3, 0], uncal: [0.35, 0.05, 0, 1], skin: [0.03, 0.3, 0.1, 0.05] },
+  organMix: { Liver: [0, 0, 0.3, 4], Gut: [0, 0, 0.2, 3.5], Spiral: [0, 0, 0.3, 3], Heart: [0.15, 0, 0.3, 1], HeartLarge: [0.15, 0, 0.3, 1], HeartSmall: [0.15, 0, 0.3, 1] },
+  finStain: { CaudalRay: [0.05, 0.4, 0.3, 0] },
+};
 
 /** 欄を出さずに、ブラウザが覚えている値だけを当てる（ギャラリーの器の中のシュモクザメ。2026-10-17 から） */
 export function applySavedHammerheadTune() {
@@ -111,6 +122,9 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
 
   const css = document.createElement("style");
   css.textContent = `
+    #hh-preset { position: fixed; z-index: 1001; right: 70px; top: 12px; display: flex; gap: 6px; }
+    #hh-preset button { font: 13px system-ui, sans-serif; padding: 6px 10px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+    #hh-preset button.on { background: #222; color: #fff; }
     #hh-tune-btn { position: fixed; z-index: 1001; right: 12px; top: 12px; font: 13px system-ui, sans-serif; padding: 6px 12px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
     #hh-tune { position: fixed; z-index: 1000; right: 12px; top: 48px; bottom: 12px; width: 340px; overflow-y: auto; background: rgba(255,255,255,.94);
       border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.2); font: 13px/1.35 system-ui, sans-serif; color: #222; padding: 10px 12px; }
@@ -276,7 +290,17 @@ export function installHammerheadTune({ open = false, page = null } = {}) {
   b2.onclick = async () => { const text = JSON.stringify(snapshot(), null, 1); out.value = text; out.style.display = "block";
     try { await navigator.clipboard.writeText(text); b2.textContent = "コピーしました"; setTimeout(() => { b2.textContent = "値をコピー"; }, 1500); } catch { out.select(); } };
   btns.append(b1, b2); panel.append(btns, out);
-  document.body.append(btn, panel);
+  // 呼び出しのボタン（画面の右上、「調整」の左）。押すと既定に戻してから、その組の値を重ねる
+  const presets = document.createElement("div"); presets.id = "hh-preset";
+  const pbtns = [["規定：1024", {}], ["参考：体青・骨赤・内臓黄", PRESET_REF]].map(([label, over]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+    b.onclick = () => { restore(DEFAULTS); restore(over); save(); refreshAll(); };
+    presets.append(b); return [b, over];
+  });
+  // 押したときの値（最初に 1 度だけ作る）と同じなら、そのボタンを黒くする
+  const now = snapshot(), wants = pbtns.map(([, over]) => { restore(DEFAULTS); restore(over); return JSON.stringify(snapshot()); }); restore(now);
+  refreshers.push(() => { const cur = JSON.stringify(snapshot()); pbtns.forEach(([b], i) => b.classList.toggle("on", cur === wants[i])); });
+  document.body.append(presets, btn, panel);
   refreshAll();
   return { panel, snapshot, restore, defaults: DEFAULTS };
 }
