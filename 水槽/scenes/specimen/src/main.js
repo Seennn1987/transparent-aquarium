@@ -30,6 +30,7 @@ import {
 import { createGalleryJars } from "./gallery-jars.js";
 import { slotCount } from "./gallery-layout.js";
 import { installTunePanel } from "./tune-panel.js";
+import { installCameraPanel } from "./camera-panel.js";
 import { createMirrorPass } from "./table-reflection.js";
 
 const STAGE_KEY = "specimen-stage";
@@ -257,10 +258,14 @@ async function start() {
     get post() { return post; }, get specimenImage() { return specimenImage; },
   };
 
+  let cameraPanel = null;   // 下で作る（orbit を作るときにも onChange が呼ばれる）
   const orbit = createOrbit(camera, canvas, {
     target: CAMERA.target.clone(),
     minDistance: 3.6,
     maxDistance: 14,
+    // 高さ（カメラと見る点を一緒に上げ下げ。2026-10-24）。下は台の天板の少し上、上は器の口（6.5）が画面の上に出ない程度まで
+    minHeight: -1,
+    maxHeight: 2,
     // The chameleon may be walked all the way round (the room's edge then shows; 2026-10-13, at the user's request).
     ...(specimenKind === "chameleon" ? {} : { minAzimuth: ROOM_YAW - ORBIT_TURN, maxAzimuth: ROOM_YAW + ORBIT_TURN }),
     onChange() {
@@ -270,9 +275,13 @@ async function start() {
         rowHidden = hide;
         setJarCount(wantedJars);
       }
+      cameraPanel?.refresh();
       loop?.invalidate();
     },
   });
+  // カメラの欄（camera-panel.js、左上の「カメラ」）: 角度・高さ・距離。ブラウザが覚えた既定の位置で始める
+  cameraPanel = installCameraPanel({ habitat, orbit, roomYaw: ROOM_YAW, kind: specimenKind, onChange() { loop?.invalidate(); } });
+  window.specimenDebug.orbit = orbit;
 
   function resize() {
     const width = Math.max(1, habitat.clientWidth);

@@ -15,6 +15,9 @@ import { circlePose, circleSpeed, dishBaseScale, fitCircle, HH_HEIGHT } from "./
 //  （器の単位 / m）。標本は縮めて描くので、組織の通り道は 1 / 縮尺 倍に数えて、本当の大きさの濃さにする（pathScale）。
 const HAMMERHEAD_URL = new URL("../assets/specimen_hammerhead.glb", import.meta.url).href;
 export const HH_DISH = {
+  // 泳ぐ高さと大きさを決める液の上端（器の単位）。2026-10-24 に器を高くした（口 1.45 → 6.5、generate_specimen_dish.py）前の液の上端。
+  //  プロデューサー「円柱の水槽の高さを画面の高さ以上にして。ただし、サメが泳ぐ高さは変えないで。」
+  swimTop: 1.406,
   clearance: 0.12,        // 器の単位。カメレオンの瓶と同じ空き（計画書 第 4 節 C2 の目安）
   tailSwing: 0.09,        // 尾の先の片側の振れ（全長に対して、hammerhead-swim.js の既定）
   // 器の大きさの、サメに対する倍率（C1 の大きさを 1）。器の形はそのままでサメを 1 / 倍率に描くので、直径も高さもサメに対してこの倍率になる。
@@ -48,8 +51,9 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
   const box = new THREE.Box3().setFromObject(model, true);
   const size = box.getSize(new THREE.Vector3());
   const c = HH_DISH.clearance;
-  const radius = (liquidBounds.max.x - liquidBounds.min.x) / 2;
-  const depth = liquidBounds.max.y - liquidBounds.min.y;
+  const swimBounds = liquidBounds.clone(); swimBounds.max.y = Math.min(swimBounds.max.y, HH_DISH.swimTop);   // 泳ぐ高さは高くする前の液で
+  const radius = (swimBounds.max.x - swimBounds.min.x) / 2;
+  const depth = swimBounds.max.y - swimBounds.min.y;
   // いまの器の大きさ（C1）: 吻端〜尾が器の真ん中を通る直径に沿い、尾の振れの分も壁から c 離れる縮尺。これを「器の直径 1 倍」とする
   const scale1 = dishBaseScale({ radius, depth, clearance: c, tailSwing: HH_DISH.tailSwing });   // hammerhead-path.js（自動テストと同じ式）
   // C2・C3（2026-10-15、プロデューサー「サメのサイズに対して水槽が小さいです。せめて直径を２倍以上にしないと周回できないのではないでしょうか？」）:
@@ -57,7 +61,7 @@ export async function createHammerheadSpecimen({ liquidBounds, facing }) {
   //  回れるとき（hammerhead-path.js の fitCircle）は、体の真ん中が器の軸のまわりの円を反時計回りに進む。回れないときは真ん中でその場の泳ぎ
   const swimOpts = () => ({ amplitude: swimLook.amplitude, wavelength: swimLook.wavelength, turnBend: swimLook.turnBend, frequency: swimLook.frequency });
   const yMid = (HH_HEIGHT.top + HH_HEIGHT.bottom) / 2;
-  const centre = liquidBounds.getCenter(new THREE.Vector3());
+  const centre = swimBounds.getCenter(new THREE.Vector3());
   const state = { ratio: 0, scale: scale1, circle: null, theta: 0, lastTime: 0 };
   const pivot = new THREE.Group();
   pivot.name = "SpecimenPivot";

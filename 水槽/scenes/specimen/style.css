@@ -153,3 +153,86 @@
     right: var(--space-4);
   }
 }
+
+/* カメラの欄（camera-panel.js、2026-10-24）。左上（ロゴを外した所） */
+#camera-open,
+#camera-panel button {
+  margin: 0;
+  width: auto;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--stroke) solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-small);
+}
+#camera-open:hover,
+#camera-panel button:hover {
+  background: var(--surface-hover);
+}
+#camera-open {
+  position: fixed;
+  z-index: 3;
+  top: var(--space-6);
+  left: var(--space-8);
+}
+#camera-panel {
+  position: fixed;
+  z-index: 3;
+  top: var(--space-6);
+  left: var(--space-8);
+  width: min(280px, calc(100vw - var(--space-16)));
+  padding: var(--space-4);
+  background: var(--scrim);
+  border: var(--stroke) solid var(--border);
+  font-size: var(--text-small);
+}
+#camera-panel[hidden],
+#camera-open[hidden] {
+  display: none;
+}
+.camera-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.camera-head h2 {
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: 600;
+  font-style: normal;
+}
+.camera-row {
+  display: block;
+  margin: var(--space-2) 0;
+}
+.camera-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.camera-top span {
+  flex: 1;
+}
+.camera-top input[type="number"] {
+  width: 5.5em;
+  font: inherit;
+}
+.camera-row input[type="range"] {
+  width: 100%;
+}
+.camera-note {
+  margin: var(--space-2) 0;
+  color: var(--text-muted);
+}
+.camera-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+#camera-panel textarea {
+  width: 100%;
+  margin-top: var(--space-2);
+  font: 11px monospace;
+}
