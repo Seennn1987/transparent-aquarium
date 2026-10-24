@@ -30,7 +30,8 @@ import { MODEL_UNITS_PER_MM } from "./chameleon-stain.js";
 import { chameleonEyes } from "./chameleon-material.js";
 
 const MM = MODEL_UNITS_PER_MM;
-const BRANCH_RADIUS = 14.6 / 2 * MM;
+// ?branchMM= the branch's diameter in mm (the grip proposals, C record 62).
+const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 14.6) / 2 * MM;
 // ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
 const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 37.5) * MM;   // model units per second
 const DUTY = 0.6555;
@@ -53,6 +54,10 @@ const HEEL = 6.7 * MM;
 // The foot's angle up from the branch: flat in the grip, the heel raised at lift-off (Higham & Jayne: the knee straightest at the
 // end of stance, the foot pushing off). The 80° is set so the hind feet reach (below).
 const HEEL_DOWN = THREE.MathUtils.degToRad(15), HEEL_UP = THREE.MathUtils.degToRad(80);
+// The grip (C record 62): the bundles hug the bark GRIP_GAP above it, reach at most GRIP_MAX round from the top, lean forward by
+// GRIP_AHEAD of their length, and open/close over GRIP_EASE of the swing at each end. Set by eye against photo 08 (?gripMax= in degrees).
+const GRIP_GAP = 0.6 * MM, GRIP_AHEAD = 0.25, GRIP_EASE = 0.25;
+const GRIP_MAX = THREE.MathUtils.degToRad(Number(new URLSearchParams(location.search).get("gripMax") ?? 150));
 const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.45);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 const PELVIS_YAW = THREE.MathUtils.degToRad(20), SHOULDER_YAW = THREE.MathUtils.degToRad(12);
@@ -81,7 +86,12 @@ export function createChameleonWalk(model, holder) {
   for (const [key, end] of [["fL", "hand"], ["fR", "hand"], ["hL", "foot"], ["hR", "foot"]]) {
     const upper = bones[`${key}_upper`], lower = bones[`${key}_lower`], tip = bones[`${key}_${end}`];
     const a = inHolder(upper).distanceTo(inHolder(lower)), b = inHolder(lower).distanceTo(inHolder(tip));
-    limbs[key] = { upper, lower, tip, a, b, hind: key[0] === "h", left: key[1] === "L" };
+    // The digit bundles' bones (glb with chameleon_digit_bones.py, C record 62): each bundle's two segments and its tip point.
+    const bundle = (side) => {
+      const b1 = bones[`${tip.name}_${side}1`], b2 = bones[`${tip.name}_${side}2`], e = bones[`${tip.name}_${side}_end`];
+      return b1 && b2 && e ? { b1, b2, e, l1: inHolder(b1).distanceTo(inHolder(b2)), l2: inHolder(b2).distanceTo(inHolder(e)) } : null;
+    };
+    limbs[key] = { upper, lower, tip, a, b, hind: key[0] === "h", left: key[1] === "L", med: bundle("med"), lat: bundle("lat") };
   }
   // Where the body sits over the branch: the hips and shoulders at BODY_LOW and BODY_LOW + 0.05 of their limbs' reach above its top.
   const mid = (p, q) => p.clone().add(q).multiplyScalar(0.5);
@@ -245,6 +255,44 @@ export function createChameleonWalk(model, holder) {
       // The hand/foot along the branch, fingers forward, gripping its top.
       const tipNow = limb.tip.localToWorld(new THREE.Vector3(0, 0.3, 0));
       aim(limb.tip, tipNow, toWorld(contact.clone().addScaledVector(FORWARD, 0.1)));
+      // The grip: in stance each bundle is laid round the branch on its own side (the lateral one to the limb's outer side), its
+      // segments following the surface (arc length = the segment's length, out to GRIP_MAX from the top); they let go over the
+      // first GRIP_EASE of the swing and close again over its last GRIP_EASE (in the air they keep the glb's open pose).
+      const gripAmt = u < swing ? 1 - Math.min(1, Math.min(u, swing - u) / (GRIP_EASE * swing)) : 1;
+      if (limb.med && limb.lat && gripAmt > 0) {
+        const outward = limb.left ? 1 : -1;
+        for (const [bd, sideSign] of [[limb.lat, outward], [limb.med, -outward]]) {
+          const at = (bone) => holder.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+          const base = at(bd.b1);
+          const rel = base.clone().sub(branchCentre); const along0 = rel.dot(FORWARD);
+          const th0 = Math.atan2(rel.dot(LEFT), rel.dot(UP));
+          const rr = BRANCH_RADIUS + GRIP_GAP;
+          const onBranch = (th, ahead) => branchCentre.clone().addScaledVector(FORWARD, along0 + ahead)
+            .addScaledVector(UP, rr * Math.cos(th)).addScaledVector(LEFT, rr * Math.sin(th));
+          const clampTh = (th) => sideSign > 0 ? Math.min(th, GRIP_MAX) : Math.max(th, -GRIP_MAX);
+          // The point on the surface, round from `from` on this side, that is exactly `len` (the segment, a straight bone) from `p`.
+          const reachOn = (p, from, len, ahead) => {
+            let lo = 0, hi = Math.PI;
+            if (onBranch(from + sideSign * hi, ahead).distanceTo(p) < len) return clampTh(from + sideSign * hi);
+            for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (onBranch(from + sideSign * m, ahead).distanceTo(p) < len) lo = m; else hi = m; }
+            return clampTh(from + sideSign * lo);
+          };
+          const mixTo = (bone, child, target) => {
+            const now = holder.worldToLocal(child.getWorldPosition(new THREE.Vector3()));
+            aim(bone, toWorld(now), toWorld(now.clone().lerp(target, gripAmt)));
+          };
+          const th1 = reachOn(base, th0, bd.l1, bd.l1 * GRIP_AHEAD);
+          mixTo(bd.b1, bd.b2, onBranch(th1, bd.l1 * GRIP_AHEAD));
+          const th2 = reachOn(at(bd.b2), th1, bd.l2, (bd.l1 + bd.l2) * GRIP_AHEAD);
+          mixTo(bd.b2, bd.e, onBranch(th2, (bd.l1 + bd.l2) * GRIP_AHEAD));
+          const got = at(bd.e).sub(branchCentre);
+          (footState[key].grip2 ??= {})[bd === limb.lat ? "lat" : "med"] = {
+            th0: THREE.MathUtils.radToDeg(th0), want: THREE.MathUtils.radToDeg(th2),
+            got: THREE.MathUtils.radToDeg(Math.atan2(got.dot(LEFT), got.dot(UP))),
+            off: (Math.hypot(got.dot(LEFT), got.dot(UP)) - rr) / MM,   // the tip's distance from the hugging surface, mm
+          };
+        }
+      }
     }
 
     // Eyes: independent saccades — a quick turn (0.12 s) to a new direction, then still for 0.4–2.2 s.
@@ -272,7 +320,7 @@ export function createChameleonWalk(model, holder) {
     model.updateMatrixWorld(true);
     return Object.fromEntries(Object.entries(limbs).map(([key, limb]) => {
       const f = footState[key] ?? {};
-      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip }];
+      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, grip: f.grip2 }];
     }));
   }
   return { backdrop, branchFrame, update, feet };

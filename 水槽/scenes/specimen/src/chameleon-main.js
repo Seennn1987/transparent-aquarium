@@ -12,6 +12,9 @@ import { createChameleonWalk } from "./chameleon-walk.js";
 // The mesh comes from the MorphoSource CT (non-commercial, not redistributed), so the file is
 // kept out of git: blender/export_chameleon_gltf.py writes it to assets/private/.
 const CHAMELEON_URL = new URL("../assets/private/specimen_chameleon.glb", import.meta.url).href;
+// ?glb=<name>: a proposal's glb from assets/private/proposals/ (letters, digits, _ and - only), to compare before it becomes the default.
+const PROPOSAL = new URLSearchParams(location.search).get("glb");
+const GLB_URL = PROPOSAL && /^[\w-]+$/.test(PROPOSAL) ? new URL(`../assets/private/proposals/${PROPOSAL}.glb`, import.meta.url).href : CHAMELEON_URL;
 const CLIP = "CH_Hover";
 const PHOTO01_TURN = [0, 0, 20];
 
@@ -37,7 +40,7 @@ async function start() {
   if (skinView > 0) { chameleonLook.skin.value = skinView; if (stain === "01") chameleonLook.film.value = skinView; }
   document.body.style.background = `rgb(${stainOf(stain).lightbox.map((v) => Math.round(v * 255)).join(",")})`;
 
-  const gltf = await new GLTFLoader().loadAsync(CHAMELEON_URL);
+  const gltf = await new GLTFLoader().loadAsync(GLB_URL);
   const model = gltf.scene;
   const reference = { value: 0 };
   applyChameleonTissue(model, reference);

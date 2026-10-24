@@ -53,6 +53,11 @@ def prepare():
     gen = runpy.run_path(g["GEN"], run_name="chameleon_ct")
     coll, rigob, skel, rig = gen["build"]()
     d, _, k = gen["load"]()
+    # DIGIT_BONES=1: 手・足の指の 2 つの束に骨を足す（chameleon_digit_bones.py、計画書 C の記録 62）。印は DIGIT_LABELS
+    if os.environ.get("DIGIT_BONES") == "1":
+        digits = runpy.run_path(os.path.join(HERE, "chameleon_digit_bones.py"), run_name="chameleon_digits")
+        labels = os.environ.get("DIGIT_LABELS", os.path.join(HERE, "private", "work", "digits_h33.npz"))
+        digits["run"](rigob, d, k, labels)
     g["build_pose"](rigob, d, k, g["jar_pose"]())
     bpy.context.view_layer.update()
     # 膜は体積のうちに切り離して作った（ct_body_pipeline/softmesh2.py）ので、伸びた面を外さない
