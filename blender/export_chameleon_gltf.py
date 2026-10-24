@@ -53,8 +53,9 @@ def prepare():
     gen = runpy.run_path(g["GEN"], run_name="chameleon_ct")
     coll, rigob, skel, rig = gen["build"]()
     d, _, k = gen["load"]()
-    # DIGIT_BONES=1: 手・足の指の 2 つの束に骨を足す（chameleon_digit_bones.py、計画書 C の記録 62）。印は DIGIT_LABELS
-    if os.environ.get("DIGIT_BONES") == "1":
+    # 手・足の指の 2 つの束に骨を足す（chameleon_digit_bones.py、計画書 C の記録 62・63。2026-10-24 から既定）。印は DIGIT_LABELS。
+    # DIGIT_BONES=0 で足さない（前の glb）
+    if os.environ.get("DIGIT_BONES", "1") == "1":
         digits = runpy.run_path(os.path.join(HERE, "chameleon_digit_bones.py"), run_name="chameleon_digits")
         labels = os.environ.get("DIGIT_LABELS", os.path.join(HERE, "private", "work", "digits_h33.npz"))
         digits["run"](rigob, d, k, labels)

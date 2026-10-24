@@ -15,8 +15,8 @@
 //   front (excursions nearly symmetric), the knee unusually extended at footfall, large pelvic rotation (57°), the limb widest out
 //   at mid-swing. So the foot travels 2 × 5.9 cm against the hip in stance, a stride of 2 × 5.9 / 0.6555 = 18 cm.
 // - Scaled to this animal: 1 model unit = 22.2 mm (chameleon-stain.js MODEL_UNITS_PER_MM), snout–vent about 11 cm, × 11 / 20.25:
-//   the speed 3.75 cm/s, the stride 9.8 cm (4.4 units), one stride 2.6 s. The branch stays Higham & Jayne's 2.4 cm × 11 / 18.1
-//   = 1.46 cm across (Krause & Fischer's 2 cm pole would be 1.1 cm). In the walking videos of the same data (Gait_Videos, Chamaeleo_calyptratus.mp4 and _2.mp4) a
+//   the speed 3.75 cm/s, the stride 9.8 cm (4.4 units), one stride 2.6 s. The branch is 10 mm across (C record 63; Higham &
+//   Jayne's 2.4 cm scaled would be 1.46 cm, Krause & Fischer's 2 cm 1.1 cm). In the walking videos of the same data (Gait_Videos, Chamaeleo_calyptratus.mp4 and _2.mp4) a
 //   hindfoot stays down about 3 s while the animal walks on a deck, as slow as this.
 // - The rocking: no measured study found. Described as rocking back and forth between spells of ordinary walking (Chameleo, ACM 2021,
 //   "walk like a chameleon detection with AI"), triggered by a moving plant or wind (La Trobe animal behaviour group, 2017, one
@@ -30,8 +30,9 @@ import { MODEL_UNITS_PER_MM } from "./chameleon-stain.js";
 import { chameleonEyes } from "./chameleon-material.js";
 
 const MM = MODEL_UNITS_PER_MM;
-// ?branchMM= the branch's diameter in mm (the grip proposals, C record 62).
-const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 14.6) / 2 * MM;
+// The branch: 10 mm across (C record 63, 2026-10-24, the producer: 「枝は案 B（直径 10 mm）にして」; Krause & Fischer's 2 cm pole scaled
+// to this animal is 11 mm). ?branchMM= to try others.
+const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 10) / 2 * MM;
 // ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
 const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 37.5) * MM;   // model units per second
 const DUTY = 0.6555;

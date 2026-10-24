@@ -195,3 +195,4 @@
 - 標本ページを撮る: `page_check/`（Mac の Chrome と共有の 8080 の配信）。4 方向（横・背中・腹・正面）は `page_check/views.py <URL> <接頭辞>`
 - 2026-10-24（記録 56）から、`chameleon.html` の指定なしの向きは写真 06 の向き（前の `?view=photo06`）。それまで指定なしで測った値（瓶の姿勢、写真 01 の色の当て直しなど）と比べるときは `?view=photo01&rot=0,0,0` を付ける
 - 2026-10-24（記録 58）から、`chameleon.html` は描く先を重ね塗りなし・16 bit で描く。通り道を読み出して測る道具（paths3.py、organcal.py、fit_*.py に渡す数を書き出すもの）には `&msaa=4&half=0` を付けて前の描き方で測る
+- 2026-10-24（記録 63）から、書き出しは手・足の指の 2 つの束に骨を足す（`blender/chameleon_digit_bones.py`、指の印は `blender/private/work/digits_h33.npz`。`DIGIT_LABELS=` で変える）。`DIGIT_BONES=0` で前の骨組み。手・足の骨の頂点を変えたら、先に `digit_labels.py` を回し直す（頂点の数が合わないと止まる）
