@@ -193,3 +193,4 @@
 - 膜から臓器まで: `cd blender/private/work && bash ../../ct_body_pipeline/run_skin_organs.sh`（約 8 分）。2026-10-17 に今の骨から回し、前の版（Cowork）と比べた: 膜と臓器の面は、面どうしの距離が同じ面を 2 回測ったときの誤差と同じ（膜で平均 0.107 mm、差の点 0%）。違うのは頂点の並びだけ。glb の検査の数は 4 桁目まで同じ（膜の体積 4.1038 → 4.1037）。標本ページを 5 方向で撮った画像の差は最大 6/255
 - 書き出し: `chameleon_body_soft.npz` を `blender/private/` に置いてから、リポジトリ直下で `/Applications/Blender.app/Contents/MacOS/Blender -b -P blender/export_chameleon_gltf.py -- <出力.glb>`（約 1 分）。今の素材からの書き出しは、今の glb とバイト単位で同じだった
 - 標本ページを撮る: `page_check/`（Mac の Chrome と共有の 8080 の配信）。4 方向（横・背中・腹・正面）は `page_check/views.py <URL> <接頭辞>`
+- 2026-10-24（記録 56）から、`chameleon.html` の指定なしの向きは写真 06 の向き（前の `?view=photo06`）。それまで指定なしで測った値（瓶の姿勢、写真 01 の色の当て直しなど）と比べるときは `?view=photo01&rot=0,0,0` を付ける

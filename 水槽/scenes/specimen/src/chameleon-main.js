@@ -46,7 +46,9 @@ async function start() {
   // camera, as it lies in 06-lightbox-calyptratus-2.jpg (the pose is still the jar's).
   const holder = new THREE.Group();
   holder.add(model);
-  const photo06 = query.get("view") === "photo06";
+  // The start is this orientation, with the rotation bars at 0 (C record 56, 2026-10-24, the producer: 「添付画像の向き規定にして。
+  // そしてそれを各軸の０度にして。」, with a picture of it). `view=photo01` gives the jar photo's orientation (C record 55) instead.
+  const photo06 = query.get("view") !== "photo01";
   if (photo06) holder.rotation.set(0, Math.PI, -Math.PI / 2);
   const scene = new THREE.Scene();
   scene.add(holder);
@@ -62,8 +64,8 @@ async function start() {
   const radius = box.getSize(new THREE.Vector3()).length() / 2;
   // The specimen hangs from a pivot at its centre, so the rotation bars (chameleon-rotate.js) turn it in place.
   const pivot = new THREE.Group(); pivot.position.copy(centre);
-  // Without `view`, the start is turned to lie as in the jar photo 01 (C record 55, 2026-10-24, the producer: 「添付画像の向きを
-  // 規定にして」): degrees about the screen's X, Y, Z (Rz · Ry · Rx), on top of the jar pose. `?rot=x,y,z` tries others.
+  // `view=photo01`: turned to lie as in the jar photo 01 (C record 55, 2026-10-24): degrees about the screen's X, Y, Z (Rz · Ry · Rx),
+  // on top of the jar pose. `?rot=x,y,z` tries others. Either way the bars start at 0.
   const rot = (query.get("rot") ?? (photo06 ? "0,0,0" : PHOTO01_TURN.join(","))).split(",").map((v) => THREE.MathUtils.degToRad(Number(v) || 0));
   pivot.quaternion.setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], "ZYX"));
   const inner = new THREE.Group(); inner.position.copy(centre).negate();
