@@ -8,6 +8,8 @@
   b1_eyes_bulge.obj  眼の盛り上がり（球）とまぶたの縁（輪）
   b1_fins.obj    ひれ: 耳の形。外の縁は丸まった管、内は頭の横へつながる膜。下の端は内へ巻く
   b1_arms.obj    腕 8 本（a3 と同じ道。口側に出て、縁から先は背へ巻く）
+融合しないもの（2026-10-24 第 12 版のあと）:
+  b1_suckers.obj・b1_cirri.obj  吸盤と触毛。腕と同じ道（弓なり・先の巻き）の上に置く（それまでは A3 のまっすぐな腕の a3_*.obj を使っていた）
 融合しないもの:
   b1_eyeballs.obj  眼球（まぶたの開口からのぞく暗い球）
 
@@ -242,12 +244,14 @@ def arms(m):
     M.CURL_STRAIGHT = 0.0
     M.ARM_BOW = ARM_BOW
     body = A.Body(peak=0.0)
-    out = []
+    out, suckers, cirri = [], [], []
     for deg in M.ARM_DEG.values():
         for side in (1, -1):
-            arm, _, _, _ = M.arm_parts(body, deg, side)
+            arm, su, ci, _ = M.arm_parts(body, deg, side)
             out.append(arm)
-    return out
+            suckers += su
+            cirri += ci
+    return out, suckers, cirri
 
 
 def main():
@@ -263,7 +267,11 @@ def main():
     for k, (fv, ff) in enumerate(fins):
         print("ひれの部品", k, "開いた辺", M.open_edges(ff), "体積", round(A.signed_volume(fv, ff), 6))
     A.save_obj(os.path.join(A.WORK, "b1_fins.obj"), *M.merge(fins))
-    A.save_obj(os.path.join(A.WORK, "b1_arms.obj"), *M.merge(arms(m)))
+    arm_meshes, suckers, cirri = arms(m)
+    A.save_obj(os.path.join(A.WORK, "b1_arms.obj"), *M.merge(arm_meshes))
+    A.save_obj(os.path.join(A.WORK, "b1_suckers.obj"), *M.merge(suckers))
+    A.save_obj(os.path.join(A.WORK, "b1_cirri.obj"), *M.merge(cirri))
+    print("吸盤", len(suckers), "触毛", len(cirri))
     print("出力", A.WORK)
 
 

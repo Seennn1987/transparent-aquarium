@@ -3,7 +3,7 @@
 
   /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup -P blender/mendako/b2_fuse_render.py -- <出力の名前>
 
-入力: blender/mendako/work/b1_body.obj・b1_eyes_bulge.obj・b1_fins.obj・b1_arms.obj（融合する）、b1_eyeballs.obj・a3_suckers.obj・a3_cirri.obj（そのまま）
+入力: blender/mendako/work/b1_body.obj・b1_eyes_bulge.obj・b1_fins.obj・b1_arms.obj（融合する）、b1_eyeballs.obj・b1_suckers.obj・b1_cirri.obj（そのまま）
 出力:
   blender/mendako/work/b2_mendako.blend      融合した形（git に入れない）
   docs/mendako/b2_<名前>_{front,oblique,top,oral}.png   描いた絵（粘土色の不透明の材質。形の陰を見るため）
@@ -148,7 +148,7 @@ def render(sc, cam, view, path, gnd):
     cd = cam.data
     gnd.hide_render = view in ("oral",)
     for o in bpy.data.objects:
-        if o.name.startswith("a3_"):
+        if o.name.startswith(("a3_", "b1_suckers", "b1_cirri")):
             o.hide_render = view != "oral"      # 吸盤と触毛は口側の絵だけ
     if view == "front":                    # 生体の正面（Sunshine2）: 砂の高さに近い所から前を見る
         cd.type = "PERSP"
@@ -188,7 +188,7 @@ def main():
     bpy.context.view_layer.objects.active = eb
     bpy.ops.object.shade_smooth()
     detail = []
-    for n, rgb in (("a3_suckers.obj", (0.86, 0.62, 0.58)), ("a3_cirri.obj", (0.82, 0.52, 0.5))):
+    for n, rgb in (("b1_suckers.obj", (0.86, 0.62, 0.58)), ("b1_cirri.obj", (0.82, 0.52, 0.5))):
         o = import_obj(n)
         o.data.materials.append(flat_material(n, rgb))
         bpy.context.view_layer.objects.active = o
