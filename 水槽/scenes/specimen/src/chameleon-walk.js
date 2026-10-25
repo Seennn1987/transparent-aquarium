@@ -89,7 +89,11 @@ const _y = new URLSearchParams(location.search);
 const PELVIS_YAW = THREE.MathUtils.degToRad(Number(_y.get("pelvisYaw") ?? 28.5)), SHOULDER_YAW = THREE.MathUtils.degToRad(Number(_y.get("shoulderYaw") ?? 12));
 const _q = new URLSearchParams(location.search);
 // degrees, degrees, the share of its length before it bends; set by eye (?tailStart= ?tailTurn= ?tailStraight= to try others)
-const TAIL_START = Number(_q.get("tailStart") ?? 230), TAIL_TURN = Number(_q.get("tailTurn") ?? 520), TAIL_STRAIGHT = Number(_q.get("tailStraight") ?? 0.4);
+// C record 70 (2026-10-25, the producer: 「文献の形で、尾を上げて、先端は少し丸める」): walking on a level branch the tail is held straight,
+// parallel to the perch or a little raised, and never touches it (Krause & Fischer 2013); in the walking videos the tip is a small
+// upward curl. So: back and 10° up from the base, straight to 75% of its length, then curling up over the last quarter (−200° in all).
+// Before: hanging below the branch and coiled (230°, 520°, 0.4), the photo's resting pose.
+const TAIL_START = Number(_q.get("tailStart") ?? 170), TAIL_TURN = Number(_q.get("tailTurn") ?? -200), TAIL_STRAIGHT = Number(_q.get("tailStraight") ?? 0.75);
 const EYE_YAW = THREE.MathUtils.degToRad(80), EYE_PITCH = THREE.MathUtils.degToRad(35);
 
 // Model frame (the glb's, the jar pose): dorsal −X, forward −Y (toward the head), left +Z.

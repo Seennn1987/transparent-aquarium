@@ -81,8 +81,11 @@ async function start() {
   const walk = walking ? createChameleonWalk(model, holder) : null;
   if (walk) { walk.branchFrame.matrixAutoUpdate = false; walk.update(0); scene.updateMatrixWorld(true); }
   const camera = new THREE.PerspectiveCamera(20, 1, radius * 0.1, radius * 20);
-  // In the photo the animal spans about 0.75 of the frame's width.
-  const size = box.getSize(new THREE.Vector3());
+  // In the photo the animal spans about 0.75 of the frame's width. Walking, the frame is the walking pose's (C record 70: the tail
+  // held out behind ran off the screen's left edge when framed on the jar pose).
+  const frameBox = walk ? new THREE.Box3().setFromObject(model, true) : box;
+  const size = frameBox.getSize(new THREE.Vector3());
+  if (walk) centre.copy(frameBox.getCenter(new THREE.Vector3()));
   const distance = photo06
     ? size.x / 0.75 / 2 / Math.tan(THREE.MathUtils.degToRad(10)) / (canvas.clientWidth / canvas.clientHeight)
     : radius / Math.tan(THREE.MathUtils.degToRad(10)) * 1.05;
