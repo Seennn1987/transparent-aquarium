@@ -127,3 +127,12 @@
 - madcham.de, The chameleon's tongue shot https://www.madcham.de/en/?p=7032 — 舌内突起はかなり軟骨、角鰓骨 2 本は骨、角舌骨の突起は小さく軟らかい軟骨
 - Huskey 2020, Gular pouch diversity in the Chamaeleonidae, *Anat. Rec.* https://anatomypubs.onlinelibrary.wiley.com/doi/10.1002/ar.24313 — 本文は読めていない
 - 乾燥骨格の写真（プロデューサーから、比較だけ。入れない）: 口を開けた頭骨で、あごの角から喉へ細い角鰓骨
+
+## 2026-10-26 に集めた比較用の資料（リポジトリ外、計画書 C の記録 88）
+
+置き場所 `~/transparent-aquarium/画像サンプル収集/エボシカメレオン/収集_2026-10-26/`。ファイルごとの出典・作者・ライセンスは各フォルダの `一覧.md`。git に入れない。
+
+- `生体_横/`: 生きた個体の横の写真 100 枚（Wikimedia Commons 66、iNaturalist の CC 34）
+- `動画/`: Wimberly ら 2021（Zenodo 5168016、CC0）の 2 本、Commons の webm 2 本、Mixkit 1470・1483。コマ 44 枚は `動画/コマ/`
+- `X線_骨格_解剖/`: Melero 2020（UAB 博士論文、CC BY-NC-ND）の X 線、Melero 2023（Open Vet J、CC BY-NC 4.0）の CT 断面、DigiMorph TNHC 62768、AMNH の骨格（CC0）、Molnar & Watanabe 2023（R Soc Open Sci、CC BY 4.0）の図、Klaver 1977、Leavey ら 2025（Anat Rec、CC BY 4.0）、Higham & Jayne 2004 の図
+- `文献/数の表.md`: 体の寸法・骨の数・枝の上の高さと関節の角度（出典の表・図・ページつき）
