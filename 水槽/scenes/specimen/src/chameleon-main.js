@@ -42,6 +42,8 @@ async function start() {
 
   const gltf = await new GLTFLoader().loadAsync(GLB_URL);
   const model = gltf.scene;
+  // The trunk of C record 89 baked in (page_check/bake_shape88.py, C record 90): chameleon-walk.js does not reshape it again.
+  model.userData.shape88Baked = Boolean(gltf.asset?.extras?.chameleon_shape88);
   const reference = { value: 0 };
   applyChameleonTissue(model, reference);
   const clip = gltf.animations.find((a) => a.name === CLIP);
@@ -182,6 +184,19 @@ async function start() {
     walkBelly(t) { walk.update(t); return walk.belly(); },
     walkOutline(t) { walk.update(t); return walk.outline(); },
     seek(t) { mixer.setTime(t); },
+    /** For baking (page_check/bake_shape88.py): each skinned mesh's bind positions as they are now (after ?shape=88), base64 of float32 x y z. */
+    meshPositions() {
+      const out = [];
+      model.traverse((o) => {
+        if (!o.isSkinnedMesh) return;
+        const a = o.geometry.getAttribute("position"), f = new Float32Array(a.count * 3);
+        for (let i = 0; i < a.count; i++) { f[3 * i] = a.getX(i); f[3 * i + 1] = a.getY(i); f[3 * i + 2] = a.getZ(i); }
+        const u = new Uint8Array(f.buffer); let bin = "";
+        for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+        out.push({ name: o.name, count: a.count, b64: btoa(bin) });
+      });
+      return out;
+    },
   };
 }
 

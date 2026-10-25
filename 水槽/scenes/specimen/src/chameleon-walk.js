@@ -104,13 +104,17 @@ const FIT_OUT_BOT = [-0.0052, -0.028, -0.0482, -0.066, -0.0811, -0.0943, -0.1063
 // 若い個体と床を歩く成体の形）で、B〜E の修正を進めて下さい。」; plan C record 88). ?shape=88 reshapes the meshes once at load (shape88()).
 // Target (docs/chameleon_trunk/target_outline_88.json): the median back and belly lines of 4 young animals and the adult walking on the floor in
 // Wimberly et al. 2021's video (t 309 s), traced in the frame x 0 at the snout, 1 at the hip, y up (snout–hip lengths), x 0.3–1.25 every 0.025.
+// Since C record 90 (2026-10-26, the producer: 「この形（?shape=88）を本番にして、静止の形に焼き込んで下さい。」) the shape is baked into
+// specimen_chameleon.glb by page_check/bake_shape88.py, which runs ?shape=88 on the glb before baking (assets/private/proposals/pre_shape88.glb).
+// A baked glb (asset.extras.chameleon_shape88) is not reshaped again.
 const SHAPE88 = new URLSearchParams(location.search).get("shape") === "88";
 const SHAPE_X0 = 0.3, SHAPE_DX = 0.025;
 const SHAPE_TOP = [0.1972, 0.1974, 0.2002, 0.2043, 0.2103, 0.2152, 0.2197, 0.2230, 0.2253, 0.2267, 0.2274, 0.2274, 0.2268, 0.2258, 0.2242, 0.2216, 0.2172, 0.2112, 0.2049, 0.1997, 0.1963, 0.1936, 0.1909, 0.1873, 0.1830, 0.1777, 0.1705, 0.1594, 0.1432, 0.1225, 0.1022, 0.0855, 0.0751, 0.0673, 0.0613, 0.0589, 0.0587, 0.0604, 0.0602];
 const SHAPE_BOT = [-0.1115, -0.1108, -0.1092, -0.1062, -0.1031, -0.1011, -0.1016, -0.1030, -0.1038, -0.1029, -0.1009, -0.0988, -0.0968, -0.0953, -0.0938, -0.0922, -0.0903, -0.0884, -0.0866, -0.0849, -0.0835, -0.0821, -0.0806, -0.0784, -0.0754, -0.0722, -0.0699, -0.0687, -0.0672, -0.0634, -0.0561, -0.0462, -0.0352, -0.0250, -0.0164, -0.0101, -0.0058, -0.0035, -0.0027];
-// With ?shape=88 the belly is shallower, and the hips come down to 0.4 of the leg's reach (14.4 mm), putting the belly 1.7–3.0 mm over the branch
-// while walking: the adults traced in C record 88 hold it 0.02 of the snout–hip length (2.5 mm) above; Krause & Fischer 2013 the hip 0.114 SVL.
-const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? (SHAPE88 ? 0.4 : 0.6));
+// With the trunk of C record 89 (baked into the glb since C record 90) the belly is shallower, and the hips come down to 0.4 of the leg's reach
+// (14.4 mm), putting the belly 1.7–3.0 mm over the branch while walking: the adults traced in C record 88 hold it 0.02 of the snout–hip length
+// (2.5 mm) above; Krause & Fischer 2013 the hip 0.114 SVL. (0.6 before, for the deeper belly; ?low= to try others.)
+const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.4);
 // ?neck=<degrees>: the head pitched by this much more, shared evenly by the 5 neck vertebrae v01–v05 (Molnar & Watanabe 2023: C1–C5), + snout down.
 const NECK_DEG = Number(new URLSearchParams(location.search).get("neck") ?? 0);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
@@ -700,6 +704,7 @@ export function createChameleonWalk(model, holder) {
     console.log(`[shape88] moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}`);
   }
   if (FIT_SKIN) fitSkin();
-  if (SHAPE88) shape88();
+  if (SHAPE88 && model.userData.shape88Baked) console.warn("[shape88] この glb は焼き込み済みなので、?shape=88 をかけない");
+  else if (SHAPE88) shape88();
   return { backdrop, branchFrame, update, feet, belly, outline };
 }
