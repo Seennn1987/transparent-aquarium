@@ -413,10 +413,17 @@ def trim_skin(max_ratio=SKIN_STRETCH_MAX):
 def jar_pose():
     """瓶の姿勢（POSE_JAR）。手足の向きの案を試すとき（計画書 C の記録 22）は、CH_LIMBS_JSON に {骨の名前: [θ, φ]} の JSON の
     パスを入れる。書いた骨だけ置き換える。"""
+    pose = dict(POSE_JAR)
+    # CH_TRUNK_ARCH=<度>: 胴の背骨を背へ弓にする案（計画書 C の記録 81、方針 A）。肩の上（体軸 TRUNK_ARCH_S0 mm）から股関節（104.7 mm）まで、
+    # 背骨の向きに A·sin(2πt) を足す（t = 0 → 1）。両端で 0、足し合わせて 0 なので、肩と股関節の高さは変わらず、胴の中ほどが持ち上がる
+    if os.environ.get("CH_TRUNK_ARCH"):
+        A = float(os.environ["CH_TRUNK_ARCH"]); s0, s1 = float(os.environ.get("CH_TRUNK_ARCH_S0", "24")), 104.7
+        ss = sorted(set([a for a, b in POSE_JAR["trunk"]] + list(np.linspace(s0, s1, 41))))
+        pose["trunk"] = [(s, interp(POSE_JAR["trunk"], s) + (A * math.sin(2 * math.pi * (s - s0) / (s1 - s0)) if s0 <= s <= s1 else 0.0)) for s in ss]
     if not os.environ.get("CH_LIMBS_JSON"):
-        return POSE_JAR
+        return pose
     import json
-    pose = dict(POSE_JAR); pose["limbs"] = dict(POSE_JAR["limbs"])
+    pose["limbs"] = dict(POSE_JAR["limbs"])
     pose["limbs"].update({n: tuple(v) for n, v in json.load(open(os.environ["CH_LIMBS_JSON"])).items()})
     print("[Chameleon CT] 手足の向きを置き換えました:", os.environ["CH_LIMBS_JSON"])
     return pose
