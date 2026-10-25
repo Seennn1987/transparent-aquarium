@@ -191,6 +191,24 @@ export function createChameleonWalk(model, holder) {
   for (let i = 24; bones[`v${i}`]; i++) tail.push(bones[`v${i}`]);
   const tailSeg = tail.slice(1).map((bone, i) => inHolder(bone).distanceTo(inHolder(tail[i])));
   const tailLength = tailSeg.reduce((x, y) => x + y, 0);
+  // Each tail bone's rest orientation and rest direction (to the next joint) in the holder's frame, for laying it on the curve without
+  // twisting (C record 69: turning each bone by the shortest turn from where it pointed rolled some 128° about their own axes where
+  // the jar's coil bends the other way, and the tip looked broken off).
+  const holderQ = () => holder.getWorldQuaternion(new THREE.Quaternion());
+  const tailRestQ = tail.map((bone) => holderQ().invert().multiply(bone.getWorldQuaternion(new THREE.Quaternion())));
+  const tailRestT = tail.map((bone, i) => (i + 1 < tail.length ? inHolder(tail[i + 1]).sub(inHolder(bone)).normalize() : null));
+  tailRestT[tail.length - 1] = tailRestT[tail.length - 2];
+  // A frame from a direction: the tangent, and the body's left axis made square to it (the coil lies in the body's side plane).
+  const frameOf = (t) => {
+    const n = LEFT.clone().addScaledVector(t, -LEFT.dot(t)).normalize(), b = t.clone().cross(n);
+    return new THREE.Matrix4().makeBasis(t, n, b);
+  };
+  const tailRestFrame = tailRestT.map(frameOf);
+  function setHolderQuat(bone, qHolder) {
+    const world = holderQ().multiply(qHolder);
+    bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+    bone.updateMatrixWorld(true);
+  }
   function layTail(t) {
     model.updateMatrixWorld(true);
     let at = holder.worldToLocal(tail[0].getWorldPosition(new THREE.Vector3())), s = 0;
@@ -200,9 +218,11 @@ export function createChameleonWalk(model, holder) {
       const k = Math.max(0, (u - TAIL_STRAIGHT) / (1 - TAIL_STRAIGHT));   // 0 → 1 along the bending part
       const theta = THREE.MathUtils.degToRad(TAIL_START + TAIL_TURN * k * k);
       const dir = FORWARD.clone().multiplyScalar(Math.cos(theta)).addScaledVector(UP, Math.sin(theta)).addScaledVector(LEFT, sway * k).normalize();
-      const next = at.clone().addScaledVector(dir, tailSeg[i]);
-      aim(tail[i], tail[i + 1].getWorldPosition(new THREE.Vector3()), toWorld(next));
-      at = next; s += tailSeg[i];
+      // The turn that takes the rest frame to the frame along the curve, applied to the bone's rest orientation (no roll).
+      const R = frameOf(dir).multiply(tailRestFrame[i].clone().transpose());
+      setHolderQuat(tail[i], new THREE.Quaternion().setFromRotationMatrix(R).multiply(tailRestQ[i]));
+      at.addScaledVector(dir, tailSeg[i]); s += tailSeg[i];
+      if (i === tailSeg.length - 1) setHolderQuat(tail[i + 1], new THREE.Quaternion().setFromRotationMatrix(R).multiply(tailRestQ[i + 1]));
     }
   }
 

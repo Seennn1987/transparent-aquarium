@@ -83,7 +83,13 @@ float eyeWeight(out vec3 c, out mat3 R) {
   float d0 = distance(position, uEye0), d1 = distance(position, uEye1);
   bool first = d0 < d1;
   c = first ? uEye0 : uEye1; R = first ? uEyeTurn0 : uEyeTurn1;
-  return uEyeMove > 1.5 ? 1. - smoothstep(uEyeIn, uEyeOut, min(d0, d1)) : 1.;
+  float w = uEyeMove > 1.5 ? 1. - smoothstep(uEyeIn, uEyeOut, min(d0, d1)) : 1.;
+  #ifdef USE_SKINNING
+  // Only what the head carries (C record 69): in the bind pose the tail's coil also lies near an eye, and its tip turned with the
+  // eyes' saccades, as if broken off.
+  if (uEyeMove > 1.5) w *= step(.5, dot(step(abs(skinIndex - uEyeJoint), vec4(.5)), skinWeight));
+  #endif
+  return w;
 }
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
@@ -246,6 +252,7 @@ export function applyChameleonTissue(model, reference) {
     if (part === "Organ" && !organ) throw new Error(`specimen_chameleon.glb の臓器 ${object.name} に名前（chameleon_organ）がありません`);
     const heart = part === "Viscera" ? heartCentre(object) : null;
     const turnMove = /^(eye|lens)_[lr]$/.test(organ ?? "") ? 1 : part === "Bone" || part === "Skin" ? 2 : 0;
+    const headJoint = object.skeleton?.bones.findIndex((b) => b.name === "head") ?? -1;
     const turnReach = part === "Bone" ? EYE_TURN_BONE : EYE_TURN_SKIN;
     const eyeAt = turnMove ? { uEye0: { value: eyeC[0] ?? new THREE.Vector3() }, uEye1: { value: eyeC[1] ?? eyeC[0] ?? new THREE.Vector3() } } : {};
     object.material = new THREE.ShaderMaterial({
@@ -258,7 +265,7 @@ export function applyChameleonTissue(model, reference) {
         uHeartPeriod: { value: HEART_PERIOD },
         uEye0: { value: eyeC[0] ?? new THREE.Vector3() }, uEye1: { value: eyeC[1] ?? eyeC[0] ?? new THREE.Vector3() },
         uEyeR: { value: part === "Bone" && eyeC.length ? eyeR * EYE_RING_REACH : 0 },
-        uEyeJoint: { value: object.skeleton?.bones.findIndex((b) => b.name === "head") ?? -1 },
+        uEyeJoint: { value: headJoint },
         ...eyeTurn(turnMove, turnReach),
       },
       vertexShader: pathVertex, fragmentShader: solidFragment, ...ADD,
@@ -273,7 +280,7 @@ export function applyChameleonTissue(model, reference) {
         uHeartRadius: { value: ORGAN_HEART_RADIUS_MM * MODEL_UNITS_PER_MM },
         uHeartAmp: organHeart ? chameleonLook.heartAmp : { value: 0 },
         uHeartPeriod: { value: HEART_PERIOD },
-        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 },
+        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: headJoint },
         ...eyeAt, ...eyeTurn(turnMove, turnReach),
       },
       vertexShader: pathVertex, fragmentShader: organFragment, ...ADD,
@@ -281,7 +288,7 @@ export function applyChameleonTissue(model, reference) {
     object.userData.filmMaterial = part === "Skin" ? new THREE.ShaderMaterial({
       uniforms: { filmMinCos: chameleonFilm.minCos, uTime: chameleonClock, uHeart: { value: new THREE.Vector3() },
         uHeartRadius: { value: 1 }, uHeartAmp: { value: 0 }, uHeartPeriod: { value: 1 },
-        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: -1 },
+        uEye0: { value: new THREE.Vector3() }, uEye1: { value: new THREE.Vector3() }, uEyeR: { value: 0 }, uEyeJoint: { value: headJoint },
         ...eyeAt, ...eyeTurn(turnMove, turnReach) },
       vertexShader: pathVertex, fragmentShader: filmFragment, ...ADD,
     }) : null;
