@@ -89,11 +89,18 @@ const _y = new URLSearchParams(location.search);
 const PELVIS_YAW = THREE.MathUtils.degToRad(Number(_y.get("pelvisYaw") ?? 28.5)), SHOULDER_YAW = THREE.MathUtils.degToRad(Number(_y.get("shoulderYaw") ?? 12));
 const _q = new URLSearchParams(location.search);
 // degrees, degrees, the share of its length before it bends; set by eye (?tailStart= ?tailTurn= ?tailStraight= to try others)
-// C record 70 (2026-10-25, the producer: 「文献の形で、尾を上げて、先端は少し丸める」): walking on a level branch the tail is held straight,
-// parallel to the perch or a little raised, and never touches it (Krause & Fischer 2013); in the walking videos the tip is a small
-// upward curl. So: back and 10° up from the base, straight to 75% of its length, then curling up over the last quarter (−200° in all).
-// Before: hanging below the branch and coiled (230°, 520°, 0.4), the photo's resting pose.
-const TAIL_START = Number(_q.get("tailStart") ?? 170), TAIL_TURN = Number(_q.get("tailTurn") ?? -200), TAIL_STRAIGHT = Number(_q.get("tailStraight") ?? 0.75);
+// C record 71 (2026-10-25, the producer, with frames of the walking video: 「丸々方向が逆だし、丸々量が少なすぎるし、のばしている部分も
+// そんなに直線的ではないはずです」). Read off the research video (Wimberly et al. 2021, Gait_Videos/Chamaeleo_calyptratus.mp4, 272–283 s,
+// a veiled chameleon walking along a door, side view): the tail leaves the rump along the back's line, a little downward, then bends
+// up in a smooth arc to rise some 50° behind the body, and its last part rolls into a spiral that turns toward the belly (back, down,
+// forward and up again; with the head to the right, counterclockwise), about one and a quarter turns, tighter toward the tip. The coil
+// holds its shape while walking. Heading θ (direction = cos θ · FORWARD + sin θ · UP; 180° = straight back):
+//   θ(u) = TAIL_START + TAIL_ARC · smooth(u / TAIL_ARC_END) + TAIL_COIL · k^1.6,  k = (u − TAIL_COIL_AT) / (1 − TAIL_COIL_AT) past TAIL_COIL_AT
+// (u: share of the tail's length from the base). Set by eye against that video. ?tailStart= ?tailArc= ?tailArcEnd= ?tailCoil= ?tailCoilAt=.
+// C record 70's (straight, the tip turned the other way) is tailStart=170&tailArc=0&tailCoil=-200&tailCoilAt=0.75.
+// Of three tried side by side with the video frame at 280 s, this one (rising most steeply, the coil one and a third turns) is nearest.
+const TAIL_START = Number(_q.get("tailStart") ?? 200), TAIL_ARC = Number(_q.get("tailArc") ?? -110), TAIL_ARC_END = Number(_q.get("tailArcEnd") ?? 0.45);
+const TAIL_COIL = Number(_q.get("tailCoil") ?? 500), TAIL_COIL_AT = Number(_q.get("tailCoilAt") ?? 0.45);
 const EYE_YAW = THREE.MathUtils.degToRad(80), EYE_PITCH = THREE.MathUtils.degToRad(35);
 
 // Model frame (the glb's, the jar pose): dorsal −X, forward −Y (toward the head), left +Z.
@@ -219,8 +226,9 @@ export function createChameleonWalk(model, holder) {
     const sway = 0.04 * Math.sin(t * 0.9);
     for (let i = 0; i < tailSeg.length; i++) {
       const u = (s + tailSeg[i] / 2) / tailLength;
-      const k = Math.max(0, (u - TAIL_STRAIGHT) / (1 - TAIL_STRAIGHT));   // 0 → 1 along the bending part
-      const theta = THREE.MathUtils.degToRad(TAIL_START + TAIL_TURN * k * k);
+      const k = Math.max(0, (u - TAIL_COIL_AT) / (1 - TAIL_COIL_AT));   // 0 → 1 along the coiled part
+      const a = Math.min(1, u / TAIL_ARC_END), arc = a * a * (3 - 2 * a);
+      const theta = THREE.MathUtils.degToRad(TAIL_START + TAIL_ARC * arc + TAIL_COIL * k ** 1.6);
       const dir = FORWARD.clone().multiplyScalar(Math.cos(theta)).addScaledVector(UP, Math.sin(theta)).addScaledVector(LEFT, sway * k).normalize();
       // The turn that takes the rest frame to the frame along the curve, applied to the bone's rest orientation (no roll).
       const R = frameOf(dir).multiply(tailRestFrame[i].clone().transpose());
@@ -259,9 +267,7 @@ export function createChameleonWalk(model, holder) {
     turnAbout(bones.v23, UP, PELVIS_YAW * yaw);
     turnAbout(bones.v24, UP, -PELVIS_YAW * yaw);   // the tail stays behind
     turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
-    // The tail: laid along a curve in the body's side plane (FORWARD, UP), from its base back and down, then coiling forward and up
-    // below the branch as in the photo (the tip toward the body). Heading θ: direction = cos θ · FORWARD + sin θ · UP; it starts
-    // at TAIL_START and turns ever faster toward the tip (the coil tightens), TAIL_TURN degrees in all.
+    // The tail: laid along a curve in the body's side plane (FORWARD, UP); its shape is θ(u) above (TAIL_START …).
     layTail(t);
     knots.position.y = (slide % KNOT_GAP);   // the branch slides back (+Y)
 
