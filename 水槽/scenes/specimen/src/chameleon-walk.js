@@ -100,6 +100,9 @@ const _q = new URLSearchParams(location.search);
 // C record 70's (straight, the tip turned the other way) is tailStart=170&tailArc=0&tailCoil=-200&tailCoilAt=0.75.
 // Of three tried side by side with the video frame at 280 s, this one (rising most steeply, the coil one and a third turns) is nearest.
 const TAIL_START = Number(_q.get("tailStart") ?? 200), TAIL_ARC = Number(_q.get("tailArc") ?? -110), TAIL_ARC_END = Number(_q.get("tailArcEnd") ?? 0.45);
+const TAIL_MOTION = _q.get("tailMotion") !== "0";
+const TAIL_SIDE_DEG = Number(_q.get("tailSide") ?? 3), TAIL_LAG = Number(_q.get("tailLag") ?? 0.25), TAIL_BOB_DEG = Number(_q.get("tailBob") ?? 5);
+const TAIL_COIL_VAR = Number(_q.get("tailCoilVar") ?? 0.12), TAIL_TILT_DEG = Number(_q.get("tailTilt") ?? 18);
 const TAIL_COIL = Number(_q.get("tailCoil") ?? 500), TAIL_COIL_AT = Number(_q.get("tailCoilAt") ?? 0.45);
 const EYE_YAW = THREE.MathUtils.degToRad(80), EYE_PITCH = THREE.MathUtils.degToRad(35);
 
@@ -220,16 +223,27 @@ export function createChameleonWalk(model, holder) {
     bone.quaternion.copy(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
     bone.updateMatrixWorld(true);
   }
-  function layTail(t) {
+  // The tail's motion while walking (C record 73, from the videos of C record 72; docs/カメレオン_歩き方の言語化_v1.0.md 8.2b), on top of the shape:
+  // 1. side to side with the pelvis's turn, opposite to it, starting at the base and reaching the tip TAIL_LAG of a stride later,
+  //    growing toward the tip: ±TAIL_SIDE_DEG at the base … ±2 × that at the tip (the tip moves by about a centimetre);
+  // 2. the arc rises and falls by ±TAIL_BOB_DEG twice a stride, highest just after each hind foot lands;
+  // 3. the coil tightens/loosens by ±TAIL_COIL_VAR and tilts by ±TAIL_TILT_DEG, slowly and unevenly (three waves of 2.3, 3.7 and 5.9 s),
+  //    whether walking or not. All set by eye against the videos (their numbers are read by eye). ?tailMotion=0 holds the tail still.
+  function layTail(t, phase, walking) {
     model.updateMatrixWorld(true);
     let at = holder.worldToLocal(tail[0].getWorldPosition(new THREE.Vector3())), s = 0;
-    const sway = 0.04 * Math.sin(t * 0.9);
+    const on = TAIL_MOTION ? 1 : 0, w = on * walking;
+    const slow = (a, b, c) => (Math.sin(2 * Math.PI * t / 2.3 + a) + 0.7 * Math.sin(2 * Math.PI * t / 3.7 + b) + 0.5 * Math.sin(2 * Math.PI * t / 5.9 + c)) / 2.2;
+    const coilScale = 1 + on * TAIL_COIL_VAR * slow(0.3, 1.9, 4.1), tilt = on * TAIL_TILT_DEG * slow(2.2, 0.4, 5.3);
+    const bob = w * TAIL_BOB_DEG * Math.cos(4 * Math.PI * (phase - LIFT.hL - 0.08));
     for (let i = 0; i < tailSeg.length; i++) {
       const u = (s + tailSeg[i] / 2) / tailLength;
       const k = Math.max(0, (u - TAIL_COIL_AT) / (1 - TAIL_COIL_AT));   // 0 → 1 along the coiled part
       const a = Math.min(1, u / TAIL_ARC_END), arc = a * a * (3 - 2 * a);
-      const theta = THREE.MathUtils.degToRad(TAIL_START + TAIL_ARC * arc + TAIL_COIL * k ** 1.6);
-      const dir = FORWARD.clone().multiplyScalar(Math.cos(theta)).addScaledVector(UP, Math.sin(theta)).addScaledVector(LEFT, sway * k).normalize();
+      const kk = Math.min(1, k * 4), coilIn = kk * kk * (3 - 2 * kk);
+      const theta = THREE.MathUtils.degToRad(TAIL_START + (TAIL_ARC - bob) * arc + TAIL_COIL * coilScale * k ** 1.6 + tilt * coilIn);
+      const side = -w * THREE.MathUtils.degToRad(TAIL_SIDE_DEG) * (1 + u) * Math.sin(2 * Math.PI * (phase - LIFT.hL - 0.25 - TAIL_LAG * u));
+      const dir = FORWARD.clone().multiplyScalar(Math.cos(theta)).addScaledVector(UP, Math.sin(theta)).addScaledVector(LEFT, Math.tan(side)).normalize();
       // The turn that takes the rest frame to the frame along the curve, applied to the bone's rest orientation (no roll).
       const R = frameOf(dir).multiply(tailRestFrame[i].clone().transpose());
       setHolderQuat(tail[i], new THREE.Quaternion().setFromRotationMatrix(R).multiply(tailRestQ[i]));
@@ -268,7 +282,9 @@ export function createChameleonWalk(model, holder) {
     turnAbout(bones.v24, UP, -PELVIS_YAW * yaw);   // the tail stays behind
     turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
     // The tail: laid along a curve in the body's side plane (FORWARD, UP); its shape is θ(u) above (TAIL_START …).
-    layTail(t);
+    // The walking part of the tail's motion fades out over 0.5 s as the rocking pause starts and back in as it ends.
+    const sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
+    layTail(t, phase, rockT > 0 ? 1 - Math.min(sm(rockT / 0.5), sm((pause - rockT) / 0.5)) : 1);
     knots.position.y = (slide % KNOT_GAP);   // the branch slides back (+Y)
 
     for (const [key, limb] of Object.entries(limbs)) {
