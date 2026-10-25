@@ -81,6 +81,21 @@ const hjKnee = (part, s) => {
 // and the toes on the perch's top; 3 mm keeps it over this 10 mm branch and lifts the mid-stance knee by 0.5–1 mm (more and the
 // feet fall short). ?ankleOut= to try others.
 const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ?? 3) * MM;
+// The trunk's pose fitted to photo 08 (C record 85, 2026-10-26, the producer: 「この進め方で、手順 2 の姿勢合わせから始め、目標の線と重ねた絵とずれの mm を
+// 見せて下さい。」; plan C record 84). ?fitSpine=1 lays the spine from the sacrum (v22) forward along the target spine line, and turns the head so its
+// snout comes to the target's snout. Target frame (docs/chameleon_trunk/target_outline_p08_84.json, fit_plan_84.png): x 0 at the snout, 1 at the hip, y up,
+// in snout–hip lengths of photo 08; scaled to this animal by its snout–hip length (121.5 mm) and anchored at v22 (target x 0.997, y 0.031).
+// The spine line: the share of the skin's depth at which the spine lies in this model, kept inside photo 08's outline, smoothed (cubic).
+const FIT_SPINE = new URLSearchParams(location.search).get("fitSpine") === "1";
+// Photo 08's casque top (x 705 px, y 82 px) in the target frame.
+const FIT_CASQUE = [(705 - 50) / 1550, (392 - 82) / 1550];
+const FIT_SH_MM = 121.5, FIT_X22 = 0.9969, FIT_Y22 = 0.0310;
+const FIT_SPINE_X = [0.28, 0.3, 0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5, 0.52, 0.54, 0.56, 0.58, 0.6, 0.62, 0.64, 0.66, 0.68, 0.7, 0.72, 0.74, 0.76, 0.78, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98];
+const FIT_SPINE_Y = [-0.0896, -0.0665, -0.0449, -0.0249, -0.0062, 0.0109, 0.0267, 0.0412, 0.0543, 0.0662, 0.0768, 0.0861, 0.0943, 0.1014, 0.1074, 0.1122, 0.1161, 0.1189, 0.1208, 0.1218, 0.1218, 0.121, 0.1194, 0.117, 0.1138, 0.1099, 0.1053, 0.1001, 0.0942, 0.0878, 0.0808, 0.0733, 0.0654, 0.057, 0.0482, 0.039];
+// Photo 08's outline in the same frame (for measuring, chameleonPage.walkOutline).
+const FIT_OUT_X = [0.0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5, 0.52, 0.54, 0.56, 0.58, 0.6, 0.62, 0.64, 0.66, 0.68, 0.7, 0.72, 0.74, 0.76, 0.78, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08, 1.1, 1.12, 1.14, 1.16];
+const FIT_OUT_TOP = [0.0045, 0.0238, 0.0388, 0.0504, 0.0607, 0.0709, 0.0834, 0.093, 0.1007, 0.1107, 0.1201, 0.1279, 0.1374, 0.1473, 0.1551, 0.164, 0.1743, 0.183, 0.1899, 0.1948, 0.1982, 0.199, 0.1251, 0.1254, 0.1416, 0.1558, 0.168, 0.1784, 0.1858, 0.1914, 0.1973, 0.2008, 0.2022, 0.2037, 0.2045, 0.2045, 0.204, 0.2015, 0.1996, 0.1972, 0.1932, 0.1869, 0.1781, 0.1682, 0.1582, 0.1483, 0.1349, 0.121, 0.1093, 0.0962, 0.0819, 0.0687, 0.0513, 0.0276, 0.0151, 0.0064, -0.0013, -0.0109, -0.0236];
+const FIT_OUT_BOT = [-0.0052, -0.028, -0.0482, -0.066, -0.0811, -0.0943, -0.1063, -0.1182, -0.1302, -0.1422, -0.1542, -0.1662, -0.1789, -0.1898, -0.1963, -0.2004, -0.203, -0.2048, -0.2063, -0.2082, -0.2109, -0.2151, -0.2281, -0.2439, -0.2584, -0.2639, -0.267, -0.2693, -0.2697, -0.2697, -0.2681, -0.2658, -0.2639, -0.2605, -0.2563, -0.2523, -0.2483, -0.2443, -0.2403, -0.2362, -0.232, -0.2296, -0.2276, -0.224, -0.2182, -0.2074, -0.1926, -0.1754, -0.1572, -0.1397, -0.1244, -0.1129, -0.1065, -0.1028, -0.099, -0.0946, -0.0879, -0.0842, -0.0826];
 const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.6);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 // The girdles' turn about the vertical, each way: the pelvis Higham & Jayne's 57° in all on the level (±28.5°, C record 67; it was ±20),
@@ -255,6 +270,85 @@ export function createChameleonWalk(model, holder) {
     }
   }
 
+  // The snout tip in the head bone's frame: the most forward point of the head's skin in the walking pose before the fit (taken once, on the first
+  // fit; in the jar pose the head hangs down, and the head bone's axis is not the skull's line). For FIT_SPINE.
+  let snoutLocal = null, casqueLocal = null;
+  function findSnout() {
+    let sk = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") sk = o; });
+    const hi = sk.skeleton.bones.indexOf(bones.head), SI = sk.geometry.getAttribute("skinIndex"), SW = sk.geometry.getAttribute("skinWeight");
+    const p = new THREE.Vector3(); let best = -Infinity;
+    for (let i = 0; i < SI.count; i++) {
+      if (SI.getX(i) !== hi || SW.getX(i) < 0.9) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); const f = holder.worldToLocal(p.clone()).dot(FORWARD);
+      if (f > best) { best = f; snoutLocal = bones.head.worldToLocal(p.clone()); }
+    }
+    best = -Infinity;   // the casque's top: the highest point of the head's skin
+    for (let i = 0; i < SI.count; i++) {
+      if (SI.getX(i) !== hi || SW.getX(i) < 0.9) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); const u = holder.worldToLocal(p.clone()).dot(UP);
+      if (u > best) { best = u; casqueLocal = bones.head.worldToLocal(p.clone()); }
+    }
+  }
+  const fitPoint = (anchor, x, y) => anchor.clone().addScaledVector(FORWARD, (FIT_X22 - x) * FIT_SH_MM * MM).addScaledVector(UP, (y - FIT_Y22) * FIT_SH_MM * MM);
+  // Lay v22 → v01 → head along the target spine line (each joint at its bone's length along the line from the one behind), then turn the head to
+  // the target's snout (x 0, y 0: where photo 08's back and belly lines meet).
+  // Turn `bone` about the body's left–right axis only (no roll or yaw), so that the direction from it to `from` (holder frame) points as `to` does
+  // seen from the side.
+  function aimSide(bone, from, to) {
+    const o = inHolder(bone), a = from.clone().sub(o), c = to.clone().sub(o);
+    a.addScaledVector(LEFT, -a.dot(LEFT)); c.addScaledVector(LEFT, -c.dot(LEFT));
+    if (a.lengthSq() < 1e-12 || c.lengthSq() < 1e-12) return;
+    const ang = Math.atan2(a.clone().cross(c).dot(LEFT), a.dot(c));
+    const local = LEFT.clone().transformDirection(holder.matrixWorld).applyQuaternion(bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+    bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(local, ang)); bone.updateMatrixWorld(true);
+  }
+  function laySpine() {
+    model.updateMatrixWorld(true);
+    if (!snoutLocal) findSnout();
+    const anchor = inHolder(bones.v22);
+    const line = [anchor.clone()];
+    for (let i = FIT_SPINE_X.length - 1; i >= 0; i--) if (FIT_SPINE_X[i] < FIT_X22) line.push(fitPoint(anchor, FIT_SPINE_X[i], FIT_SPINE_Y[i]));
+    const d0 = line[line.length - 1].clone().sub(line[line.length - 2]);
+    line.push(line[line.length - 1].clone().add(d0.multiplyScalar(20)));   // run on straight past the line's front end
+    let cur = anchor, seg = 0;
+    const chain = []; for (let i = 21; i >= 5; i--) chain.push(bones[`v${String(i).padStart(2, "0")}`]);   // the trunk to v06, along the line; the neck below
+    for (let k = 0; k + 1 < chain.length; k++) {
+      const bone = chain[k], child = chain[k + 1];
+      const childNow = inHolder(child), L = childNow.distanceTo(inHolder(bone));
+      if (L < 1e-4) continue;   // v22 and v21 share their joint; the root v22 is not turned (it carries the pelvis and the tail)
+      let target = null;
+      for (; seg + 1 < line.length; seg++) {
+        const A = line[seg].clone().sub(cur), B = line[seg + 1].clone().sub(cur);
+        if (B.length() >= L) {   // the point between A and B at distance L from cur
+          let lo = 0, hi = 1;
+          for (let it = 0; it < 30; it++) { const m = (lo + hi) / 2; if (A.clone().lerp(B, m).length() < L) lo = m; else hi = m; }
+          target = cur.clone().add(A.lerp(B, lo)); break;
+        }
+      }
+      if (!target) break;
+      target.addScaledVector(LEFT, childNow.dot(LEFT) - target.dot(LEFT));   // keep the joint's side-to-side place
+      aimSide(bone, childNow, target);
+      cur = target;
+    }
+    // The head and neck: the head takes photo 08's angle (snout → casque top, FIT_CASQUE), and the neck vertebrae (v05…v01) bend, half the remaining
+    // miss each in turn, until the snout comes to the target's snout (x 0, y 0). 12 rounds.
+    const neck = [1, 2, 3, 4, 5].map((i) => bones[`v0${i}`]);
+    const snoutT = fitPoint(anchor, 0, 0), casqueT = fitPoint(anchor, FIT_CASQUE[0], FIT_CASQUE[1]);
+    const sAt = (q) => holder.worldToLocal(bones.head.localToWorld(q.clone()));
+    const headAngle = () => { const h0 = inHolder(bones.head); aimSide(bones.head, h0.clone().add(sAt(casqueLocal).sub(sAt(snoutLocal))), h0.clone().add(casqueT.clone().sub(snoutT))); };
+    for (let round = 0; round < 12; round++) {
+      headAngle();
+      for (const b of neck) {
+        const o = inHolder(b), a = sAt(snoutLocal).sub(o), c = snoutT.clone().sub(o);
+        a.addScaledVector(LEFT, -a.dot(LEFT)); c.addScaledVector(LEFT, -c.dot(LEFT));
+        const ang = Math.atan2(a.clone().cross(c).dot(LEFT), a.dot(c)) * 0.5;
+        const local = LEFT.clone().transformDirection(holder.matrixWorld).applyQuaternion(b.parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+        b.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(local, ang)); b.updateMatrixWorld(true);
+      }
+    }
+    headAngle();
+  }
+
   function update(t) {
     for (const [b, r] of base) b.quaternion.copy(r);
     // Walking time g stops during the rocking pauses.
@@ -284,6 +378,7 @@ export function createChameleonWalk(model, holder) {
     turnAbout(bones.v23, UP, PELVIS_YAW * yaw);
     turnAbout(bones.v24, UP, -PELVIS_YAW * yaw);   // the tail stays behind
     turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
+    if (FIT_SPINE) laySpine();
     // The tail: laid along a curve in the body's side plane (FORWARD, UP); its shape is θ(u) above (TAIL_START …).
     // The walking part of the tail's motion fades out over 0.5 s as the rocking pause starts and back in as it ends.
     const sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
@@ -434,5 +529,24 @@ export function createChameleonWalk(model, holder) {
     }
     return { lowestMM: lowest / MM, alongMM: along / MM, trunkMM: [trunkBack / MM, trunkFront / MM], profile: prof.map((x) => Math.round(x / MM * 10) / 10) };
   }
-  return { backdrop, branchFrame, update, feet, belly };
+  /** For checking (C record 85): the skin's outline (trunk, head, neck and tail base; not the limbs) in photo 08's target frame, anchored at v22, and its
+   *  distance from photo 08's outline at FIT_OUT_X, in mm. */
+  function outline() {
+    model.updateMatrixWorld(true);
+    let sk = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") sk = o; });
+    const SI = sk.geometry.getAttribute("skinIndex"), SW = sk.geometry.getAttribute("skinWeight"), sb = sk.skeleton.bones;
+    const anchor = inHolder(bones.v22), SH = FIT_SH_MM * MM, n = FIT_OUT_X.length;
+    const top = new Array(n).fill(-Infinity), bot = new Array(n).fill(Infinity), p = new THREE.Vector3();
+    for (let i = 0; i < SI.count; i += 2) {
+      let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } }
+      const nm = sb[bi].name; if (/^(h|f)[LR]_(upper|lower|hand|foot)|_med|_lat/.test(nm)) continue; if (/^v\d/.test(nm) && +nm.slice(1) > 32) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p);
+      const x = FIT_X22 - (p.dot(FORWARD) - anchor.dot(FORWARD)) / SH, y = FIT_Y22 + (p.dot(UP) - anchor.dot(UP)) / SH;
+      const b = Math.round(x / 0.02); if (b < 0 || b >= n) continue;
+      top[b] = Math.max(top[b], y); bot[b] = Math.min(bot[b], y);
+    }
+    const dt = top.map((v, i) => (v - FIT_OUT_TOP[i]) * FIT_SH_MM), db = bot.map((v, i) => (v - FIT_OUT_BOT[i]) * FIT_SH_MM);
+    return { x: FIT_OUT_X, top, bot, dTopMM: dt, dBotMM: db, targetTop: FIT_OUT_TOP, targetBot: FIT_OUT_BOT };
+  }
+  return { backdrop, branchFrame, update, feet, belly, outline };
 }
