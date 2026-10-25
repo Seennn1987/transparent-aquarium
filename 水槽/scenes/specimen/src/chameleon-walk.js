@@ -99,7 +99,9 @@ const _q = new URLSearchParams(location.search);
 // (u: share of the tail's length from the base). Set by eye against that video. ?tailStart= ?tailArc= ?tailArcEnd= ?tailCoil= ?tailCoilAt=.
 // C record 70's (straight, the tip turned the other way) is tailStart=170&tailArc=0&tailCoil=-200&tailCoilAt=0.75.
 // Of three tried side by side with the video frame at 280 s, this one (rising most steeply, the coil one and a third turns) is nearest.
-const TAIL_START = Number(_q.get("tailStart") ?? 200), TAIL_ARC = Number(_q.get("tailArc") ?? -110), TAIL_ARC_END = Number(_q.get("tailArcEnd") ?? 0.45);
+// C record 75 (the producer: 「尻尾の付け根の方のアールが大きすぎて参考動画より尻尾が立ちすぎている」): the arc −110° over 45% → −80° over 50%
+// (of three tried against the video frame at 280 s, the nearest; the tail rises at about 40–45° as in the video).
+const TAIL_START = Number(_q.get("tailStart") ?? 200), TAIL_ARC = Number(_q.get("tailArc") ?? -80), TAIL_ARC_END = Number(_q.get("tailArcEnd") ?? 0.5);
 const TAIL_MOTION = _q.get("tailMotion") !== "0";
 // Halved (C record 74, the producer: 「今度は動きが大きすぎるのではないでしょうか？」; record 73 had 3°, 5°, 0.12, 18°).
 const TAIL_SIDE_DEG = Number(_q.get("tailSide") ?? 1.5), TAIL_LAG = Number(_q.get("tailLag") ?? 0.25), TAIL_BOB_DEG = Number(_q.get("tailBob") ?? 2.5);
