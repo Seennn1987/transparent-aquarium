@@ -101,8 +101,9 @@ const _q = new URLSearchParams(location.search);
 // Of three tried side by side with the video frame at 280 s, this one (rising most steeply, the coil one and a third turns) is nearest.
 const TAIL_START = Number(_q.get("tailStart") ?? 200), TAIL_ARC = Number(_q.get("tailArc") ?? -110), TAIL_ARC_END = Number(_q.get("tailArcEnd") ?? 0.45);
 const TAIL_MOTION = _q.get("tailMotion") !== "0";
-const TAIL_SIDE_DEG = Number(_q.get("tailSide") ?? 3), TAIL_LAG = Number(_q.get("tailLag") ?? 0.25), TAIL_BOB_DEG = Number(_q.get("tailBob") ?? 5);
-const TAIL_COIL_VAR = Number(_q.get("tailCoilVar") ?? 0.12), TAIL_TILT_DEG = Number(_q.get("tailTilt") ?? 18);
+// Halved (C record 74, the producer: 「今度は動きが大きすぎるのではないでしょうか？」; record 73 had 3°, 5°, 0.12, 18°).
+const TAIL_SIDE_DEG = Number(_q.get("tailSide") ?? 1.5), TAIL_LAG = Number(_q.get("tailLag") ?? 0.25), TAIL_BOB_DEG = Number(_q.get("tailBob") ?? 2.5);
+const TAIL_COIL_VAR = Number(_q.get("tailCoilVar") ?? 0.06), TAIL_TILT_DEG = Number(_q.get("tailTilt") ?? 9);
 const TAIL_COIL = Number(_q.get("tailCoil") ?? 500), TAIL_COIL_AT = Number(_q.get("tailCoilAt") ?? 0.45);
 const EYE_YAW = THREE.MathUtils.degToRad(80), EYE_PITCH = THREE.MathUtils.degToRad(35);
 
