@@ -61,6 +61,26 @@ const HEEL_DOWN = THREE.MathUtils.degToRad(15), HEEL_UP = THREE.MathUtils.degToR
 // GRIP_AHEAD of their length, and open/close over GRIP_EASE of the swing at each end. Set by eye against photo 08 (?gripMax= in degrees).
 const GRIP_GAP = 0.6 * MM, GRIP_AHEAD = 0.25, GRIP_EASE = 0.25;
 const GRIP_MAX = THREE.MathUtils.degToRad(Number(new URLSearchParams(location.search).get("gripMax") ?? 150));
+// The knee's path against the hip (C record 68): Higham & Jayne 2004 Fig. 5D (side) and 5A (from above), C. calyptratus on the level
+// perch, read off the figure (400 dpi; points taken by eye, about evenly spaced in time) and scaled × 11 / 18.1, in mm: [forward, up,
+// out]. The hind knees aim at it (the IK's pole); the knee then lies as near it as the leg's lengths allow. At footfall the knee is
+// in front of the hip and near the midline; at mid-stance it sticks straight out to the side, level with the hip (their text: "at
+// mid-stance the knee is nearly lateral to the hip"); at the end of stance it is behind the hip and a little below; in the swing it
+// rises above the hip.
+const HJ_KNEE = {
+  stance: [[18.0, -0.3, 6.3], [16.4, -0.3, 6.6], [15.4, 0.7, 6.8], [14.1, 2.3, 7.1], [13.1, 2.5, 7.9], [11.9, 2.5, 8.8], [7.3, -1.4, 15.0],
+    [-1.9, -2.9, 20.5], [-10.4, -6.6, 18.2], [-16.9, -8.5, 12.7], [-20.1, -9.2, 9.9], [-21.5, -7.0, 9.2], [-22.0, -4.3, 9.0]],
+  swing: [[-21.8, -5.3, 9.1], [-19.4, -6.3, 10.2], [-14.8, -4.6, 14.9], [-3.8, -1.0, 19.8], [6.4, 5.3, 16.2], [10.0, 8.4, 11.8],
+    [11.7, 7.3, 9.0], [14.1, 4.8, 7.1], [16.2, 4.0, 6.6], [16.7, 1.7, 6.5], [16.8, -0.3, 6.5], [18.0, -0.3, 6.3]],
+};
+const hjKnee = (part, s) => {
+  const P = HJ_KNEE[part], x = Math.min(Math.max(s, 0), 1) * (P.length - 1), i = Math.min(Math.floor(x), P.length - 2), w = x - i;
+  return P[i].map((v, k) => v + (P[i + 1][k] - v) * w);
+};
+// The hind ankle out to the leg's side of the grip, mm (C record 68): Higham & Jayne Fig. 5A has the ankle lateral to the hip in stance
+// and the toes on the perch's top; 3 mm keeps it over this 10 mm branch and lifts the mid-stance knee by 0.5–1 mm (more and the
+// feet fall short). ?ankleOut= to try others.
+const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ?? 3) * MM;
 const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.6);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 // The girdles' turn about the vertical, each way: the pelvis Higham & Jayne's 57° in all on the level (±28.5°, C record 67; it was ±20),
@@ -243,7 +263,8 @@ export function createChameleonWalk(model, holder) {
       footState[key] = { stance: u >= swing, slide, u };
       // The sole's grip on the branch; the wrist/ankle sits HEEL behind it and a little above (the foot lies along the branch).
       const contact = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
-      const target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel));
+      const target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel))
+        .addScaledVector(LEFT, (limb.left ? 1 : -1) * (limb.hind ? ANKLE_OUT : 0));
       // Two bones to the wrist/ankle, the elbow/knee out to the side and up.
       const root = holder.worldToLocal(limb.upper.getWorldPosition(new THREE.Vector3()));
       const span = target.clone().sub(root); let d = span.length();
@@ -252,7 +273,13 @@ export function createChameleonWalk(model, holder) {
       d = Math.min(d, (a + b) * 0.999); span.setLength(d);
       const end = root.clone().add(span);
       const axis = span.clone().normalize();
-      const pole = new THREE.Vector3().addScaledVector(LEFT, limb.left ? 1 : -1).addScaledVector(UP, 0.6).addScaledVector(FORWARD, limb.hind ? 0.3 : -0.3);
+      let pole;
+      if (limb.hind) {
+        const [kx, ky, kz] = hjKnee(u < swing ? "swing" : "stance", u < swing ? u / swing : (u - swing) / DUTY);
+        pole = new THREE.Vector3().addScaledVector(FORWARD, kx).addScaledVector(UP, ky).addScaledVector(LEFT, (limb.left ? 1 : -1) * kz);
+      } else {
+        pole = new THREE.Vector3().addScaledVector(LEFT, limb.left ? 1 : -1).addScaledVector(UP, 0.6).addScaledVector(FORWARD, -0.3);
+      }
       pole.addScaledVector(axis, -pole.dot(axis)).normalize();
       const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
       const joint = root.clone().addScaledVector(axis, x).addScaledVector(pole, h);
@@ -329,7 +356,10 @@ export function createChameleonWalk(model, holder) {
     model.updateMatrixWorld(true);
     return Object.fromEntries(Object.entries(limbs).map(([key, limb]) => {
       const f = footState[key] ?? {};
-      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, grip: f.grip2 }];
+      // the knee/elbow and the ankle/wrist against the hip/shoulder, mm: x forward, y up, z out to the limb's side (Higham & Jayne Fig. 5)
+      const hip = inHolder(limb.upper), side = limb.left ? 1 : -1;
+      const rel = (bone) => { const r = inHolder(bone).sub(hip); return [r.dot(FORWARD) / MM, r.dot(UP) / MM, side * r.dot(LEFT) / MM]; };
+      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, grip: f.grip2, knee: rel(limb.lower), ankle: rel(limb.tip) }];
     }));
   }
   /** For checking: how far the skin's lowest point (every `step`-th vertex, skinned) lies above the branch's top, in mm (< 0: sunk in). */
