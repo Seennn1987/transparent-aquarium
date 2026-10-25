@@ -100,7 +100,19 @@ const FIT_SPINE_Y = [-0.0896, -0.0665, -0.0449, -0.0249, -0.0062, 0.0109, 0.0267
 const FIT_OUT_X = [0.0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5, 0.52, 0.54, 0.56, 0.58, 0.6, 0.62, 0.64, 0.66, 0.68, 0.7, 0.72, 0.74, 0.76, 0.78, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04, 1.06, 1.08, 1.1, 1.12, 1.14, 1.16];
 const FIT_OUT_TOP = [0.0045, 0.0238, 0.0388, 0.0504, 0.0607, 0.0709, 0.0834, 0.093, 0.1007, 0.1107, 0.1201, 0.1279, 0.1374, 0.1473, 0.1551, 0.164, 0.1743, 0.183, 0.1899, 0.1948, 0.1982, 0.199, 0.1251, 0.1254, 0.1416, 0.1558, 0.168, 0.1784, 0.1858, 0.1914, 0.1973, 0.2008, 0.2022, 0.2037, 0.2045, 0.2045, 0.204, 0.2015, 0.1996, 0.1972, 0.1932, 0.1869, 0.1781, 0.1682, 0.1582, 0.1483, 0.1349, 0.121, 0.1093, 0.0962, 0.0819, 0.0687, 0.0513, 0.0276, 0.0151, 0.0064, -0.0013, -0.0109, -0.0236];
 const FIT_OUT_BOT = [-0.0052, -0.028, -0.0482, -0.066, -0.0811, -0.0943, -0.1063, -0.1182, -0.1302, -0.1422, -0.1542, -0.1662, -0.1789, -0.1898, -0.1963, -0.2004, -0.203, -0.2048, -0.2063, -0.2082, -0.2109, -0.2151, -0.2281, -0.2439, -0.2584, -0.2639, -0.267, -0.2693, -0.2697, -0.2697, -0.2681, -0.2658, -0.2639, -0.2605, -0.2563, -0.2523, -0.2483, -0.2443, -0.2403, -0.2362, -0.232, -0.2296, -0.2276, -0.224, -0.2182, -0.2074, -0.1926, -0.1754, -0.1572, -0.1397, -0.1244, -0.1129, -0.1065, -0.1028, -0.099, -0.0946, -0.0879, -0.0842, -0.0826];
-const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.6);
+// The trunk's shape fitted to the young and walking animals (C record 89, 2026-10-26, the producer: 「案 1（今の個体の年齢のまま、深さ 0.31〜0.38、
+// 若い個体と床を歩く成体の形）で、B〜E の修正を進めて下さい。」; plan C record 88). ?shape=88 reshapes the meshes once at load (shape88()).
+// Target (docs/chameleon_trunk/target_outline_88.json): the median back and belly lines of 4 young animals and the adult walking on the floor in
+// Wimberly et al. 2021's video (t 309 s), traced in the frame x 0 at the snout, 1 at the hip, y up (snout–hip lengths), x 0.3–1.25 every 0.025.
+const SHAPE88 = new URLSearchParams(location.search).get("shape") === "88";
+const SHAPE_X0 = 0.3, SHAPE_DX = 0.025;
+const SHAPE_TOP = [0.1972, 0.1974, 0.2002, 0.2043, 0.2103, 0.2152, 0.2197, 0.2230, 0.2253, 0.2267, 0.2274, 0.2274, 0.2268, 0.2258, 0.2242, 0.2216, 0.2172, 0.2112, 0.2049, 0.1997, 0.1963, 0.1936, 0.1909, 0.1873, 0.1830, 0.1777, 0.1705, 0.1594, 0.1432, 0.1225, 0.1022, 0.0855, 0.0751, 0.0673, 0.0613, 0.0589, 0.0587, 0.0604, 0.0602];
+const SHAPE_BOT = [-0.1115, -0.1108, -0.1092, -0.1062, -0.1031, -0.1011, -0.1016, -0.1030, -0.1038, -0.1029, -0.1009, -0.0988, -0.0968, -0.0953, -0.0938, -0.0922, -0.0903, -0.0884, -0.0866, -0.0849, -0.0835, -0.0821, -0.0806, -0.0784, -0.0754, -0.0722, -0.0699, -0.0687, -0.0672, -0.0634, -0.0561, -0.0462, -0.0352, -0.0250, -0.0164, -0.0101, -0.0058, -0.0035, -0.0027];
+// With ?shape=88 the belly is shallower, and the hips come down to 0.4 of the leg's reach (14.4 mm), putting the belly 1.7–3.0 mm over the branch
+// while walking: the adults traced in C record 88 hold it 0.02 of the snout–hip length (2.5 mm) above; Krause & Fischer 2013 the hip 0.114 SVL.
+const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? (SHAPE88 ? 0.4 : 0.6));
+// ?neck=<degrees>: the head pitched by this much more, shared evenly by the 5 neck vertebrae v01–v05 (Molnar & Watanabe 2023: C1–C5), + snout down.
+const NECK_DEG = Number(new URLSearchParams(location.search).get("neck") ?? 0);
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 // The girdles' turn about the vertical, each way: the pelvis Higham & Jayne's 57° in all on the level (±28.5°, C record 67; it was ±20),
 // largest at footfall; the shoulders set by eye.
@@ -383,6 +395,7 @@ export function createChameleonWalk(model, holder) {
     turnAbout(bones.v24, UP, -PELVIS_YAW * yaw);   // the tail stays behind
     turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
     if (FIT_SPINE) laySpine();
+    if (NECK_DEG) for (let i = 1; i <= 5; i++) turnAbout(bones[`v0${i}`], LEFT, THREE.MathUtils.degToRad(NECK_DEG / 5));
     // The tail: laid along a curve in the body's side plane (FORWARD, UP); its shape is θ(u) above (TAIL_START …).
     // The walking part of the tail's motion fades out over 0.5 s as the rocking pause starts and back in as it ends.
     const sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
@@ -608,6 +621,85 @@ export function createChameleonWalk(model, holder) {
     const dt = top.map((v, i) => (v - FIT_OUT_TOP[i]) * FIT_SH_MM), db = bot.map((v, i) => (v - FIT_OUT_BOT[i]) * FIT_SH_MM);
     return { x: FIT_OUT_X, top, bot, dTopMM: dt, dBotMM: db, targetTop: FIT_OUT_TOP, targetBot: FIT_OUT_BOT };
   }
+  // ?shape=88 (C record 89): one smooth reshaping of the trunk and the tail's base, at load, in the walking pose at FIT_SKIN_T. In the snout–hip frame
+  // (x 0 at the snout, 1 at the hip; y across it, the back +), each point's height from the spine line is scaled: below the spine by kb(x), above by
+  // kt(x). kb and kt are the target's depth over the model's, both taken from smoothed outlines and then smoothed again along x (no per-place
+  // ratios: C record 87). kt is kept within 0.9–1 (the back only lowered: its height is bone, not a thicker skin, C record 87). Faded in over x 0.30–0.40 and
+  // out over 1.20–1.30. Each vertex moves by its skin weights on the trunk's bones (vertebrae, ribs, girdles), so the limb roots and the head blend.
+  // Skin, ribs, rib cartilage and organs (not the eyes) move together, written back into the bind positions as in fitSkin().
+  function shape88() {
+    update(FIT_SKIN_T); model.updateMatrixWorld(true);
+    let sk = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") sk = o; });
+    const two = (p) => [p.dot(FORWARD), p.dot(UP)];
+    const hipP = two(inHolder(limbs.hL.upper).add(inHolder(limbs.hR.upper)).multiplyScalar(0.5));
+    // the snout: the most forward point of the head's skin
+    const hi = sk.skeleton.bones.indexOf(bones.head), SI0 = sk.geometry.getAttribute("skinIndex"), SW0 = sk.geometry.getAttribute("skinWeight"), p = new THREE.Vector3();
+    let sn = null, ct = null;
+    for (let i = 0; i < SI0.count; i++) {
+      if (SI0.getX(i) !== hi || SW0.getX(i) < 0.9) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const q = two(p);
+      if (!sn || q[0] > sn[0]) sn = q; if (!ct || q[1] > ct[1]) ct = q;
+    }
+    let e1 = [hipP[0] - sn[0], hipP[1] - sn[1]]; const L = Math.hypot(e1[0], e1[1]); e1 = [e1[0] / L, e1[1] / L];
+    let e2 = [-e1[1], e1[0]]; if ((ct[0] - sn[0]) * e2[0] + (ct[1] - sn[1]) * e2[1] < 0) e2 = [-e2[0], -e2[1]];
+    const toXY = (q) => [((q[0] - sn[0]) * e1[0] + (q[1] - sn[1]) * e1[1]) / L, ((q[0] - sn[0]) * e2[0] + (q[1] - sn[1]) * e2[1]) / L];
+    const up2 = FORWARD.clone().multiplyScalar(e2[0]).addScaledVector(UP, e2[1]);   // the frame's y in the holder
+    // the spine line: the vertebrae's joints
+    const sp = Object.keys(bones).filter((n) => /^v\d\d$/.test(n)).map((n) => toXY(two(inHolder(bones[n])))).sort((a, b) => a[0] - b[0]);
+    const spine = (x) => { if (x <= sp[0][0]) return sp[0][1]; for (let i = 0; i + 1 < sp.length; i++) if (x <= sp[i + 1][0]) { const w = (x - sp[i][0]) / Math.max(1e-9, sp[i + 1][0] - sp[i][0]); return sp[i][1] + w * (sp[i + 1][1] - sp[i][1]); } return sp[sp.length - 1][1]; };
+    // the model's outline (trunk, tail base; not the limbs or the head), in bins of SHAPE_DX
+    const n = SHAPE_TOP.length, top = new Array(n).fill(-Infinity), bot = new Array(n).fill(Infinity);
+    const limbRe = /^(h|f)[LR]_(upper|lower|hand|foot)|_med|_lat|^head$|^hyoid/;
+    const bodyW = (mesh, i, SI, SW) => { let w = 0; for (let c = 0; c < 4; c++) { const wc = SW.getComponent(i, c); if (wc > 0 && !limbRe.test(mesh.skeleton.bones[SI.getComponent(i, c)].name)) w += wc; } return w; };
+    for (let i = 0; i < SI0.count; i++) {
+      if (bodyW(sk, i, SI0, SW0) < 0.9) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+      const b = Math.round((x - SHAPE_X0) / SHAPE_DX); if (b < 0 || b >= n) continue;
+      top[b] = Math.max(top[b], y); bot[b] = Math.min(bot[b], y);
+    }
+    const fill = (a) => { for (let i = 0; i < n; i++) if (!Number.isFinite(a[i])) { let j = i; while (j < n && !Number.isFinite(a[j])) j++; a[i] = j < n ? a[j] : a[i - 1]; } return a; };
+    const gauss = (a, s) => a.map((_, i) => { let su = 0, ws = 0; for (let j = 0; j < n; j++) { const w = Math.exp(-0.5 * ((i - j) / s) ** 2); su += w * a[j]; ws += w; } return su / ws; });
+    const mt = gauss(fill(top), 1.6), mb = gauss(fill(bot), 1.6);
+    const xs = SHAPE_TOP.map((_, i) => SHAPE_X0 + i * SHAPE_DX);
+    const kb0 = xs.map((x, i) => Math.min(2, Math.max(0.5, (spine(x) - SHAPE_BOT[i]) / Math.max(1e-3, spine(x) - mb[i]))));
+    const kt0 = xs.map((x, i) => Math.min(1, Math.max(0.9, (SHAPE_TOP[i] - spine(x)) / Math.max(1e-3, mt[i] - spine(x)))));
+    const kb = gauss(kb0, 2), kt = gauss(kt0, 2);
+    const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const at = (k, x) => { const f = (x - SHAPE_X0) / SHAPE_DX, i = Math.min(n - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return k[i] + w * (k[i + 1] - k[i]); };
+    const fade = (x) => sm(0.30, 0.40, x) * (1 - sm(1.20, 1.30, x));
+    const skipOrgan = /^(eye|lens)_[lr]$|^claw$/;
+    const hq = holder.getWorldQuaternion(new THREE.Quaternion()), hs = holder.getWorldScale(new THREE.Vector3()).x;
+    let moved = 0;
+    model.traverse((mesh) => {
+      if (!mesh.isSkinnedMesh) return;
+      const part = mesh.userData.chameleon_part, organ = mesh.userData.chameleon_organ;
+      if (!(part === "Skin" || part === "Bone" || part === "Cartilage" || (part === "Organ" && !skipOrgan.test(organ ?? "")))) return;
+      const pos = mesh.geometry.getAttribute("position"), SI = mesh.geometry.getAttribute("skinIndex"), SW = mesh.geometry.getAttribute("skinWeight");
+      const sb = mesh.skeleton.bones, bm = mesh.skeleton.boneMatrices; mesh.skeleton.update();
+      const meshInv = new THREE.Matrix3().setFromMatrix4(mesh.matrixWorld).invert();
+      const M = new THREE.Matrix4(), Mk = new THREE.Matrix4();
+      for (let i = 0; i < pos.count; i++) {
+        let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } }
+        if (part === "Bone" && !/^rib/.test(sb[bi].name)) continue;   // of the skeleton only the ribs: vertebrae, girdles and limbs keep their shape
+        const wBody = bodyW(mesh, i, SI, SW); if (wBody <= 0) continue;
+        mesh.getVertexPosition(i, p); mesh.localToWorld(p); holder.worldToLocal(p);
+        const [x, y] = toXY(two(p)), f = fade(x); if (f <= 0) continue;
+        const s0 = spine(x), k = y >= s0 ? at(kt, x) : at(kb, x);
+        const dy = (s0 + (y - s0) * (1 + (k - 1) * f) - y) * wBody;
+        if (Math.abs(dy) < 1e-7) continue;
+        const d = up2.clone().multiplyScalar(dy * L);
+        d.applyQuaternion(hq).multiplyScalar(hs).applyMatrix3(meshInv);
+        M.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > 0) { Mk.fromArray(bm, SI.getComponent(i, c) * 16); for (let e = 0; e < 16; e++) M.elements[e] += w * Mk.elements[e]; } }
+        M.premultiply(mesh.bindMatrixInverse).multiply(mesh.bindMatrix);
+        d.applyMatrix3(new THREE.Matrix3().setFromMatrix4(M).invert());
+        pos.setXYZ(i, pos.getX(i) + d.x, pos.getY(i) + d.y, pos.getZ(i) + d.z); moved++;
+      }
+      pos.needsUpdate = true; mesh.geometry.computeBoundingSphere();
+    });
+    console.log(`[shape88] moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}`);
+  }
   if (FIT_SKIN) fitSkin();
+  if (SHAPE88) shape88();
   return { backdrop, branchFrame, update, feet, belly, outline };
 }
