@@ -87,6 +87,10 @@ const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ??
 // in snout–hip lengths of photo 08; scaled to this animal by its snout–hip length (121.5 mm) and anchored at v22 (target x 0.997, y 0.031).
 // The spine line: the share of the skin's depth at which the spine lies in this model, kept inside photo 08's outline, smoothed (cubic).
 const FIT_SPINE = new URLSearchParams(location.search).get("fitSpine") === "1";
+const FIT_SKIN = FIT_SPINE && new URLSearchParams(location.search).get("fitSkin") === "1", FIT_SKIN_T = 6.5;
+// The belly is lowered to photo 08's line only as far as FIT_CLEAR (mm) above the branch's top at FIT_SKIN_T (C record 86: at photo 08's depth the
+// belly sank 6–7 mm into the 10 mm branch, and the legs cannot lift the body the 20 mm photo 08's gap would need). ?fitClear= to try others.
+const FIT_CLEAR = Number(new URLSearchParams(location.search).get("fitClear") ?? 2);
 // Photo 08's casque top (x 705 px, y 82 px) in the target frame.
 const FIT_CASQUE = [(705 - 50) / 1550, (392 - 82) / 1550];
 const FIT_SH_MM = 121.5, FIT_X22 = 0.9969, FIT_Y22 = 0.0310;
@@ -529,6 +533,62 @@ export function createChameleonWalk(model, holder) {
     }
     return { lowestMM: lowest / MM, alongMM: along / MM, trunkMM: [trunkBack / MM, trunkFront / MM], profile: prof.map((x) => Math.round(x / MM * 10) / 10) };
   }
+  // Step 3 of C record 84 (C record 86, 2026-10-26, the producer: 「手順 3 に進んで、膜を目標の線へ寄せ、胴の深さと高さを合わせた絵とずれの mm を見せて下さい。」):
+  // ?fitSkin=1 (with fitSpine) reshapes the meshes once, at load, in the fitted pose at FIT_SKIN_T: at each place x along the body, the skin above the
+  // spine line is stretched so its top meets photo 08's back line, and below so its bottom meets the belly line (a scale about the spine, so what lies
+  // inside — ribs, rib cartilage, organs — keeps its place in the depth and the ribs reach the deeper belly). Not the head (x < 0.36, faded in to
+  // 0.46), the limbs, nor the tail past the hip (faded out 1.02 → 1.12). The change is written back into the meshes' bind positions through each
+  // vertex's own skinning, so it walks with the body.
+  function fitSkin() {
+    update(FIT_SKIN_T); model.updateMatrixWorld(true);
+    const o = outline(), SH = FIT_SH_MM * MM, anchor = inHolder(bones.v22);
+    const spineAt = (x) => {
+      const xs = FIT_SPINE_X, ys = FIT_SPINE_Y, n = xs.length;
+      if (x <= xs[0]) return ys[0] + (ys[1] - ys[0]) / (xs[1] - xs[0]) * (x - xs[0]);
+      if (x >= xs[n - 1]) return ys[n - 1] + (ys[n - 1] - ys[n - 2]) / (xs[n - 1] - xs[n - 2]) * (x - xs[n - 1]);
+      let i = 0; while (xs[i + 1] < x) i++; const w = (x - xs[i]) / (xs[i + 1] - xs[i]); return ys[i] + w * (ys[i + 1] - ys[i]);
+    };
+    const tab = (arr, x) => { const i = Math.min(arr.length - 2, Math.max(0, Math.floor(x / 0.02))), w = Math.min(1, Math.max(0, x / 0.02 - i)); const a = arr[i], b = arr[i + 1]; return Number.isFinite(a) && Number.isFinite(b) ? a + w * (b - a) : (Number.isFinite(a) ? a : b); };
+    const yBranch = FIT_Y22 + (branchTop - anchor.dot(UP)) / SH + FIT_CLEAR / FIT_SH_MM;
+    const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const field = (p) => {   // holder-frame displacement for a point now at p
+      const x = FIT_X22 - (p.dot(FORWARD) - anchor.dot(FORWARD)) / SH, y = FIT_Y22 + (p.dot(UP) - anchor.dot(UP)) / SH;
+      const w = sm(0.36, 0.46, x) * (1 - sm(1.02, 1.12, x)); if (w <= 0) return null;
+      const s = spineAt(x); let ny;
+      if (y >= s) { const m = tab(o.top, x), t = tab(o.targetTop, x); if (!(m - s > 1e-3)) return null; ny = s + (y - s) * Math.min(2, Math.max(0.5, (t - s) / (m - s))); }
+      else { const m = tab(o.bot, x), t = Math.max(tab(o.targetBot, x), yBranch); if (!(s - m > 1e-3)) return null; ny = s + (y - s) * Math.min(2, Math.max(0.5, (s - t) / (s - m))); }
+      return UP.clone().multiplyScalar((ny - y) * SH * w);
+    };
+    const skipOrgan = /^(eye|lens)_[lr]$|^hyoid_cartilage$|^claw$/;
+    const hq = holder.getWorldQuaternion(new THREE.Quaternion()), hs = holder.getWorldScale(new THREE.Vector3()).x;
+    let moved = 0;
+    model.traverse((mesh) => {
+      if (!mesh.isSkinnedMesh) return;
+      const part = mesh.userData.chameleon_part, organ = mesh.userData.chameleon_organ;
+      if (!(part === "Skin" || part === "Bone" || part === "Cartilage" || (part === "Organ" && !skipOrgan.test(organ ?? "")))) return;
+      const pos = mesh.geometry.getAttribute("position"), SI = mesh.geometry.getAttribute("skinIndex"), SW = mesh.geometry.getAttribute("skinWeight");
+      const sb = mesh.skeleton.bones, bm = mesh.skeleton.boneMatrices; mesh.skeleton.update();
+      const meshInv = new THREE.Matrix3().setFromMatrix4(mesh.matrixWorld).invert();
+      const M = new THREE.Matrix4(), Mk = new THREE.Matrix4(), p = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } }
+        const nm = sb[bi].name;
+        if (/^(h|f)[LR]_(upper|lower|hand|foot)|_med|_lat|^head$|^hyoid$/.test(nm)) continue;
+        if (part === "Bone" && !/^rib/.test(nm)) continue;   // the skeleton: only the ribs (vertebrae and girdles keep their shape)
+        mesh.getVertexPosition(i, p); mesh.localToWorld(p); holder.worldToLocal(p);
+        const d = field(p); if (!d) continue;
+        // holder → world → mesh local → bind (the blended skinning matrix's inverse)
+        d.applyQuaternion(hq).multiplyScalar(hs).applyMatrix3(meshInv);
+        M.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > 0) { Mk.fromArray(bm, SI.getComponent(i, c) * 16); for (let e = 0; e < 16; e++) M.elements[e] += w * Mk.elements[e]; } }
+        M.premultiply(mesh.bindMatrixInverse).multiply(mesh.bindMatrix);
+        const L3 = new THREE.Matrix3().setFromMatrix4(M).invert(); d.applyMatrix3(L3);
+        pos.setXYZ(i, pos.getX(i) + d.x, pos.getY(i) + d.y, pos.getZ(i) + d.z); moved++;
+      }
+      pos.needsUpdate = true; mesh.geometry.computeBoundingSphere();
+    });
+    console.log(`[fitSkin] moved ${moved} vertices`);
+  }
   /** For checking (C record 85): the skin's outline (trunk, head, neck and tail base; not the limbs) in photo 08's target frame, anchored at v22, and its
    *  distance from photo 08's outline at FIT_OUT_X, in mm. */
   function outline() {
@@ -548,5 +608,6 @@ export function createChameleonWalk(model, holder) {
     const dt = top.map((v, i) => (v - FIT_OUT_TOP[i]) * FIT_SH_MM), db = bot.map((v, i) => (v - FIT_OUT_BOT[i]) * FIT_SH_MM);
     return { x: FIT_OUT_X, top, bot, dTopMM: dt, dBotMM: db, targetTop: FIT_OUT_TOP, targetBot: FIT_OUT_BOT };
   }
+  if (FIT_SKIN) fitSkin();
   return { backdrop, branchFrame, update, feet, belly, outline };
 }
