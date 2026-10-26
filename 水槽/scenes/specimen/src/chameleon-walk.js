@@ -117,8 +117,11 @@ const SHAPE_DEPTH = [0.2549, 0.2608, 0.2696, 0.2778, 0.2828, 0.2850, 0.2866, 0.2
 // The throat's skin this far (mm) under the lowest of the lower jaw, the hyoid and its cartilage: photo 06 (the cleared specimen) has it 0.7–1.7 mm
 // under the lower jaw (C record 93).
 const THROAT_MM = 1.5;
+const WRAP_BIN_MM = 0.25, WRAP_SIG_MM = Number(new URLSearchParams(location.search).get("wrapSig") ?? 1), WRAP_MAX_MM = Number(new URLSearchParams(location.search).get("wrapMax") ?? 1.5);   // shape88(), C record 98
+const BELLY_ROUND_MM = Number(new URLSearchParams(location.search).get("bellyRound") ?? 0);   // 0: pushing the pinch sideways widened it (C record 98)
+const TRIM_MM = Number(new URLSearchParams(location.search).get("trim") ?? 0), TRIM_BIN_MM = Number(new URLSearchParams(location.search).get("trimBin") ?? 0.1);   // shape88(), C record 98
 const FIN_ROUNDS = Number(new URLSearchParams(location.search).get("finRounds") ?? 2), FIN_SIG = Number(new URLSearchParams(location.search).get("finSig") ?? 2.5);   // shape88(), C record 97
-const PIT_REACH_MM = Number(new URLSearchParams(location.search).get("pitReach") ?? 3);   // shape88(), C record 97
+const PIT_REACH_MM = Number(new URLSearchParams(location.search).get("pitReach") ?? 3); const PIT_BINS = (new URLSearchParams(location.search).get("pitBins") ?? "0.25").split(",").map(Number);   // mm, one pass each   // shape88(), C record 97
 const ROOT_SMOOTH = Number(new URLSearchParams(location.search).get("rootSmooth") ?? 0), ROOT_RINGS = Number(new URLSearchParams(location.search).get("rootRings") ?? 3);   // shape88(), C record 97
 const ROOT_W = (new URLSearchParams(location.search).get("rootW") ?? "0.1,0.9").split(",").map(Number);
 const EDGE_BAND_MM = Number(new URLSearchParams(location.search).get("edgeBand") ?? 4), EDGE_SMOOTH = Number(new URLSearchParams(location.search).get("edgeSmooth") ?? 20);   // shape88(), C record 96
@@ -1027,10 +1030,12 @@ export function createChameleonWalk(model, holder) {
     // outline had narrow V-shaped gaps, 1–1.5 mm wide and up to 4 mm deep, where the upper arm's or thigh's skin meets the chest's or belly's (at the
     // forelimbs' roots, x 0.35 and by the near forearm). The notch step above saw only the trunk's skin, so these were missed. Here the outline is taken
     // from all the skin but the forearms, shins, hands and feet, within PIT_REACH_MM under the trunk's bottom (the legs hanging lower are left out), in
-    // 0.25 mm bins over x 0.28–1.10; its lower envelope (the lowest within ±3 mm, a Gaussian of 0.75 mm, never above the outline) is the target, and
+    // bins over x 0.28–1.10, a pass with each of PIT_BINS (a finer pass, 0.05 mm over x 0.45–1.05, was tried in C record 98: it took the slit's zero away but left a fringe
+    // of fine streaks along the edge, so the round bottom below is used instead: the last slit by the forearm was a strip of skin between two rib ends, 0.3 mm
+    // across, ending 1.5 mm above the edge, and 0.25 or 0.1 mm bins took its neighbours' low points); its lower envelope (the lowest within ±3 mm, a Gaussian of 0.75 mm, never above the outline) is the target, and
     // the skin in the gaps comes down to it, whatever its weights (only down; within a band of 2.5 times the move, at least 2 mm).
-    const pitted = (() => {
-      const PX0 = 0.28, PX1 = 1.10, PDX = 0.25 / FIT_SH_MM, pn = Math.ceil((PX1 - PX0) / PDX) + 1, pb = new Array(pn).fill(Infinity);
+    const pitPass = (PIT_BIN_MM, PX0 = 0.28, PX1 = 1.10) => {
+      const PDX = PIT_BIN_MM / FIT_SH_MM, pn = Math.ceil((PX1 - PX0) / PDX) + 1, pb = new Array(pn).fill(Infinity), PK = 0.25 / PIT_BIN_MM;
       const farLimb = /_(lower|hand|foot)|_med|_lat/;
       const mainBone = (mesh, i, SI, SW) => { let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } } return mesh.skeleton.bones[bi].name; };
       const trunkBot = (x) => ntab(ns, Math.min(NX1, Math.max(NX0, x)));
@@ -1042,8 +1047,9 @@ export function createChameleonWalk(model, holder) {
         const b = Math.round((x - PX0) / PDX); if (b >= 0 && b < pn) pb[b] = Math.min(pb[b], y);
       }
       for (let i = 0; i < pn; i++) if (!Number.isFinite(pb[i])) pb[i] = i ? pb[i - 1] : pb.find(Number.isFinite);
-      const pmin = pb.map((_, i) => { let m = Infinity; for (let j = Math.max(0, i - 12); j <= Math.min(pn - 1, i + 12); j++) m = Math.min(m, pb[j]); return m; });
-      const ps = pmin.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - 9); j <= Math.min(pn - 1, i + 9); j++) { const w = Math.exp(-0.5 * ((i - j) / 3) ** 2); su += w * pmin[j]; ws += w; } return Math.min(pb[i], su / ws); });
+      const mR = Math.round(12 * PK), gR = Math.round(9 * PK), gS = 3 * PK;
+      const pmin = pb.map((_, i) => { let m = Infinity; for (let j = Math.max(0, i - mR); j <= Math.min(pn - 1, i + mR); j++) m = Math.min(m, pb[j]); return m; });
+      const ps = pmin.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - gR); j <= Math.min(pn - 1, i + gR); j++) { const w = Math.exp(-0.5 * ((i - j) / gS) ** 2); su += w * pmin[j]; ws += w; } return Math.min(pb[i], su / ws); });
       const ptab = (a, x) => { const f = (x - PX0) / PDX, i = Math.min(pn - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return a[i] + w * (a[i + 1] - a[i]); };
       const pFade = (x) => sm(PX0, PX0 + 0.02, x) * (1 - sm(PX1 - 0.02, PX1, x));
       const n = applyDy((x, y, wBody, part, mesh, i, SI, SW) => {
@@ -1054,7 +1060,8 @@ export function createChameleonWalk(model, holder) {
         return d * (1 - t) * (1 - t) * f;
       }, ["Skin"], true);
       return [n, Math.max(...pb.map((v, i) => v - ps[i])) * FIT_SH_MM];
-    })();
+    };
+    const pitted = PIT_BINS.map((b, k) => (k ? pitPass(b, 0.45, 1.05) : pitPass(b))).reduce((a, r) => [a[0] + r[0], Math.max(a[1], r[1])], [0, 0]);
     // The fins (C record 97): pulled down at the midline, the bottom of the throat and the belly had become thin fins of skin, a fraction of a mm
     // across, that show from the side as white slits (no path through them). Around each 1 mm section, x 0.25–0.95 with the throat (not the groin: there it waved the edge under the thighs), the skin below the
     // level is brought out to its outline smoothed around (a Gaussian of FIN_SIG bins of 7.5°) and along x (3 mm), troughs only, FIN_ROUNDS rounds.
@@ -1062,6 +1069,118 @@ export function createChameleonWalk(model, holder) {
     for (let r = 0; r < FIN_ROUNDS; r++) { const [n, lm] = roundOut(0.25, 0.95, true, FIN_SIG); fins += n; finMax = Math.max(finMax, lm); }
     // and finely (0.25 mm sections, along x a Gaussian of 0.75 mm): the narrowest pinches, 0.3 mm across
     for (let r = 0; r < FIN_ROUNDS; r++) { const [n, lm] = roundOut(0.25, 0.95, true, FIN_SIG, FDX / 4, 3); fins += n; finMax = Math.max(finMax, lm); }
+    // A round bottom (C record 98, 2026-10-27, the producer: 「前腕の横に残っている 0.5 mm の筋も消して下さい。」): what was left by the forearm was a
+    // pinch, the skin a fraction of a mm across for 1.5 mm up from the edge, so thin that light went through. Around each 0.25 mm section along x
+    // 0.30–1.05 (head and trunk skin, not the forearms, shins, hands or feet), a vertex BELLY_ROUND_MM or less above the section's bottom is pushed out
+    // sideways from the spine's side line until it is at least as far out as a circle of radius BELLY_ROUND_MM resting on that bottom: sqrt(2 R h) at
+    // height h (out only).
+    const rounded = (() => {
+      if (!(BELLY_ROUND_MM > 0)) return 0;
+      const RX0 = 0.30, RX1 = 1.05, RDX = 0.25 / FIT_SH_MM, rn = Math.ceil((RX1 - RX0) / RDX) + 1, rb = new Array(rn).fill(Infinity), R = BELLY_ROUND_MM / FIT_SH_MM;
+      const farLimb = /_(lower|hand|foot)|_med|_lat/;
+      const mainBone = (mesh, i, SI, SW) => { let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } } return mesh.skeleton.bones[bi].name; };
+      for (let i = 0; i < SI0.count; i++) {
+        if (bodyWh(sk, i, SI0, SW0) < 0.5) continue;
+        sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+        const b = Math.round((x - RX0) / RDX); if (b >= 0 && b < rn) rb[b] = Math.min(rb[b], y);
+      }
+      for (let i = 0; i < rn; i++) if (!Number.isFinite(rb[i])) rb[i] = i ? rb[i - 1] : rb.find(Number.isFinite);
+      const rbS = rb.map((_, i) => { let m = Infinity; for (let j = Math.max(0, i - 4); j <= Math.min(rn - 1, i + 4); j++) m = Math.min(m, rb[j]); return m; });   // within ±1 mm
+      const rFade = (x) => sm(RX0, RX0 + 0.03, x) * (1 - sm(RX1 - 0.03, RX1, x));
+      return applyDy((x, y, wBody, part, mesh, i, SI, SW, z) => {
+        const f = rFade(x); if (f <= 0 || farLimb.test(mainBone(mesh, i, SI, SW))) return 0;
+        const fb3 = (x - RX0) / RDX, k = Math.min(rn - 2, Math.max(0, Math.floor(fb3))), w = Math.min(1, Math.max(0, fb3 - k));
+        const h = y - ((1 - w) * rbS[k] + w * rbS[k + 1]); if (h < 0 || h > R) return 0;
+        const need = Math.sqrt(Math.max(0, 2 * R * h - h * h)), dz = z - spZ(x), out = need - Math.abs(dz);
+        if (out <= 0) return 0;
+        return [0, Math.sign(dz || 1) * out * f];
+      }, ["Skin"], true);
+    })();
+    // Trim (C record 98): the pinch by the forearm was a strip of skin between two rib ends' lobes, ending 1.5 mm above them; pulling the strip down
+    // left a fringe of fine streaks, pushing it sideways widened it. Instead the lobes' tips come up to the strip: along x 0.30–1.05 in TRIM_BIN_MM bins
+    // the bottom of the head's and trunk's skin is taken, and its upper envelope over ±0.5 mm (the highest bin bottom), smoothed (a Gaussian of 0.3 mm,
+    // never more than TRIM_MM above the bottom), is the new bottom; skin below it comes up to it (only up; within a band of 2.5 times the move, at
+    // least 1.5 mm).
+    const trimmed = (() => {
+      if (!(TRIM_MM > 0)) return [0, 0];
+      const TX0 = 0.30, TX1 = 1.05, TDX = TRIM_BIN_MM / FIT_SH_MM, tn = Math.ceil((TX1 - TX0) / TDX) + 1, tb = new Array(tn).fill(Infinity);
+      const farLimb = /_(lower|hand|foot)|_med|_lat/;
+      const mainBone = (mesh, i, SI, SW) => { let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } } return mesh.skeleton.bones[bi].name; };
+      for (let i = 0; i < SI0.count; i++) {
+        if (bodyWh(sk, i, SI0, SW0) < 0.5) continue;
+        sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+        const b = Math.round((x - TX0) / TDX); if (b >= 0 && b < tn) tb[b] = Math.min(tb[b], y);
+      }
+      for (let i = 0; i < tn; i++) if (!Number.isFinite(tb[i])) tb[i] = i ? tb[i - 1] : tb.find(Number.isFinite);
+      const hR = Math.max(1, Math.round(0.5 / TRIM_BIN_MM)), gS = 0.3 / TRIM_BIN_MM, gR = Math.ceil(3 * gS), cap = TRIM_MM / FIT_SH_MM;
+      const tmax = tb.map((_, i) => { let m = -Infinity; for (let j = Math.max(0, i - hR); j <= Math.min(tn - 1, i + hR); j++) m = Math.max(m, tb[j]); return m; });
+      const tt = tmax.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - gR); j <= Math.min(tn - 1, i + gR); j++) { const w = Math.exp(-0.5 * ((i - j) / gS) ** 2); su += w * tmax[j]; ws += w; } return Math.min(tb[i] + cap, Math.max(tb[i], su / ws)); });
+      const ttab = (a, x) => { const f = (x - TX0) / TDX, i = Math.min(tn - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return a[i] + w * (a[i + 1] - a[i]); };
+      const tFade = (x) => sm(TX0, TX0 + 0.03, x) * (1 - sm(TX1 - 0.03, TX1, x));
+      const n = applyDy((x, y, wBody, part, mesh, i, SI, SW) => {
+        const f = tFade(x); if (f <= 0 || farLimb.test(mainBone(mesh, i, SI, SW))) return 0;
+        const b = ttab(tb, x), c = ttab(tt, x), d = c - b; if (d <= 0) return 0;
+        const band = Math.max(1.5 / FIT_SH_MM, 2.5 * d), t = (y - b) / band; if (t < 0 || t >= 1) return 0;
+        return d * (1 - t) * (1 - t) * f;
+      }, ["Skin"], true);
+      return [n, Math.max(...tt.map((v, i) => v - tb[i])) * FIT_SH_MM];
+    })();
+    // Wrap (C record 98): the skin below the spine still had fine lobes and folds from being built around the bones (a lobe at each rib end, and
+    // between two of them a strip of skin ending higher, which shows as a white pinch). Here every skin vertex below the level, x 0.40–1.05, is set on a
+    // smooth surface: in sections of WRAP_BIN_MM along x and 7.5° around (about the point midway between the spine and the bottom, on the spine's
+    // side line), the outermost radius is smoothed (a Gaussian of WRAP_SIG_MM along x and 1.5 sections around) and each vertex is moved along its
+    // radius to it, in or out by at most WRAP_MAX_MM, never closer than 0.8 mm to the bones and rib cartilage inside.
+    const wrapped = (() => {
+      if (!(WRAP_SIG_MM > 0)) return [0, 0];
+      const WX0 = 0.40, WX1 = 1.05, WDX = WRAP_BIN_MM / FIT_SH_MM, wn = Math.ceil((WX1 - WX0) / WDX) + 1, NTW = 24;
+      const bot = new Array(wn).fill(Infinity);
+      for (let i = 0; i < SI0.count; i++) {
+        if (bodyW(sk, i, SI0, SW0) < 0.9) continue;
+        sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+        const b = Math.round((x - WX0) / WDX); if (b >= 0 && b < wn) bot[b] = Math.min(bot[b], y);
+      }
+      for (let i = 0; i < wn; i++) if (!Number.isFinite(bot[i])) bot[i] = i ? bot[i - 1] : bot.find(Number.isFinite);
+      const botS = bot.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - 40); j <= Math.min(wn - 1, i + 40); j++) { const w = Math.exp(-0.5 * ((i - j) / 12) ** 2); su += w * bot[j]; ws += w; } return su / ws; });
+      const cen = (x, b) => [(spine(x) + botS[Math.min(wn - 1, Math.max(0, b))]) / 2, spZ(x)];
+      const polar = (x, y, z) => { const b = Math.round((x - WX0) / WDX); const [yc, zc] = cen(x, b); const t = Math.atan2(y - yc, z - zc); return [b, t, Math.hypot(y - yc, z - zc), yc, zc]; };
+      const tbin = (t) => Math.min(NTW - 1, Math.max(0, Math.floor((t + Math.PI) / Math.PI * NTW)));
+      const outer = Array.from({ length: wn }, () => new Array(NTW).fill(0)), inner = Array.from({ length: wn }, () => new Array(NTW).fill(0));
+      for (let i = 0; i < SI0.count; i++) {
+        if (bodyW(sk, i, SI0, SW0) < 0.9) continue;
+        sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+        const [b, t, r] = polar(x, y, p.dot(LEFT) / L); if (b < 0 || b >= wn || t > 0) continue;
+        const k = tbin(t); outer[b][k] = Math.max(outer[b][k], r);
+      }
+      model.traverse((mesh) => {
+        if (!mesh.isSkinnedMesh || !["Bone", "Cartilage"].includes(mesh.userData.chameleon_part)) return;
+        const SI = mesh.geometry.getAttribute("skinIndex"), SW = mesh.geometry.getAttribute("skinWeight"), q = new THREE.Vector3();
+        for (let i = 0; i < SI.count; i++) {
+          if (bodyW(mesh, i, SI, SW) < 0.5) continue;
+          mesh.getVertexPosition(i, q); mesh.localToWorld(q); holder.worldToLocal(q); const [x, y] = toXY(two(q));
+          const [b, t, r] = polar(x, y, q.dot(LEFT) / L); if (b < 0 || b >= wn || t > 0) continue;
+          const k = tbin(t); inner[b][k] = Math.max(inner[b][k], r + 0.8 / FIT_SH_MM);
+        }
+      });
+      for (let k = 0; k < NTW; k++) for (let b = 0; b < wn; b++) if (!(outer[b][k] > 0)) { let j = b; while (j < wn && !(outer[j][k] > 0)) j++; outer[b][k] = j < wn ? outer[j][k] : (b ? outer[b - 1][k] : 0); }
+      const xs2 = WRAP_SIG_MM / WRAP_BIN_MM, xr = Math.ceil(3 * xs2);
+      const smo = outer.map((row, b) => row.map((_, k) => { let su = 0, ws = 0;
+        for (let bb = Math.max(0, b - xr); bb <= Math.min(wn - 1, b + xr); bb++) for (let kk = Math.max(0, k - 3); kk <= Math.min(NTW - 1, k + 3); kk++) { const w = Math.exp(-0.5 * ((b - bb) / xs2) ** 2 - 0.5 * ((k - kk) / 1.5) ** 2); su += w * outer[bb][kk]; ws += w; }
+        return Math.max(su / ws, inner[b][k]); }));
+      const wFade = (x) => sm(WX0, WX0 + 0.05, x) * (1 - sm(WX1 - 0.05, WX1, x)), cap = WRAP_MAX_MM / FIT_SH_MM;
+      let mx = 0;
+      const n = applyDy((x, y, wBody, part, mesh, i, SI, SW, z) => {
+        const f = wFade(x) * wBody; if (f <= 0) return 0;
+        const s0 = spine(x); if (y >= s0) return 0;
+        const [b0, t, r, yc, zc] = polar(x, y, z); if (t > 0 || r < 1e-6) return 0;
+        const fb4 = (x - WX0) / WDX, b = Math.min(wn - 2, Math.max(0, Math.floor(fb4))), wb = Math.min(1, Math.max(0, fb4 - b));
+        const fk = (t + Math.PI) / Math.PI * NTW - 0.5, k = Math.min(NTW - 2, Math.max(0, Math.floor(fk))), wk = Math.min(1, Math.max(0, fk - k));
+        const target = (1 - wb) * ((1 - wk) * smo[b][k] + wk * smo[b][k + 1]) + wb * ((1 - wk) * smo[b + 1][k] + wk * smo[b + 1][k + 1]);
+        const dr = Math.max(-cap, Math.min(cap, target - r)) * f * sm(0, 0.25, (s0 - y) / Math.max(1e-3, s0 - botS[Math.min(wn - 1, Math.max(0, b0))]));
+        mx = Math.max(mx, Math.abs(dr));
+        return [dr * (y - yc) / r, dr * (z - zc) / r];
+      }, ["Skin"]);
+      return [n, mx * FIT_SH_MM];
+    })();
     // Unfold (C record 96, 2026-10-27, the producer: 「まだお腹がわの細かな波打ちが残っています。」): the moves above turn about 300 of the skin's faces over
     // against the start (x 0.40, 0.55–0.70, 1.0, at the limbs' roots and the rib ends), and each fold shows through as a narrow white notch. Where a
     // face is turned, its corners and their neighbours (2 rings) are drawn halfway to their neighbours' mean, in the bind positions, until none is left
@@ -1091,7 +1210,7 @@ export function createChameleonWalk(model, holder) {
     if (dbg) model.userData.shapeDebug = dbg;
     const notchMax = Math.max(...nb.map((v, i) => v - Math.min(v, ns[i]))) * FIT_SH_MM;
     const dev = fb.map((v, i) => Math.abs(v - line[i])).filter((v, i) => fillFade(FX0 + i * FDX) > 0.5);
-    console.log(`[shape88] belly curve's lowest ${(y0k * FIT_SH_MM).toFixed(1)} mm (by the depth ${(y0d * FIT_SH_MM).toFixed(1)}, under the girdles ${(y0g * FIT_SH_MM).toFixed(1)}); moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}; belly line: ${filled} skin vertices moved, at most ${(Math.max(...dev) * FIT_SH_MM).toFixed(2)} mm; sides: ${sides} skin vertices, troughs filled up to ${liftMax.toFixed(2)} mm; edge notches: ${notched} skin vertices, up to ${notchMax.toFixed(2)} mm; pits: ${pitted[0]} skin vertices, up to ${pitted[1].toFixed(2)} mm; fins: ${fins} skin vertices, up to ${finMax.toFixed(2)} mm; unfolded in ${unfolded[0]} rounds, ${unfolded[1]} vertices still on turned faces`);
+    console.log(`[shape88] belly curve's lowest ${(y0k * FIT_SH_MM).toFixed(1)} mm (by the depth ${(y0d * FIT_SH_MM).toFixed(1)}, under the girdles ${(y0g * FIT_SH_MM).toFixed(1)}); moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}; belly line: ${filled} skin vertices moved, at most ${(Math.max(...dev) * FIT_SH_MM).toFixed(2)} mm; sides: ${sides} skin vertices, troughs filled up to ${liftMax.toFixed(2)} mm; edge notches: ${notched} skin vertices, up to ${notchMax.toFixed(2)} mm; round bottom: ${rounded} skin vertices; wrap: ${wrapped[0]} skin vertices, up to ${wrapped[1].toFixed(2)} mm; trim: ${trimmed[0]} skin vertices, up to ${trimmed[1].toFixed(2)} mm; pits: ${pitted[0]} skin vertices, up to ${pitted[1].toFixed(2)} mm; fins: ${fins} skin vertices, up to ${finMax.toFixed(2)} mm; unfolded in ${unfolded[0]} rounds, ${unfolded[1]} vertices still on turned faces`);
   }
   if (FIT_SKIN) fitSkin();
   if (SHAPE88 && model.userData.shape88Baked) console.warn("[shape88] この glb は焼き込み済みなので、?shape=88 をかけない");
