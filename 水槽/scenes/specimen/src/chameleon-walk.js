@@ -117,6 +117,10 @@ const SHAPE_DEPTH = [0.2549, 0.2608, 0.2696, 0.2778, 0.2828, 0.2850, 0.2866, 0.2
 // The throat's skin this far (mm) under the lowest of the lower jaw, the hyoid and its cartilage: photo 06 (the cleared specimen) has it 0.7–1.7 mm
 // under the lower jaw (C record 93).
 const THROAT_MM = 1.5;
+const EDGE_BAND_MM = Number(new URLSearchParams(location.search).get("edgeBand") ?? 4), EDGE_SMOOTH = Number(new URLSearchParams(location.search).get("edgeSmooth") ?? 20);   // shape88(), C record 96
+const LIMB_JOIN_MM = Number(new URLSearchParams(location.search).get("limbJoin") ?? 6);   // shape88(), C record 96
+const UNFOLD_ROUNDS = Number(new URLSearchParams(location.search).get("unfold") ?? 0);   // shape88()'s last step (C record 96)
+const SKIN_MOVE_SMOOTH = Number(new URLSearchParams(location.search).get("moveSmooth") ?? 0);   // rounds of smoothMoves(); 0: it moved the folds elsewhere (C record 96)
 // The belly's line (C record 95, 2026-10-27, the producer: 「今度はお腹が地面に対して全体的にくぼんでいます。これはやりすぎです。限りなく水平に近いながら胴体
 // として丸みは維持していないと現実的ではありません」): the back less the traced depth followed the back's arch and bowed the belly up in the middle. Now a
 // gentle curve, lowest at BELLY_LOW_X, rising BELLY_RISE_MM[0] toward the chest (x 0.42) and BELLY_RISE_MM[1] toward the hip (x 1.0), squared in x;
@@ -665,8 +669,45 @@ export function createChameleonWalk(model, holder) {
   // ratios: C record 87). kt is kept within 0.9–1 (the back only lowered: its height is bone, not a thicker skin, C record 87). Faded in over x 0.30–0.40 and
   // out over 1.20–1.30. Each vertex moves by its skin weights on the trunk's bones (vertebrae, ribs, girdles), so the limb roots and the head blend.
   // Skin, ribs, rib cartilage and organs (not the eyes) move together, written back into the bind positions as in fitSkin().
+  // The skin's welded neighbours (vertices split at seams joined), once per geometry, for smoothMoves().
+  const weldCache = new WeakMap();
+  function welded(geo) {
+    if (weldCache.has(geo)) return weldCache.get(geo);
+    const pos = geo.getAttribute("position"), idx = geo.index.array, key = new Map(), id = new Int32Array(pos.count); let m = 0;
+    for (let i = 0; i < pos.count; i++) { const k = `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`; let j = key.get(k); if (j === undefined) { j = m++; key.set(k, j); } id[i] = j; }
+    const nb = Array.from({ length: m }, () => new Set());
+    for (let t = 0; t < idx.length; t += 3) { const a = id[idx[t]], b = id[idx[t + 1]], c = id[idx[t + 2]]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+    const r = { id, m, nb: nb.map((s) => Int32Array.from(s)) }; weldCache.set(geo, r); return r;
+  }
+  function smoothMoves(geo, D, rounds) {
+    const { id, m, nb } = welded(geo), W = new Float64Array(m * 3), cnt = new Int32Array(m);
+    for (let i = 0; i < id.length; i++) { const j = id[i]; W[3 * j] += D[3 * i]; W[3 * j + 1] += D[3 * i + 1]; W[3 * j + 2] += D[3 * i + 2]; cnt[j]++; }
+    for (let j = 0; j < m; j++) for (let c = 0; c < 3; c++) W[3 * j + c] /= cnt[j];
+    const T = new Float64Array(m * 3);
+    for (let r = 0; r < rounds; r++) {
+      for (let j = 0; j < m; j++) { const n = nb[j]; let x = 0, y = 0, z = 0; for (let k = 0; k < n.length; k++) { x += W[3 * n[k]]; y += W[3 * n[k] + 1]; z += W[3 * n[k] + 2]; } const l = n.length || 1;
+        T[3 * j] = 0.5 * W[3 * j] + 0.5 * x / l; T[3 * j + 1] = 0.5 * W[3 * j + 1] + 0.5 * y / l; T[3 * j + 2] = 0.5 * W[3 * j + 2] + 0.5 * z / l; }
+      W.set(T);
+    }
+    for (let i = 0; i < id.length; i++) { const j = id[i]; D[3 * i] = W[3 * j]; D[3 * i + 1] = W[3 * j + 1]; D[3 * i + 2] = W[3 * j + 2]; }
+  }
   function shape88() {
     update(FIT_SKIN_T); model.updateMatrixWorld(true);
+    // ?shapeDebug=1: after each step, the skin's faces turned over against the start (bind positions), and where (x)
+    const dbg = new URLSearchParams(location.search).get("shapeDebug") === "1" ? [] : null;
+    let skin0 = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") skin0 = o; });
+    const P0 = skin0.geometry.getAttribute("position").array.slice(), IDX = skin0.geometry.index.array;
+    const dbgPts = []; if (dbg) model.userData.shapeDebugPts = dbgPts;
+    const dbgArea = Number(new URLSearchParams(location.search).get("dbgArea") ?? 0);
+    const flips = (tag, toXYf) => {
+      if (!dbg) return;
+      const P = skin0.geometry.getAttribute("position").array, xs = [], q = new THREE.Vector3();
+      for (let t = 0; t < IDX.length; t += 3) {
+        const n = (A) => { const a = IDX[t] * 3, b = IDX[t + 1] * 3, c = IDX[t + 2] * 3; const ux = A[b] - A[a], uy = A[b + 1] - A[a + 1], uz = A[b + 2] - A[a + 2], vx = A[c] - A[a], vy = A[c + 1] - A[a + 1], vz = A[c + 2] - A[a + 2]; return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]; };
+        const a = n(P0), b = n(P), A0 = Math.hypot(...a); if (A0 > dbgArea && a[0] * b[0] + a[1] * b[1] + a[2] * b[2] < 0) { if (toXYf) { skin0.getVertexPosition(IDX[t], q); skin0.localToWorld(q); if (tag === "notch") dbgPts.push(q.clone()); holder.worldToLocal(q); xs.push(+toXYf(q).toFixed(2)); } else xs.push(0); }
+      }
+      { const h = {}; for (const x of xs) { const k = (Math.round(x * 20) / 20).toFixed(2); h[k] = (h[k] || 0) + 1; } dbg.push([tag, xs.length, h]); }
+    };
     let sk = null; model.traverse((o) => { if (o.isSkinnedMesh && o.userData.chameleon_part === "Skin") sk = o; });
     const two = (p) => [p.dot(FORWARD), p.dot(UP)];
     const hipP = two(inHolder(limbs.hL.upper).add(inHolder(limbs.hR.upper)).multiplyScalar(0.5));
@@ -743,6 +784,7 @@ export function createChameleonWalk(model, holder) {
         const sb = mesh.skeleton.bones, bm = mesh.skeleton.boneMatrices; mesh.skeleton.update();
         const meshInv = new THREE.Matrix3().setFromMatrix4(mesh.matrixWorld).invert();
         const M = new THREE.Matrix4(), Mk = new THREE.Matrix4();
+        const D = new Float32Array(pos.count * 3);   // each vertex's move in the bind positions
         for (let i = 0; i < pos.count; i++) {
           let best = 0, bi = 0; for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > best) { best = w; bi = SI.getComponent(i, c); } }
           if (part === "Bone" && !/^rib/.test(sb[bi].name)) continue;   // of the skeleton only the ribs: vertebrae, girdles and limbs keep their shape
@@ -757,17 +799,27 @@ export function createChameleonWalk(model, holder) {
           for (let c = 0; c < 4; c++) { const w = SW.getComponent(i, c); if (w > 0) { Mk.fromArray(bm, SI.getComponent(i, c) * 16); for (let e = 0; e < 16; e++) M.elements[e] += w * Mk.elements[e]; } }
           M.premultiply(mesh.bindMatrixInverse).multiply(mesh.bindMatrix);
           d.applyMatrix3(new THREE.Matrix3().setFromMatrix4(M).invert());
-          pos.setXYZ(i, pos.getX(i) + d.x, pos.getY(i) + d.y, pos.getZ(i) + d.z); moved++;
+          D[3 * i] = d.x; D[3 * i + 1] = d.y; D[3 * i + 2] = d.z; moved++;
         }
+        // On the skin the moves are smoothed over the surface (SKIN_MOVE_SMOOTH rounds, each vertex halfway to its neighbours' mean; vertices at the same
+        // place, split at seams, welded) before they are applied, so neighbours never move apart enough to turn a face over (C record 96: per-bin bottoms
+        // and the limbs' skin weights made neighbouring moves differ by more than their spacing).
+        if (part === "Skin" && SKIN_MOVE_SMOOTH > 0) smoothMoves(mesh.geometry, D, SKIN_MOVE_SMOOTH);
+        for (let i = 0; i < pos.count; i++) if (D[3 * i] || D[3 * i + 1] || D[3 * i + 2]) pos.setXYZ(i, pos.getX(i) + D[3 * i], pos.getY(i) + D[3 * i + 1], pos.getZ(i) + D[3 * i + 2]);
         pos.needsUpdate = true; mesh.geometry.computeBoundingSphere();
       });
       return moved;
     };
-    const moved = applyDy((x, y, wBody) => {
+    // The limbs' skin where it joins the trunk moves with it (C record 96: it stayed with the limb bones while the belly rose 9 mm, and the skin between
+    // stretched into a thin sheet that showed white at the forelimbs' roots): a skin vertex weighted to a limb moves as the trunk's skin does above the
+    // trunk's old bottom, fading to its own weight over LIMB_JOIN_MM below it.
+    const joinW = (wBody, part, y, bottom) => part !== "Skin" || wBody >= 1 ? wBody : Math.max(wBody, Math.min(1, Math.max(0, 1 - (bottom - y) / (LIMB_JOIN_MM / FIT_SH_MM))));
+    const moved = applyDy((x, y, wBody, part) => {
       const f = fade(x); if (f <= 0) return 0;
       const s0 = spine(x), k = y >= s0 ? at(kt, x) : at(kb, x);
-      return (s0 + (y - s0) * (1 + (k - 1) * f) - y) * wBody;
-    }, ["Skin", "Bone", "Cartilage", "Organ"]);
+      return (s0 + (y - s0) * (1 + (k - 1) * f) - y) * joinW(wBody, part, y, at(mb, x));
+    }, ["Skin", "Bone", "Cartilage", "Organ"], true);
+    flips("depth", (q) => toXY(two(q))[0]);
     // The belly line, chin to tail, as one smooth line (C record 92, 2026-10-26, the producer: 「お腹側が顎から胴体まで、および胴体から尻尾までがほぼ一直線（もちろん
     // 丸みはある）の綺麗なラインで繋がっていなきゃおかしいです。」; before it, C record 91: the small waves over the rib ends). The skin is built around the
     // bones (skinbody.py), so its bottom line steps up under the throat (behind the jaw, 2.5–5.7 mm above the traced animals' line) and at the tail's base
@@ -825,10 +877,14 @@ export function createChameleonWalk(model, holder) {
     const fillFade = (x) => sm(0.0, 0.04, x) * (1 - sm(1.22, 1.30, x));
     const filled = applyDy((x, y, wBody, part, mesh, i, SI, SW) => {
       const f = fillFade(x); if (f <= 0) return 0;
-      const b = tab(fb, x), c = tab(line, x), band = Math.min(12 / FIT_SH_MM, Math.max(6 / FIT_SH_MM, 0.3 * (tab(ft, x) - b)));
-      const wv = 1 - Math.min(1, Math.max(0, (y - b) / band)); if (wv <= 0) return 0;
-      return (c - b) * wv * wv * (3 - 2 * wv) * f * bodyWh(mesh, i, SI, SW);
+      // the weight falls as (1 − t)² over the band, and the band is at least 2.5 times the move, so the skin never folds over itself (C record 96: with
+      // a smoothstep over a fixed 6–12 mm band, moves of 4–5 mm turned 400 faces over, seen as narrow white notches in the belly's edge)
+      const b = tab(fb, x), c = tab(line, x), band = Math.max(2.5 * Math.abs(c - b), Math.min(12 / FIT_SH_MM, Math.max(6 / FIT_SH_MM, 0.3 * (tab(ft, x) - b))));
+      const t = Math.min(1, Math.max(0, (y - b) / band)); if (t >= 1) return 0;
+      const wl = joinW(bodyWh(mesh, i, SI, SW), part, y, b);
+      return (c - b) * (1 - t) * (1 - t) * f * wl;
     }, ["Skin", "Organ", "Bone", "Cartilage"], true);
+    flips("line", (q) => toXY(two(q))[0]);
     model.userData.shape88Line = { x0: FX0, dx: FDX, bottom: fb, inner, line, jaw, want };   // for checking
     // The belly's sides (C record 94, from C record 93: along the body, 45–75° below the level the skin waved 1.0–1.4 mm with the rib ends): around each
     // 1 mm section (centre midway between the spine and the new bottom, on the spine's side line), the outermost skin per 7.5° below the level is taken,
@@ -871,9 +927,94 @@ export function createChameleonWalk(model, holder) {
       return [dl * g * (y - yc) / r, dl * g * (z - zc) / r];
     }, ["Skin"]);
     liftMax = Math.max(liftMax, Math.max(...lift.map((row) => Math.max(...row))) * FIT_SH_MM);
+    flips("sides" + round, (q) => toXY(two(q))[0]);
     }
+    // The bottom band's pleats (C record 96): the skin, built around the bones, has fine pleats along its bottom at every rib end; lifting it by a
+    // different amount per bin folds them over (about 250 faces turned, seen as narrow white notches). The skin within EDGE_BAND_MM of the bottom, along
+    // x 0.38–1.05, is smoothed with Taubin's filter (λ 0.5, μ −0.53: high frequencies out, no shrinking), EDGE_SMOOTH rounds, weighted down toward the band's top.
+    const edgeSmoothed = (() => {
+      if (!(EDGE_SMOOTH > 0)) return 0;
+      const geo = skin0.geometry, pos = geo.getAttribute("position"), P = pos.array, { id, m, nb } = welded(geo);
+      const SIs = geo.getAttribute("skinIndex"), SWs = geo.getAttribute("skinWeight"), q = new THREE.Vector3();
+      const bins = new Map(), wv = new Float64Array(m), yx = new Array(m);
+      for (let i = 0; i < id.length; i++) {
+        skin0.getVertexPosition(i, q); skin0.localToWorld(q); holder.worldToLocal(q); const [x, y] = toXY(two(q)); yx[id[i]] = [x, y];
+        if (bodyW(skin0, i, SIs, SWs) < 0.3) continue;
+        const b = Math.round(x / FDX); bins.set(b, Math.min(bins.get(b) ?? Infinity, y));
+      }
+      const EB = EDGE_BAND_MM / FIT_SH_MM;
+      for (let j = 0; j < m; j++) {
+        const [x, y] = yx[j]; if (x < 0.38 || x > 1.05) continue;
+        let lo = Infinity; for (let k = -3; k <= 3; k++) lo = Math.min(lo, bins.get(Math.round(x / FDX) + k) ?? Infinity);
+        const t = (y - lo) / EB; if (t < 1) wv[j] = (1 - Math.max(0, t)) ** 2 * sm(0.38, 0.42, x) * (1 - sm(1.01, 1.05, x));
+      }
+      const W = new Float64Array(m * 3); for (let i = 0; i < id.length; i++) for (let c = 0; c < 3; c++) W[3 * id[i] + c] = P[3 * i + c];
+      const act = []; for (let j = 0; j < m; j++) if (wv[j] > 0) act.push(j);
+      const T = new Float64Array(act.length * 3);
+      for (let r = 0; r < EDGE_SMOOTH; r++) for (const lam of [0.5, -0.53]) {
+        act.forEach((j, a) => { const n = nb[j]; let x = 0, y = 0, z = 0; for (let k = 0; k < n.length; k++) { x += W[3 * n[k]]; y += W[3 * n[k] + 1]; z += W[3 * n[k] + 2]; } const l = n.length || 1;
+          T[3 * a] = lam * wv[j] * (x / l - W[3 * j]); T[3 * a + 1] = lam * wv[j] * (y / l - W[3 * j + 1]); T[3 * a + 2] = lam * wv[j] * (z / l - W[3 * j + 2]); });
+        act.forEach((j, a) => { W[3 * j] += T[3 * a]; W[3 * j + 1] += T[3 * a + 1]; W[3 * j + 2] += T[3 * a + 2]; });
+      }
+      for (let i = 0; i < id.length; i++) for (let c = 0; c < 3; c++) P[3 * i + c] = W[3 * id[i] + c];
+      pos.needsUpdate = true; geo.computeBoundingSphere();
+      return act.length;
+    })();
+    flips("edge", (q) => toXY(two(q))[0]);
+    // The belly's edge, finely (C record 96, 2026-10-27, the producer: 「まだお腹がわの細かな波打ちが残っています。」, with three places circled): seen from
+    // the side the bottom edge still had narrow notches, 0.5–1 mm wide and up to 0.87 mm deep (x 0.41, 0.65, 0.70), under the 1 mm bins above. In 0.5 mm
+    // bins along x 0.30–1.05 the lowest skin (trunk) is taken, its lower envelope found (the lowest within ±2 mm, a Gaussian of 1 mm), and where the edge
+    // stands above that it comes down to it (only
+    // down); the skin within 2.5 mm of the bottom moves, by how near it is.
+    const NX0 = 0.30, NX1 = 1.05, NDX = 0.5 / FIT_SH_MM, nn = Math.ceil((NX1 - NX0) / NDX) + 1, nb = new Array(nn).fill(Infinity);
+    for (let i = 0; i < SI0.count; i++) {
+      if (bodyW(sk, i, SI0, SW0) < 0.3) continue;
+      sk.getVertexPosition(i, p); sk.localToWorld(p); holder.worldToLocal(p); const [x, y] = toXY(two(p));
+      const b = Math.round((x - NX0) / NDX); if (b >= 0 && b < nn) nb[b] = Math.min(nb[b], y);
+    }
+    for (let i = 0; i < nn; i++) if (!Number.isFinite(nb[i])) nb[i] = i ? nb[i - 1] : nb.find(Number.isFinite);
+    // the lower envelope: the lowest within ±2 mm, then a Gaussian of 1 mm, never above the edge (a notch is filled from the edge's low points beside it)
+    const nmin = nb.map((_, i) => { let m = Infinity; for (let j = Math.max(0, i - 4); j <= Math.min(nn - 1, i + 4); j++) m = Math.min(m, nb[j]); return m; });
+    const ns = nmin.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - 6); j <= Math.min(nn - 1, i + 6); j++) { const w = Math.exp(-0.5 * ((i - j) / 2) ** 2); su += w * nmin[j]; ws += w; } return Math.min(nb[i], su / ws); });
+    const ntab = (a, x) => { const f = (x - NX0) / NDX, i = Math.min(nn - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return a[i] + w * (a[i + 1] - a[i]); };
+    const nFade = (x) => sm(NX0, NX0 + 0.02, x) * (1 - sm(NX1 - 0.02, NX1, x)), NBAND = 2.5 / FIT_SH_MM;
+    const notched = applyDy((x, y, wBody) => {
+      const f = nFade(x); if (f <= 0) return 0;
+      const b = ntab(nb, x), d = Math.min(0, ntab(ns, x) - b); if (d >= 0) return 0;
+      const band = Math.max(NBAND, 2.5 * -d), t = Math.min(1, Math.max(0, (y - b) / band)); if (t >= 1) return 0;
+      return d * (1 - t) * (1 - t) * f * Math.min(1, wBody / 0.6);
+    }, ["Skin"]);
+    flips("notch", (q) => toXY(two(q))[0]);
+    // Unfold (C record 96, 2026-10-27, the producer: 「まだお腹がわの細かな波打ちが残っています。」): the moves above turn about 300 of the skin's faces over
+    // against the start (x 0.40, 0.55–0.70, 1.0, at the limbs' roots and the rib ends), and each fold shows through as a narrow white notch. Where a
+    // face is turned, its corners and their neighbours (2 rings) are drawn halfway to their neighbours' mean, in the bind positions, until none is left
+    // (at most UNFOLD_ROUNDS).
+    const unfolded = (() => {
+      const geo = skin0.geometry, pos = geo.getAttribute("position"), P = pos.array, { id, m, nb } = welded(geo);
+      const W = new Float64Array(m * 3), W0 = new Float64Array(m * 3);
+      for (let i = 0; i < id.length; i++) for (let c = 0; c < 3; c++) { W[3 * id[i] + c] = P[3 * i + c]; W0[3 * id[i] + c] = P0[3 * i + c]; }
+      const F = []; for (let t = 0; t < IDX.length; t += 3) F.push([id[IDX[t]], id[IDX[t + 1]], id[IDX[t + 2]]]);
+      const nrm = (A, f) => { const [a, b, c] = f.map((k) => 3 * k); const ux = A[b] - A[a], uy = A[b + 1] - A[a + 1], uz = A[b + 2] - A[a + 2], vx = A[c] - A[a], vy = A[c + 1] - A[a + 1], vz = A[c + 2] - A[a + 2]; return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]; };
+      const N0 = F.map((f) => nrm(W0, f));
+      let left = 0, r = 0;
+      for (; r < UNFOLD_ROUNDS; r++) {
+        const sel = new Set();
+        F.forEach((f, k) => { const a = N0[k], b = nrm(W, f); if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] < 0) for (const v of f) sel.add(v); });
+        left = sel.size; if (!left) break;
+        for (let ring = 0; ring < 2; ring++) for (const v of [...sel]) for (const n of nb[v]) sel.add(n);
+        const T = new Map();
+        for (const v of sel) { const n = nb[v]; let x = 0, y = 0, z = 0; for (const k of n) { x += W[3 * k]; y += W[3 * k + 1]; z += W[3 * k + 2]; } const l = n.length || 1; T.set(v, [0.5 * W[3 * v] + 0.5 * x / l, 0.5 * W[3 * v + 1] + 0.5 * y / l, 0.5 * W[3 * v + 2] + 0.5 * z / l]); }
+        for (const [v, q] of T) { W[3 * v] = q[0]; W[3 * v + 1] = q[1]; W[3 * v + 2] = q[2]; }
+      }
+      for (let i = 0; i < id.length; i++) for (let c = 0; c < 3; c++) P[3 * i + c] = W[3 * id[i] + c];
+      pos.needsUpdate = true; geo.computeBoundingSphere();
+      return [r, left];
+    })();
+    flips("unfold", (q) => toXY(two(q))[0]);
+    if (dbg) model.userData.shapeDebug = dbg;
+    const notchMax = Math.max(...nb.map((v, i) => v - Math.min(v, ns[i]))) * FIT_SH_MM;
     const dev = fb.map((v, i) => Math.abs(v - line[i])).filter((v, i) => fillFade(FX0 + i * FDX) > 0.5);
-    console.log(`[shape88] belly curve's lowest ${(y0k * FIT_SH_MM).toFixed(1)} mm (by the depth ${(y0d * FIT_SH_MM).toFixed(1)}, under the girdles ${(y0g * FIT_SH_MM).toFixed(1)}); moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}; belly line: ${filled} skin vertices moved, at most ${(Math.max(...dev) * FIT_SH_MM).toFixed(2)} mm; sides: ${sides} skin vertices, troughs filled up to ${liftMax.toFixed(2)} mm`);
+    console.log(`[shape88] belly curve's lowest ${(y0k * FIT_SH_MM).toFixed(1)} mm (by the depth ${(y0d * FIT_SH_MM).toFixed(1)}, under the girdles ${(y0g * FIT_SH_MM).toFixed(1)}); moved ${moved} vertices; kb ${kb.map((v) => v.toFixed(2)).join(" ")}; kt ${kt.map((v) => v.toFixed(2)).join(" ")}; belly line: ${filled} skin vertices moved, at most ${(Math.max(...dev) * FIT_SH_MM).toFixed(2)} mm; sides: ${sides} skin vertices, troughs filled up to ${liftMax.toFixed(2)} mm; edge notches: ${notched} skin vertices, up to ${notchMax.toFixed(2)} mm; unfolded in ${unfolded[0]} rounds, ${unfolded[1]} vertices still on turned faces`);
   }
   if (FIT_SKIN) fitSkin();
   if (SHAPE88 && model.userData.shape88Baked) console.warn("[shape88] この glb は焼き込み済みなので、?shape=88 をかけない");
