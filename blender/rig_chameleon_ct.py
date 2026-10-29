@@ -199,7 +199,8 @@ def build_pose(rigob, d, k, pose):
         Rp = R[b.parent.name] if b.parent is not None else Matrix.Identity(3)
         tgt = pose["limbs"].get(b.name)
         c = b.name.split("_")[0]
-        if b.name.endswith("_girdle") and c in pose.get("girdle_tilt", {}):
+        # 静止の骨で肩甲骨を起こしてある骨（ct_body_pipeline/limb_roots.py、計画書 C の記録 102）には girdle_tilt を使わない
+        if b.name.endswith("_girdle") and c in pose.get("girdle_tilt", {}) and "rig__girdle_upright" not in d.files:
             best, bs = 1e9, 0.0
             for i in range(0, n, 5):
                 q, _, _ = axis_at(i * step)
