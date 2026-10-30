@@ -322,7 +322,17 @@ export function createChameleonWalk(model, holder) {
   const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-3, 2, 5); backdrop.add(sun);
 
   // Where each foot lands, on top of the branch, a little to its own side of the midline.
+  // C record 109: with ?gait=d the sole grips GRIP_DEG round from the top on the limb's own side (the hind feet on the branch's side: Higham & Jayne 2004a
+  // p.239, on the perch the ankle is at times medial to the hip, and their knee comes level with the hip at mid-stance, which needs the ankle well below the
+  // hip; the hands on the top, Krause & Fischer 2013: always the middle of the upper quarter). The sole lies on the bark there (gripFrame).
+  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 0), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 0) };
+  const gripAngle = (limb) => (GAIT === "d" ? THREE.MathUtils.degToRad(GRIP_DEG[limb.hind ? "hind" : "fore"]) : 0);
+  const gripFrame = (limb) => {
+    const a = gripAngle(limb), out = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
+    return { up: UP.clone().multiplyScalar(Math.cos(a)).addScaledVector(out, Math.sin(a)), out: out.clone().multiplyScalar(Math.cos(a)).addScaledVector(UP, -Math.sin(a)) };
+  };
   const plantAt = (limb, along) => {
+    if (gripAngle(limb) > 0) return branchCentre.clone().addScaledVector(gripFrame(limb).up, BRANCH_RADIUS * 0.95).addScaledVector(FORWARD, along);
     const side = (limb.left ? 1 : -1) * BRANCH_RADIUS * 0.35;
     return branchCentre.clone().addScaledVector(UP, BRANCH_RADIUS * 0.95).addScaledVector(LEFT, side).addScaledVector(FORWARD, along);
   };
@@ -344,31 +354,88 @@ export function createChameleonWalk(model, holder) {
       retr: deg(Math.atan2(-fw, lat)), dep: deg(Math.atan2(-up, Math.hypot(fw, lat))) };
   }
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: 0.15 }, W_FORE = { knee: 1, ankle: 0, retr: 0.5, dep: 0.5 };
+  const _w = new URLSearchParams(location.search);
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? 0.15) }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? 0.5), dep: 0.5 };
   /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
    *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
-  function solveStance(limb, root, contact, tg, heelNow, ax) {
-    const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), Wt = limb.hind ? W_HIND : W_FORE, { a, b } = limb;
-    const side = limb.hind ? ANKLE_OUT : WRIST_OUT;
-    let best = null;
-    for (let th = 0; th <= 110; th += 2) {
-      const t = THREE.MathUtils.degToRad(th);
-      const ankle = new THREE.Vector3().addScaledVector(FORWARD, -HEEL * Math.cos(t)).addScaledVector(UP, HEEL * Math.sin(t)).addScaledVector(outward, side)
-        .setLength(limb.palm).add(contact);
-      const span = ankle.clone().sub(root), d = span.length();
-      if (d > (a + b) * 0.995) continue;
-      const axis = span.clone().divideScalar(d), x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
-      const e1 = outward.clone().addScaledVector(axis, -outward.dot(axis)).normalize(), e2 = axis.clone().cross(e1);
-      for (let k = 0; k < 72; k++) {
-        const ph = (k / 72) * 2 * Math.PI, knee = root.clone().addScaledVector(axis, x).addScaledVector(e1, h * Math.cos(ph)).addScaledVector(e2, h * Math.sin(ph));
-        if (knee.clone().sub(root).dot(ax.lat) < 0.3 * a) continue;   // the knee/elbow stays out to its own side
-        const g = anglesOf(root, knee, ankle, contact, ax);
-        let c = HEEL_REG * (th - heelNow) ** 2;
-        for (const key of ["knee", "ankle", "retr", "dep"]) if (tg[key] != null && Wt[key]) c += Wt[key] * (g[key] - tg[key]) ** 2;
-        if (!best || c < best.c) best = { c, ankle, knee };
-      }
+  // C record 109: the stance's pose comes from a path made once over one stride: the heel's lift θ and the knee/elbow's turn φ about the line from the
+  // girdle to the wrist/ankle, sampled at STANCE_N + 1 moments of the stance; the path is the one with the least sum of the misses from the target angles
+  // and of the changes between neighbouring moments (searching each frame on its own let the pose jump between two equally near ones, e.g. the humerus
+  // 25° → 68° down in one frame).
+  const STANCE_N = 40, stancePath = {}, stanceSamples = {};
+  let recording = false;
+  const poseFrom = (limb, root, contact, outward, side, th, ph) => {
+    const { a, b } = limb, t = THREE.MathUtils.degToRad(th), gf = gripFrame(limb);
+    const ankle = new THREE.Vector3().addScaledVector(FORWARD, -HEEL * Math.cos(t)).addScaledVector(gf.up, HEEL * Math.sin(t)).addScaledVector(gf.out, side)
+      .setLength(limb.palm).add(contact);
+    const span = ankle.clone().sub(root); let d = span.length();
+    const over = d > (a + b) * 0.995; d = Math.min(d, (a + b) * 0.995);
+    const axis = span.clone().normalize(), x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+    const e1 = outward.clone().addScaledVector(axis, -outward.dot(axis)).normalize(), e2 = axis.clone().cross(e1);
+    const r = THREE.MathUtils.degToRad(ph);
+    return { ankle, knee: root.clone().addScaledVector(axis, x).addScaledVector(e1, h * Math.cos(r)).addScaledVector(e2, h * Math.sin(r)), over };
+  };
+  const stanceCost = (limb, smp, th, ph) => {
+    const pose = poseFrom(limb, smp.root, smp.contact, smp.outward, smp.side, th, ph);
+    if (pose.over || pose.knee.clone().sub(smp.root).dot(smp.ax.lat) < 0.3 * limb.a) return { c: 1e9, pose };
+    const g = anglesOf(smp.root, pose.knee, pose.ankle, smp.contact, smp.ax), Wt = limb.hind ? W_HIND : W_FORE;
+    let c = HEEL_REG * (th - smp.heelNow) ** 2;
+    for (const k of ["knee", "ankle", "retr", "dep"]) if (smp.tg[k] != null && Wt[k]) c += Wt[k] * (g[k] - smp.tg[k]) ** 2;
+    return { c, pose };
+  };
+  function solveStance(limb, root, contact, tg, heelNow, ax, key, s, record = false) {
+    const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), side = limb.hind ? ANKLE_OUT : WRIST_OUT;
+    const path = stancePath[key];
+    if (!recording && path) {
+      const x = Math.min(Math.max(s, 0), 1) * STANCE_N, i = Math.min(Math.floor(x), STANCE_N - 1), w = x - i;
+      return poseFrom(limb, root, contact, outward, side, path[i].th + (path[i + 1].th - path[i].th) * w, path[i].ph + (path[i + 1].ph - path[i].ph) * w);
     }
-    return best;
+    const smp = { root: root.clone(), contact: contact.clone(), ax: { fw: ax.fw.clone(), lat: ax.lat.clone() }, outward, side, tg, heelNow, s };
+    if (record) (stanceSamples[key] ??= []).push(smp);
+    let best = null;
+    for (let th = 0; th <= 110; th += 2) for (let ph = 0; ph < 360; ph += 5) {
+      const r = stanceCost(limb, smp, th, ph);
+      if (!best || r.c < best.c) best = { c: r.c, th, ph, ...r.pose };
+    }
+    return best && best.c < 1e9 ? best : null;
+  }
+  /** The least-cost path through the recorded moments (Viterbi over a grid of θ and φ). */
+  function makeStancePath(key) {
+    const limb = limbs[key], all = stanceSamples[key] ?? [];
+    if (all.length < 4) return;
+    const smps = [];
+    for (let i = 0; i <= STANCE_N; i++) { const s = i / STANCE_N; smps.push(all.reduce((p, q) => (Math.abs(q.s - s) < Math.abs(p.s - s) ? q : p))); }
+    const TH = [], PH = [];
+    for (let th = 0; th <= 108; th += 4) TH.push(th);
+    for (let ph = 0; ph < 360; ph += 10) PH.push(ph);
+    const nS = TH.length * PH.length, LAMBDA = 0.3;
+    const cost = smps.map((smp) => { const c = new Float64Array(nS); let n = 0; for (const th of TH) for (const ph of PH) c[n++] = stanceCost(limb, smp, th, ph).c; return c; });
+    let acc = Float64Array.from(cost[0]); const back = [];
+    const dph = (p, q) => { let d = Math.abs(p - q) % 360; return d > 180 ? 360 - d : d; };
+    for (let i = 1; i < smps.length; i++) {
+      const nx = new Float64Array(nS), bk = new Int32Array(nS);
+      for (let a2 = 0; a2 < nS; a2++) {
+        const th2 = TH[Math.floor(a2 / PH.length)], ph2 = PH[a2 % PH.length];
+        let bv = Infinity, bi = 0;
+        for (let a1 = 0; a1 < nS; a1++) {
+          if (acc[a1] >= bv) continue;
+          const th1 = TH[Math.floor(a1 / PH.length)], ph1 = PH[a1 % PH.length];
+          const v = acc[a1] + LAMBDA * ((th2 - th1) ** 2 + dph(ph2, ph1) ** 2);
+          if (v < bv) { bv = v; bi = a1; }
+        }
+        nx[a2] = bv + cost[i][a2]; bk[a2] = bi;
+      }
+      acc = nx; back.push(bk);
+    }
+    let cur = 0; for (let a = 1; a < nS; a++) if (acc[a] < acc[cur]) cur = a;
+    const idx = [cur]; for (let i = back.length - 1; i >= 0; i--) { cur = back[i][cur]; idx.unshift(cur); }
+    // unwrap φ along the path, then smooth both lightly
+    const path = idx.map((a) => ({ th: TH[Math.floor(a / PH.length)], ph: PH[a % PH.length] }));
+    for (let i = 1; i < path.length; i++) { let d = path[i].ph - path[i - 1].ph; d -= 360 * Math.round(d / 360); path[i].ph = path[i - 1].ph + d; }
+    stancePath[key] = path.map((p, i) => {
+      const nb = [path[i - 1] ?? p, p, path[i + 1] ?? p];
+      return { th: (nb[0].th + 2 * nb[1].th + nb[2].th) / 4, ph: (nb[0].ph + 2 * nb[1].ph + nb[2].ph) / 4 };
+    });
   }
   /** Swing: the limb laid out from the target angles (the tibia/forearm hanging from the knee/elbow in the plane with the vertical, the foot/hand
    *  forward in the plane with the branch's line). Returns { knee, ankle, sole }. */
@@ -652,7 +719,7 @@ export function createChameleonWalk(model, holder) {
       const ax = axesOf(key);
       if (GAIT !== "a") {
         if (u >= swing) {
-          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel), ax);
+          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel), ax, key, (u - swing) / DUTY, recording);
           if (sol) { target = sol.ankle; kneeAt = sol.knee; }
         } else {
           // The angles follow the target lines, shifted at each end onto the stance's pose there (w0 fades over the first 0.4 of the swing, w1 grows over
@@ -660,8 +727,8 @@ export function createChameleonWalk(model, holder) {
           const s = u / swing, sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); }, w0 = sm(1 - s / 0.4), w1 = sm((s - 0.6) / 0.4);
           const off = plantAt(limb, reach - DUTY * STRIDE), on = plantAt(limb, reach);
           const ax0 = axesAt(key, phase, phase - u, ax), ax1 = axesAt(key, phase, phase + swing - u, ax);
-          const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP), ax0);
-          const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN), ax1);
+          const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP), ax0, key, 1);
+          const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN), ax1, key, 0);
           if (s0 && s1) {
             const a0 = anglesOf(root, s0.knee, s0.ankle, off, ax0), a1 = anglesOf(root, s1.knee, s1.ankle, on, ax1);
             const t0 = jointTargets(limb.hind, false, 0), t1 = jointTargets(limb.hind, false, 1), ts = jointTargets(limb.hind, false, s);
@@ -787,7 +854,7 @@ export function createChameleonWalk(model, holder) {
       // the knee/elbow and the ankle/wrist against the hip/shoulder, mm: x forward, y up, z out to the limb's side (Higham & Jayne Fig. 5)
       const hip = inHolder(limb.upper), side = limb.left ? 1 : -1;
       const rel = (bone) => { const r = inHolder(bone).sub(hip); return [r.dot(FORWARD) / MM, r.dot(UP) / MM, side * r.dot(LEFT) / MM]; };
-      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, tipB: f.tipB, grip: f.grip2, knee: rel(limb.lower), ankle: rel(limb.tip) }];
+      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, tipB: f.tipB, hgt: (inHolder(limb.upper).dot(UP) - branchTop) / MM, grip: f.grip2, knee: rel(limb.lower), ankle: rel(limb.tip) }];
     }));
   }
   /** For checking: how far the skin's lowest point (every `step`-th vertex, skinned) lies above the branch's top, in mm (< 0: sunk in). */
@@ -1433,5 +1500,15 @@ export function createChameleonWalk(model, holder) {
   if (FIT_SKIN) fitSkin();
   if (SHAPE88 && model.userData.shape88Baked) console.warn("[shape88] この glb は焼き込み済みなので、?shape=88 をかけない");
   else if (SHAPE88) shape88();
+  // Make the stance paths (C record 109): one stride walked in order, recording each limb's stance moments, then the least-cost path per limb.
+  if (GAIT !== "a" && new URLSearchParams(location.search).get("noTable") !== "1") {
+    const T = STRIDE / SPEED, M = 300;
+    recording = true;
+    for (let i = 0; i < M; i++) update((i / M) * T);
+    recording = false;
+    for (const k of Object.keys(limbs)) makeStancePath(k);
+    if (new URLSearchParams(location.search).get("debugTable") === "1") console.log("stanceTable " + JSON.stringify(Object.fromEntries(Object.entries(stancePath).map(([k, t]) => [k, t.map((b) => [Math.round(b.th), Math.round(b.ph)])]))));
+    update(0);
+  }
   return { backdrop, branchFrame, update, feet, belly, outline };
 }
