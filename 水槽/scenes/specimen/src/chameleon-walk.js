@@ -205,6 +205,7 @@ const SKIN_MOVE_SMOOTH = Number(new URLSearchParams(location.search).get("moveSm
 // 5 mm higher over it, so the depth alone lifted the belly to the pelvis and bent it there). Behind x 1.0 it goes up to the tail's base. The traced animals: lowest at x 0.5–0.65, up 1.5–4 mm to x 0.42 and, young
 // and walking, 2–6.5 mm to x 1.0 (one 10.8); 13 of 14 bulge down (quadratic term +), this model's did not (−0.24).
 const BELLY_LOW_X = 0.6, BELLY_RISE_MM = [2.5, 2.0], GIRDLE_CLEAR_MM = 1.5;
+const BELLY_TRACED = new URLSearchParams(location.search).get("bellyTraced") === "1";   // C record 112: the traced belly line as the target (see shape88)
 const bellyBow = (x) => { const r = (x < BELLY_LOW_X ? BELLY_RISE_MM[0] / (BELLY_LOW_X - 0.42) ** 2 : BELLY_RISE_MM[1] / (1.0 - BELLY_LOW_X) ** 2) / FIT_SH_MM; return r * (x - BELLY_LOW_X) ** 2; };
 const SHAPE_TOP = [0.1972, 0.1974, 0.2002, 0.2043, 0.2103, 0.2152, 0.2197, 0.2230, 0.2253, 0.2267, 0.2274, 0.2274, 0.2268, 0.2258, 0.2242, 0.2216, 0.2172, 0.2112, 0.2049, 0.1997, 0.1963, 0.1936, 0.1909, 0.1873, 0.1830, 0.1777, 0.1705, 0.1594, 0.1432, 0.1225, 0.1022, 0.0855, 0.0751, 0.0673, 0.0613, 0.0589, 0.0587, 0.0604, 0.0602];
 const SHAPE_BOT = [-0.1115, -0.1108, -0.1092, -0.1062, -0.1031, -0.1011, -0.1016, -0.1030, -0.1038, -0.1029, -0.1009, -0.0988, -0.0968, -0.0953, -0.0938, -0.0922, -0.0903, -0.0884, -0.0866, -0.0849, -0.0835, -0.0821, -0.0806, -0.0784, -0.0754, -0.0722, -0.0699, -0.0687, -0.0672, -0.0634, -0.0561, -0.0462, -0.0352, -0.0250, -0.0164, -0.0101, -0.0058, -0.0035, -0.0027];
@@ -292,7 +293,7 @@ export function createChameleonWalk(model, holder) {
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
   const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
   const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.373 : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.32 : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
@@ -301,6 +302,8 @@ export function createChameleonWalk(model, holder) {
   // all: Peterson's 14 mm scaled to this animal is 7.7 mm); the femur's depression weighed 1.05, the humerus' forward–back 2.5. No arch in the back: with
   // ARCH_DEG 14 (C record 91) the trunk stood 5.5–6.8 mm above the traced animals' back and belly lines (x 0.5–0.8 of snout–hip, C record 89's target);
   // with 0 they are 0.3–2.7 mm apart and the belly hangs 11.6–12.4 mm under the snout–hip line (the photos: 11.7 mm).
+  // C record 112: with the traced belly line baked in (the chest 4–9 mm deeper) the hips come down to 0.32 (12.8 mm; Krause & Fischer 11.7 mm), the
+  // belly 2.4 mm over the branch (the adults in photos 2.5 mm).
   const D = GAIT === "d";
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -4 : 4)) * MM;
@@ -1059,7 +1062,7 @@ export function createChameleonWalk(model, holder) {
     const midK = xs.map((x, i) => [x, i]).filter(([x]) => x >= 0.45 && x <= 0.75);
     const y0d = midK.reduce((a, [x, i]) => a + mt[i] - SHAPE_DEPTH[i] - bellyBow(x), 0) / midK.length;
     // the girdles (they do not move) under the trunk, x 0.42–1.02: the curve stays GIRDLE_CLEAR_MM under them
-    let y0g = Infinity;
+    let y0g = Infinity; const girdleLow = new Array(n).fill(Infinity);
     model.traverse((mesh) => {
       if (!mesh.isSkinnedMesh || mesh.userData.chameleon_part !== "Bone") return;
       const SI = mesh.geometry.getAttribute("skinIndex"), SW = mesh.geometry.getAttribute("skinWeight"), sb = mesh.skeleton.bones, q = new THREE.Vector3();
@@ -1068,15 +1071,22 @@ export function createChameleonWalk(model, holder) {
         if (!/girdle/.test(sb[bi].name)) continue;
         mesh.getVertexPosition(i, q); mesh.localToWorld(q); holder.worldToLocal(q); const [x, y] = toXY(two(q));
         if (x >= 0.42 && x <= 1.02) y0g = Math.min(y0g, y - GIRDLE_CLEAR_MM / FIT_SH_MM - bellyBow(x));
+        if (BELLY_TRACED) { const b = Math.round((x - SHAPE_X0) / SHAPE_DX); if (b >= 0 && b < n) girdleLow[b] = Math.min(girdleLow[b], y); }
       }
     });
     const y0k = Math.min(y0d, y0g);
-    const tgtK = xs.map((x, i) => { const w = sm(1.0, 1.12, x); return (1 - w) * (y0k + bellyBow(Math.min(x, 1.0))) + w * (mt[i] - SHAPE_DEPTH[i]); });
-    const kb0 = xs.map((x, i) => 1 + (Math.min(2, Math.max(0.5, (spine(x) - tgtK[i]) / Math.max(1e-3, spine(x) - mb[i]))) - 1) * sm(0.45, 0.55, x));
+    // C record 112 (2026-10-31, the producer: 「まだお腹の形が全然違います。ちゃんと実物と比較しなさい」): the belly's target is the traced belly line itself
+    // (VENT_BOT, the five animals of C record 89, snout–hip frame) from x 0.30 to 1.0, kept GIRDLE_CLEAR_MM under the girdles at each x; the depth rule
+    // above left the chest (x < 0.5) as the CT's skin, 4–9 mm above the traced line, and tied the belly to the back's height.
+    const ventAt = (x) => { const f = x / VENT_DX, i = Math.min(VENT_BOT.length - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return VENT_BOT[i] + w * (VENT_BOT[i + 1] - VENT_BOT[i]); };
+    const tgtTraced = gauss(xs.map((x, i) => Math.min(ventAt(Math.min(x, 1.0)), Number.isFinite(girdleLow[i]) ? girdleLow[i] - GIRDLE_CLEAR_MM / FIT_SH_MM : Infinity)), 1.5);
+    const tgtK = xs.map((x, i) => { const w = sm(1.0, 1.12, x); return (1 - w) * (BELLY_TRACED ? tgtTraced[i] : y0k + bellyBow(Math.min(x, 1.0))) + w * (mt[i] - SHAPE_DEPTH[i]); });
+    const kb0 = xs.map((x, i) => 1 + (Math.min(2, Math.max(0.5, (spine(x) - tgtK[i]) / Math.max(1e-3, spine(x) - mb[i]))) - 1) * (BELLY_TRACED ? sm(0.28, 0.36, x) : sm(0.45, 0.55, x)));
     // Above the spine nothing moves since C record 91: the back's height comes from the arch of the spine (ARCH_DEG); lowering the skin over the higher
     // back pressed it onto the spines' tips (0.2–0.3 mm left).
     const kt0 = xs.map(() => 1);
     const kb = gauss(kb0, 2), kt = gauss(kt0, 2);
+    if (new URLSearchParams(location.search).get("dbgShape") === "1") console.log("shapeDbg " + JSON.stringify(xs.map((x, i) => [+x.toFixed(3), +spine(x).toFixed(3), +mb[i].toFixed(3), +tgtK[i].toFixed(3), +kb0[i].toFixed(2), +kb[i].toFixed(2)]).filter((r) => r[0] >= 0.25 && r[0] <= 1.05)));
     const at = (k, x) => { const f = (x - SHAPE_X0) / SHAPE_DX, i = Math.min(n - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return k[i] + w * (k[i + 1] - k[i]); };
     const fade = (x) => sm(0.30, 0.40, x) * (1 - sm(1.20, 1.30, x));
     const skipOrgan = /^(eye|lens)_[lr]$|^claw$/;
@@ -1179,8 +1189,9 @@ export function createChameleonWalk(model, holder) {
     // the back's line without the spines' tips: the highest within ±3 mm, then a Gaussian of 4 mm
     const ftM = ft.map((_, i) => { let m = -Infinity; for (let j = Math.max(0, i - 3); j <= Math.min(fn - 1, i + 3); j++) m = Math.max(m, ft[j]); return m; });
     const ftS = ftM.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - 12); j <= Math.min(fn - 1, i + 12); j++) { const w = Math.exp(-0.5 * ((i - j) / 4) ** 2); su += w * ftM[j]; ws += w; } return su / ws; });
-    const trunkWant = (x, i) => { const w = sm(1.0, 1.12, x); return (1 - w) * (y0k + bellyBow(Math.min(x, 1.0))) + w * (ftS[i] - depthAt(x)); };
-    const want = fb.map((_, i) => { const x = FX0 + i * FDX, w = sm(0.28, 0.58, x); return (1 - w) * (jawF[i] - THROAT_MM / FIT_SH_MM) + w * trunkWant(x, i); });
+    const trunkWant = (x, i) => { const w = sm(1.0, 1.12, x); return (1 - w) * (BELLY_TRACED ? ventAt(Math.min(x, 1.0)) : y0k + bellyBow(Math.min(x, 1.0))) + w * (ftS[i] - depthAt(x)); };
+    // C record 112: with the traced belly line the chest follows it from x 0.32 (the throat, THROAT_MM under the jaw, gives way over 0.22–0.32)
+    const want = fb.map((_, i) => { const x = FX0 + i * FDX, w = BELLY_TRACED ? sm(0.22, 0.32, x) : sm(0.28, 0.58, x); return (1 - w) * (jawF[i] - THROAT_MM / FIT_SH_MM) + w * trunkWant(x, i); });
     let line = cap.map((v, i) => Math.min(v, want[i]));
     for (let r = 0; r < 16; r++) line = line.map((_, i) => { let su = 0, ws = 0; for (let j = Math.max(0, i - 3); j <= Math.min(fn - 1, i + 3); j++) { const w = Math.exp(-0.5 * (i - j) ** 2); su += w * line[j]; ws += w; } return Math.min(cap[i], su / ws); });
     const tab = (a, x) => { const f = (x - FX0) / FDX, i = Math.min(fn - 2, Math.max(0, Math.floor(f))), w = Math.min(1, Math.max(0, f - i)); return a[i] + w * (a[i + 1] - a[i]); };
