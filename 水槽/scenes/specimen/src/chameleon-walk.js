@@ -85,7 +85,18 @@ const hjKnee = (part, s) => {
 // 105° at lift-off), in the swing the video (Wimberly et al. 2021, 304–310 s): folded to about 30° by mid-swing, opened again over the last 0.3 (to
 // 113° here, the narrow perch's footfall); the humerus as higElbow, down 38.5° in stance and 15° in the swing (the video: the elbow about level with
 // the shoulder). ?gait=a: the poses of C record 104 instead.
-const GAIT = new URLSearchParams(location.search).get("gait") ?? "b";
+const GAIT_ARG = new URLSearchParams(location.search).get("gait");   // unset: "d" with the girdles of C record 102, "b" before them
+// C record 106 (2026-10-30, the producer: 「この方針で D（肩帯・腰帯の回りと前後の滑り）を入れて、後ろ脚の押し出しの終わりと前脚が着く時の肘を実物に近づけ、
+// 同じグラフと絵で見せて下さい。」), ?gait=d: the shoulder girdles slide forward and back along the body, each opposite the other, (Higham 2015
+// table 1, B. pumilum on the narrow level perch: the shoulder line turns from −42° at footfall to +22° at lift-off, 64° in all, ±32° about the 10 mm from
+// the midline to each shoulder here; Peterson 1984: the shoulder joint moves 14 mm and 33° in Chamaeleo, the scapulocoracoid sliding in the
+// sternum's groove, InspiRat 2014): forward at the limb's footfall, back at its lift-off. Higham's line turns further at footfall than at lift-off:
+// 10 mm × tan 42° = 9 mm forward (SLIDE_FF), 10 mm × tan 22° = 4 mm back (SLIDE_ES); with these the forefoot lands where it did before C record 104
+// (?foreShift=0), and against the shoulder line the elbow opens to 100° at footfall (C record 105: 87°; Higham: 113°). The trunk ahead of v06 no longer turns (Fischer 2010: the front
+// of the spine is nearly stiff, the girdle does the shoulder's travel). The limbs' forward–back angles are taken, as the papers take them, against the
+// line joining the left and right hips (shoulders) seen from above (Higham & Jayne 2004b p.236), in the solving and in the checking. ?gait=b: C record 105.
+// Only with the girdles of C record 102: in the glb before them the shoulders stand 5.4 mm apart, and the slides would turn their line ±65°.
+const SLIDE_FF = Number(new URLSearchParams(location.search).get("slideFF") ?? 9), SLIDE_ES = Number(new URLSearchParams(location.search).get("slideES") ?? 4);
 // How much the heel's lift is held to the stance's schedule (HEEL_DOWN, rising to HEEL_UP at lift-off) against the target angles, per degree squared.
 const HEEL_REG = Number(new URLSearchParams(location.search).get("heelReg") ?? 0.02);
 const HJ_PH = [0, 11, 19, 30, 41, 52, 59, 70, 81, 89, 100].map((x) => x / 100), HJ_DUTY = 0.57;
@@ -121,7 +132,7 @@ const LOW_FORE = new URLSearchParams(location.search).get("lowFore");
 const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
 // Each foot's stance moved back against its girdle, mm. The forefoot 8 mm (C record 104): landing half the stance's travel ahead of the shoulder, the
 // humerus pointed 54–62° forward at footfall (Higham 2015: 11°); 8 mm brings it to 23° and leaves it 66° back at lift-off (56°). ?foreShift= / ?hindShift=.
-const FORE_SHIFT = Number(new URLSearchParams(location.search).get("foreShift") ?? 8) * MM, HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 0) * MM;
+const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 0) * MM;
 // The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
 // 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
 const HIG_RETR = [-11, 58, 56], HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 38.5);
@@ -269,7 +280,10 @@ export function createChameleonWalk(model, holder) {
   const mid = (p, q) => p.clone().add(q).multiplyScalar(0.5);
   const hip = mid(inHolder(limbs.hL.upper), inHolder(limbs.hR.upper));
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM ? 0.42 : 0.32;
+  const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : newRoots ? 0.42 : 0.32;
+  const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
+  const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
@@ -321,8 +335,8 @@ export function createChameleonWalk(model, holder) {
   // C record 105: the angles a pose gives (as measured: in the holder's frame, `outward` the limb's side), and the two solvers.
   const deg = THREE.MathUtils.radToDeg;
   const innerAngle = (p, q, r) => { const u = p.clone().sub(q), w2 = r.clone().sub(q); return deg(Math.acos(Math.max(-1, Math.min(1, u.dot(w2) / (u.length() * w2.length()))))); };
-  function anglesOf(root, knee, ankle, sole, outward) {
-    const f = knee.clone().sub(root), lat = f.dot(outward), fw = f.dot(FORWARD), up = f.dot(UP);
+  function anglesOf(root, knee, ankle, sole, ax) {
+    const f = knee.clone().sub(root), lat = f.dot(ax.lat), fw = f.dot(ax.fw), up = f.dot(UP);
     return { knee: innerAngle(root, knee, ankle), ankle: sole ? innerAngle(knee, ankle, sole) : null,
       retr: deg(Math.atan2(-fw, lat)), dep: deg(Math.atan2(-up, Math.hypot(fw, lat))) };
   }
@@ -330,7 +344,7 @@ export function createChameleonWalk(model, holder) {
   const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: 0.15 }, W_FORE = { knee: 1, ankle: 0, retr: 0.5, dep: 0.5 };
   /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
    *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
-  function solveStance(limb, root, contact, tg, heelNow) {
+  function solveStance(limb, root, contact, tg, heelNow, ax) {
     const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), Wt = limb.hind ? W_HIND : W_FORE, { a, b } = limb;
     const side = limb.hind ? ANKLE_OUT : WRIST_OUT;
     let best = null;
@@ -344,8 +358,8 @@ export function createChameleonWalk(model, holder) {
       const e1 = outward.clone().addScaledVector(axis, -outward.dot(axis)).normalize(), e2 = axis.clone().cross(e1);
       for (let k = 0; k < 72; k++) {
         const ph = (k / 72) * 2 * Math.PI, knee = root.clone().addScaledVector(axis, x).addScaledVector(e1, h * Math.cos(ph)).addScaledVector(e2, h * Math.sin(ph));
-        if (knee.clone().sub(root).dot(outward) < 0.3 * a) continue;   // the knee/elbow stays out to its own side
-        const g = anglesOf(root, knee, ankle, contact, outward);
+        if (knee.clone().sub(root).dot(ax.lat) < 0.3 * a) continue;   // the knee/elbow stays out to its own side
+        const g = anglesOf(root, knee, ankle, contact, ax);
         let c = HEEL_REG * (th - heelNow) ** 2;
         for (const key of ["knee", "ankle", "retr", "dep"]) if (tg[key] != null && Wt[key]) c += Wt[key] * (g[key] - tg[key]) ** 2;
         if (!best || c < best.c) best = { c, ankle, knee };
@@ -355,9 +369,9 @@ export function createChameleonWalk(model, holder) {
   }
   /** Swing: the limb laid out from the target angles (the tibia/forearm hanging from the knee/elbow in the plane with the vertical, the foot/hand
    *  forward in the plane with the branch's line). Returns { knee, ankle, sole }. */
-  function layAngles(limb, root, tg) {
-    const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), r = THREE.MathUtils.degToRad(tg.retr), p = THREE.MathUtils.degToRad(tg.dep);
-    const f = new THREE.Vector3().addScaledVector(FORWARD, -Math.sin(r) * Math.cos(p)).addScaledVector(UP, -Math.sin(p)).addScaledVector(outward, Math.cos(r) * Math.cos(p));
+  function layAngles(limb, root, tg, ax) {
+    const r = THREE.MathUtils.degToRad(tg.retr), p = THREE.MathUtils.degToRad(tg.dep);
+    const f = new THREE.Vector3().addScaledVector(ax.fw, -Math.sin(r) * Math.cos(p)).addScaledVector(UP, -Math.sin(p)).addScaledVector(ax.lat, Math.cos(r) * Math.cos(p));
     const knee = root.clone().addScaledVector(f, limb.a);
     const down = UP.clone().negate(), n = down.addScaledVector(f, -down.dot(f)).normalize(), kk = THREE.MathUtils.degToRad(tg.knee);
     const t = f.clone().multiplyScalar(-Math.cos(kk)).addScaledVector(n, Math.sin(kk));
@@ -366,6 +380,41 @@ export function createChameleonWalk(model, holder) {
     const g = t.clone().multiplyScalar(-Math.cos(aa)).addScaledVector(m, Math.sin(aa));
     return { knee, ankle, sole: ankle.clone().addScaledVector(g, HEEL) };
   }
+  /** The axes the forward–back angle is taken in: out along the line from the other side's hip/shoulder to this one's, seen from above, and forward
+   *  square to it (?gait=d); before, the holder's. */
+  const PAIR = { fL: "fR", fR: "fL", hL: "hR", hR: "hL" };
+  function axesOf(key) {
+    const outward = LEFT.clone().multiplyScalar(limbs[key].left ? 1 : -1);
+    if (GAIT !== "d") return { fw: FORWARD.clone(), lat: outward };
+    const lat = inHolder(limbs[key].upper).sub(inHolder(limbs[PAIR[key]].upper));
+    lat.addScaledVector(UP, -lat.dot(UP)).normalize();
+    const fw = UP.clone().cross(lat); if (fw.dot(FORWARD) < 0) fw.negate();
+    return { fw, lat };
+  }
+  // Where the girdles are at another moment of the stride (the swing's two ends are solved in the axes they will have then, not in today's).
+  // ?gait=d: the pelvis turns PELVIS_LAG later, so each hip is furthest forward a little after its foot lands and furthest back between the other foot's
+  // landing (0.5) and its own lift-off (DUTY) rather than at the other's landing (Higham 2015 table 1, B. pumilum: the pelvis −12° at footfall, +24° at
+  // lift-off, the hip going back through the whole stance). ?pelvisLag= as a share of the stride.
+  const PELVIS_LAG = GAIT === "d" ? Number(new URLSearchParams(location.search).get("pelvisLag") ?? (DUTY - 0.5) / 2) : 0;
+  const yawAt = (ph) => Math.sin(2 * Math.PI * (ph - LIFT.hL - 0.25 - PELVIS_LAG));
+  const slideAt = (k, ph) => {
+    const uu = (((ph - LIFT[k] - DUTY) % 1) + 2) % 1, sw = 1 - DUTY;
+    const c = uu < sw ? -Math.cos(Math.PI * uu / sw) : Math.cos(Math.PI * (uu - sw) / DUTY);   // +1 at footfall, −1 at lift-off
+    return (c > 0 ? c * SLIDE_FF : c * SLIDE_ES) * MM;
+  };
+  function axesAt(key, phNow, phThen, axNow) {
+    if (GAIT !== "d") return axNow;
+    if (limbs[key].hind) {
+      const turn = PELVIS_YAW * (yawAt(phThen) - yawAt(phNow));
+      return { fw: axNow.fw.clone().applyAxisAngle(UP, turn), lat: axNow.lat.clone().applyAxisAngle(UP, turn) };
+    }
+    const at = (k) => inHolder(limbs[k].upper).addScaledVector(FORWARD, slideAt(k, phThen) - slideAt(k, phNow));
+    const lat = at(key).sub(at(PAIR[key])); lat.addScaledVector(UP, -lat.dot(UP)).normalize();
+    const fw = UP.clone().cross(lat); if (fw.dot(FORWARD) < 0) fw.negate();
+    return { fw, lat };
+  }
+  // The shoulder girdles' rest positions (?gait=d slides them).
+  const girdleBase = Object.fromEntries(["fL", "fR"].map((k) => [k, bones[`${k}_girdle`]?.position.clone()]));
 
   // Eyes: each one's own target and saccade.
   const eyes = [0, 1].map((i) => ({ yaw: 0, pitch: 0, fromYaw: 0, fromPitch: 0, toYaw: 0, toPitch: 0, start: 0, next: 0.5 + i * 0.8 }));
@@ -530,7 +579,7 @@ export function createChameleonWalk(model, holder) {
     model.quaternion.copy(bodyTurn);
     model.position.set(0, 0, 0).addScaledVector(UP, 0.03 * Math.sin(4 * Math.PI * phase)).addScaledVector(FORWARD, rock);
     // Girdles turn about the vertical, out of phase (the pelvis with the hind feet, the shoulders with the fore feet).
-    const yaw = Math.sin(2 * Math.PI * (phase - LIFT.hL - 0.25));
+    const yaw = yawAt(phase);
     model.updateMatrixWorld(true);
     // Turn a bone about an axis given in the holder's frame.
     const turnAbout = (bone, axis, angle) => {
@@ -541,7 +590,17 @@ export function createChameleonWalk(model, holder) {
     };
     turnAbout(bones.v23, UP, PELVIS_YAW * yaw);
     turnAbout(bones.v24, UP, -PELVIS_YAW * yaw);   // the tail stays behind
-    turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
+    for (const k of ["fL", "fR"]) if (girdleBase[k]) bones[`${k}_girdle`].position.copy(girdleBase[k]);
+    if (GAIT === "d") {
+      // the shoulders slide: SLIDE_FF forward at the limb's footfall, SLIDE_ES back at its lift-off, forward again through the swing
+      for (const k of ["fL", "fR"]) {
+        const gb = bones[`${k}_girdle`]; if (!gb) continue;
+        const val = slideAt(k, phase);
+        gb.updateMatrixWorld(true);
+        const to = holder.localToWorld(inHolder(gb).addScaledVector(FORWARD, val));
+        gb.position.copy(gb.parent.worldToLocal(to)); gb.updateMatrixWorld(true);
+      }
+    } else turnAbout(bones.v06, UP, -SHOULDER_YAW * yaw);
     if (FIT_SPINE) laySpine();
     if (NECK_DEG) for (let i = 1; i <= 5; i++) turnAbout(bones[`v0${i}`], LEFT, THREE.MathUtils.degToRad(NECK_DEG / 5));
     if (ARCH_DEG) {
@@ -587,27 +646,28 @@ export function createChameleonWalk(model, holder) {
       // C record 105: in stance the wrist/ankle and the elbow/knee solved for the target angles, the sole held where it grips; in the swing the limb laid
       // out from the target angles, eased at both ends onto the stance's poses at lift-off and at the next footfall (so nothing jumps).
       let kneeAt = null;
+      const ax = axesOf(key);
       if (GAIT !== "a") {
         if (u >= swing) {
-          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel));
+          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel), ax);
           if (sol) { target = sol.ankle; kneeAt = sol.knee; }
         } else {
           // The angles follow the target lines, shifted at each end onto the stance's pose there (w0 fades over the first 0.4 of the swing, w1 grows over
           // the last 0.4); what laying out those end angles misses of the stance's poses (the leg's own plane) is added the same way.
           const s = u / swing, sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); }, w0 = sm(1 - s / 0.4), w1 = sm((s - 0.6) / 0.4);
-          const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
           const off = plantAt(limb, reach - DUTY * STRIDE), on = plantAt(limb, reach);
-          const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP));
-          const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN));
+          const ax0 = axesAt(key, phase, phase - u, ax), ax1 = axesAt(key, phase, phase + swing - u, ax);
+          const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP), ax0);
+          const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN), ax1);
           if (s0 && s1) {
-            const a0 = anglesOf(root, s0.knee, s0.ankle, off, outward), a1 = anglesOf(root, s1.knee, s1.ankle, on, outward);
+            const a0 = anglesOf(root, s0.knee, s0.ankle, off, ax0), a1 = anglesOf(root, s1.knee, s1.ankle, on, ax1);
             const t0 = jointTargets(limb.hind, false, 0), t1 = jointTargets(limb.hind, false, 1), ts = jointTargets(limb.hind, false, s);
             const mix = {};
             for (const k of ["knee", "ankle", "retr", "dep"]) {
               const at = (tg) => tg[k] ?? 150;
               mix[k] = at(ts) + w0 * (a0[k] - at(t0)) + w1 * (a1[k] - at(t1));
             }
-            const lay = layAngles(limb, root, mix), lay0 = layAngles(limb, root, a0), lay1 = layAngles(limb, root, a1);
+            const lay = layAngles(limb, root, mix, ax), lay0 = layAngles(limb, root, a0, ax0), lay1 = layAngles(limb, root, a1, ax1);
             const blend = (p, p0, q0, p1, q1) => p.clone().addScaledVector(q0.clone().sub(p0), w0).addScaledVector(q1.clone().sub(p1), w1);
             target = blend(lay.ankle, lay0.ankle, s0.ankle, lay1.ankle, s1.ankle);
             kneeAt = blend(lay.knee, lay0.knee, s0.knee, lay1.knee, s1.knee);
