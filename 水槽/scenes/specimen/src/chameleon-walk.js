@@ -96,12 +96,20 @@ const GAIT_ARG = new URLSearchParams(location.search).get("gait");   // unset: "
 // of the spine is nearly stiff, the girdle does the shoulder's travel). The limbs' forward–back angles are taken, as the papers take them, against the
 // line joining the left and right hips (shoulders) seen from above (Higham & Jayne 2004b p.236), in the solving and in the checking. ?gait=b: C record 105.
 // Only with the girdles of C record 102: in the glb before them the shoulders stand 5.4 mm apart, and the slides would turn their line ±65°.
-const SLIDE_FF = Number(new URLSearchParams(location.search).get("slideFF") ?? 9), SLIDE_ES = Number(new URLSearchParams(location.search).get("slideES") ?? 4);
+const SLIDE_FF_ARG = new URLSearchParams(location.search).get("slideFF"), SLIDE_ES_ARG = new URLSearchParams(location.search).get("slideES");
 // How much the heel's lift is held to the stance's schedule (HEEL_DOWN, rising to HEEL_UP at lift-off) against the target angles, per degree squared.
 const HEEL_REG = Number(new URLSearchParams(location.search).get("heelReg") ?? 0.02);
 const HJ_PH = [0, 11, 19, 30, 41, 52, 59, 70, 81, 89, 100].map((x) => x / 100), HJ_DUTY = 0.57;
-const HJ_LINE = { knee: [116, 71, 52, 63, 99, 129, 113, 85, 104, 116, 115], ankle: [152, 126, 96, 93, 95, 104, 124, 143, 151, 165, 157],
+const HJ_LINE_1 = { knee: [116, 71, 52, 63, 99, 129, 113, 85, 104, 116, 115], ankle: [152, 126, 96, 93, 95, 104, 124, 143, 151, 165, 157],
   retr: [-54, -38, -30, -14, 30, 35, 17, -38, -56, -66, -55], dep: [-9, -13, -1, 4, 3, 2, 1, -21, -43, -45, -41] };
+// C record 110 (2026-10-31, the producer: 「後ろ脚の正は Higham & Jayne の 4 頭の平均（2004a）にしてください。」): the one stride above gives the shape over time;
+// its sizes are stretched to the 4 animals' means on the level perch (Higham & Jayne 2004a Figs 7–8): the femur's retraction −65 → +50° (the stride
+// −66 → +35), its depression −38 → +31° (−45 → +4), the knee 130° at footfall (116°, stretched about its least, 52°, which the text calls acute); the
+// ankle at footfall 150° (152°) is left as it is. ?hjRef=1 for the one stride.
+const stretch = (ys, lo0, hi0, lo1, hi1) => ys.map((v) => lo1 + (v - lo0) * (hi1 - lo1) / (hi0 - lo0));
+const HJ_LINE = new URLSearchParams(location.search).get("hjRef") === "1" ? HJ_LINE_1 : {
+  knee: stretch(HJ_LINE_1.knee, 52, 116, 52, 130), ankle: HJ_LINE_1.ankle,
+  retr: stretch(HJ_LINE_1.retr, -66, 35, -65, 50), dep: stretch(HJ_LINE_1.dep, -45, 4, -38, 31) };
 const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[i + 1]) i++; const w = Math.min(1, Math.max(0, (x - xs[i]) / (xs[i + 1] - xs[i]))); return ys[i] + (ys[i + 1] - ys[i]) * w; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
 function jointTargets(hind, stance, s) {
@@ -124,8 +132,7 @@ function jointTargets(hind, stance, s) {
 // 62° and 57°. The ankle 5 mm out (6.8 mm from the midline, just past the bark's side, the foot clasping it) and the wrist 4 mm out bring them to 49° and
 // 44°; the mid-stance femur cannot come level here (the femur, 22.7 mm, is longer than the tibia, 17.2 mm: with the ankle under the hip the knee is at
 // least 14.8 mm under it, 41°). ?ankleOut= / ?wristOut= to try others.
-const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ?? 5) * MM;
-const WRIST_OUT = Number(new URLSearchParams(location.search).get("wristOut") ?? 4) * MM;
+const ANKLE_OUT_ARG = new URLSearchParams(location.search).get("ankleOut"), WRIST_OUT_ARG = new URLSearchParams(location.search).get("wristOut");
 // The shoulders' height as a share of the forelimb's reach (?lowFore=; unset: BODY_LOW + 0.05).
 const LOW_FORE = new URLSearchParams(location.search).get("lowFore");
 // The elbow aimed at Higham 2015 (below); ?forePole=old: out, up and back by eye as before.
@@ -221,7 +228,7 @@ const NECK_DEG = Number(new URLSearchParams(location.search).get("neck") ?? 0);
 // highest at x 0.70–0.725; this model's by 0.047 at x 0.625. ARCH_DEG tilts v21 up by that much, bends v20–v06 back down by twice it (shared as
 // sin(π u)), and turns the neck (v05–v01, a fifth each) up by it again, so the shoulders keep their height and the head its direction. Measured from x 0.45 (clear of the
 // casque's back edge) the young and walking animals' arch is 0.067 (adults 0.088); the model's 0.035 at 0°, 0.064 at 12°, 0.074 at 16°: 14°. ?arch=<degrees>.
-const ARCH_DEG = Number(new URLSearchParams(location.search).get("arch") ?? 14);
+const ARCH_ARG = new URLSearchParams(location.search).get("arch");
 const SWING_LIFT = 0.35, SWING_OUT = 0.45;   // model units: how high and how far out the foot travels at mid-swing
 // The girdles' turn about the vertical, each way: the pelvis Higham & Jayne's 57° in all on the level (±28.5°, C record 67; it was ±20),
 // largest at footfall; the shoulders set by eye.
@@ -284,10 +291,21 @@ export function createChameleonWalk(model, holder) {
   const hip = mid(inHolder(limbs.hL.upper), inHolder(limbs.hR.upper));
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
   const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : newRoots ? 0.24 : 0.32;
   const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.373 : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
+  // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
+  // the hips 0.373 of the leg's reach over the branch (14.9 mm) and the shoulders 0.40 (the belly 2.7 mm over the branch; the adults in photos 2.5 mm);
+  // the hind soles 70° round from the top, the hands 30°; the ankle 1 mm out, the wrist 4 mm in; the shoulders sliding 5 mm forward and 2 mm back (7 mm in
+  // all: Peterson's 14 mm scaled to this animal is 7.7 mm); the femur's depression weighed 1.05, the humerus' forward–back 2.5. No arch in the back: with
+  // ARCH_DEG 14 (C record 91) the trunk stood 5.5–6.8 mm above the traced animals' back and belly lines (x 0.5–0.8 of snout–hip, C record 89's target);
+  // with 0 they are 0.3–2.7 mm apart and the belly hangs 11.6–12.4 mm under the snout–hip line (the photos: 11.7 mm).
+  const D = GAIT === "d";
+  const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
+  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -4 : 4)) * MM;
+  const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? 0.40 : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
@@ -325,7 +343,7 @@ export function createChameleonWalk(model, holder) {
   // C record 109: with ?gait=d the sole grips GRIP_DEG round from the top on the limb's own side (the hind feet on the branch's side: Higham & Jayne 2004a
   // p.239, on the perch the ankle is at times medial to the hip, and their knee comes level with the hip at mid-stance, which needs the ankle well below the
   // hip; the hands on the top, Krause & Fischer 2013: always the middle of the upper quarter). The sole lies on the bark there (gripFrame).
-  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 0), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 0) };
+  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 70), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 30) };
   const gripAngle = (limb) => (GAIT === "d" ? THREE.MathUtils.degToRad(GRIP_DEG[limb.hind ? "hind" : "fore"]) : 0);
   const gripFrame = (limb) => {
     const a = gripAngle(limb), out = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
@@ -355,7 +373,7 @@ export function createChameleonWalk(model, holder) {
   }
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
   const _w = new URLSearchParams(location.search);
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? 0.15) }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? 0.5), dep: 0.5 };
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)) }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 2.5 : 0.5)), dep: 0.5 };
   /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
    *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
   // C record 109: the stance's pose comes from a path made once over one stride: the heel's lift θ and the knee/elbow's turn φ about the line from the
