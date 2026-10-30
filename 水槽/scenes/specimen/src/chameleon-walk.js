@@ -77,10 +77,31 @@ const hjKnee = (part, s) => {
   const P = HJ_KNEE[part], x = Math.min(Math.max(s, 0), 1) * (P.length - 1), i = Math.min(Math.floor(x), P.length - 2), w = x - i;
   return P[i].map((v, k) => v + (P[i + 1][k] - v) * w);
 };
-// The hind ankle out to the leg's side of the grip, mm (C record 68): Higham & Jayne Fig. 5A has the ankle lateral to the hip in stance
-// and the toes on the perch's top; 3 mm keeps it over this 10 mm branch and lifts the mid-stance knee by 0.5–1 mm (more and the
-// feet fall short). ?ankleOut= to try others.
-const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ?? 3) * MM;
+// The hind ankle and the wrist out to the limb's side of the grip, mm (C record 68: the ankle 3 mm, Higham & Jayne Fig. 5A has it lateral to the hip).
+// C record 104 (2026-10-30, the producer: 「この方針で、まず A（体の高さと足を着く位置）を直し、グラフと並べた絵で見せて下さい。」): with the girdles of C record 102
+// (hips 7.3 mm, shoulders 10 mm out from the midline) and the feet near the middle of this 10 mm branch, the femur and humerus pointed down as much as
+// 62° and 57°. The ankle 5 mm out (6.8 mm from the midline, just past the bark's side, the foot clasping it) and the wrist 4 mm out bring them to 49° and
+// 44°; the mid-stance femur cannot come level here (the femur, 22.7 mm, is longer than the tibia, 17.2 mm: with the ankle under the hip the knee is at
+// least 14.8 mm under it, 41°). ?ankleOut= / ?wristOut= to try others.
+const ANKLE_OUT = Number(new URLSearchParams(location.search).get("ankleOut") ?? 5) * MM;
+const WRIST_OUT = Number(new URLSearchParams(location.search).get("wristOut") ?? 4) * MM;
+// The shoulders' height as a share of the forelimb's reach (?lowFore=; unset: BODY_LOW + 0.05).
+const LOW_FORE = new URLSearchParams(location.search).get("lowFore");
+// The elbow aimed at Higham 2015 (below); ?forePole=old: out, up and back by eye as before.
+const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
+// Each foot's stance moved back against its girdle, mm. The forefoot 8 mm (C record 104): landing half the stance's travel ahead of the shoulder, the
+// humerus pointed 54–62° forward at footfall (Higham 2015: 11°); 8 mm brings it to 23° and leaves it 66° back at lift-off (56°). ?foreShift= / ?hindShift=.
+const FORE_SHIFT = Number(new URLSearchParams(location.search).get("foreShift") ?? 8) * MM, HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 0) * MM;
+// The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
+// 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
+const HIG_RETR = [-11, 58, 56], HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 38.5);
+const higElbow = (stance, s) => {
+  const ease = (x) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(x, 0), 1));
+  const r = stance ? (s < 0.5 ? HIG_RETR[0] + (HIG_RETR[1] - HIG_RETR[0]) * ease(s / 0.5) : HIG_RETR[1] + (HIG_RETR[2] - HIG_RETR[1]) * ease((s - 0.5) / 0.5))
+    : HIG_RETR[2] + (HIG_RETR[0] - HIG_RETR[2]) * ease(s);
+  const R = THREE.MathUtils.degToRad(r), D = THREE.MathUtils.degToRad(HIG_DEP);
+  return [-Math.sin(R) * Math.cos(D), -Math.sin(D), Math.cos(R) * Math.cos(D)];   // [forward, up, out]
+};
 // The trunk's pose fitted to photo 08 (C record 85, 2026-10-26, the producer: 「この進め方で、手順 2 の姿勢合わせから始め、目標の線と重ねた絵とずれの mm を
 // 見せて下さい。」; plan C record 84). ?fitSpine=1 lays the spine from the sacrum (v22) forward along the target spine line, and turns the head so its
 // snout comes to the target's snout. Target frame (docs/chameleon_trunk/target_outline_p08_84.json, fit_plan_84.png): x 0 at the snout, 1 at the hip, y up,
@@ -145,7 +166,10 @@ const SHAPE_BOT = [-0.1115, -0.1108, -0.1092, -0.1062, -0.1031, -0.1011, -0.1016
 // the belly sat 0.6–1.9 mm over at 0.4, so 0.43 (1.9–3.2 mm); with the belly line of C record 92 it sits 2.9–4.3 mm over at 0.43, so 0.4 again.
 // C record 94 raised the belly 6–9 mm (the traced trunk's depth under the back): the hips at 0.32 (11.5 mm, 0.112 SVL: Krause & Fischer's 0.114),
 // the belly 6.3–7.8 mm over (the young animal traced over a branch, IN240: 0.05 of the snout–hip length, 6 mm). 0.25 would bring it to 3.8–5.1 mm.
-const BODY_LOW = Number(new URLSearchParams(location.search).get("low") ?? 0.32);
+// C record 104: with the girdles of C record 102 the skin under the hips sank 0.1–1.4 mm into the branch at 0.32, and the knee folded to 29° in mid-stance
+// (Higham & Jayne on the perch: 52°); at 0.42 (16.8 mm) the belly is 2.6–4.0 mm over (the traced adults: 2.5 mm) and the knee opens to 42°. The glb
+// with the girdles of C record 102 is told by its hips' spread (14.6 mm; before, 5.1 mm, and 0.32 kept the belly 2.9–4.2 mm over).
+const BODY_LOW_ARG = new URLSearchParams(location.search).get("low");
 // ?neck=<degrees>: the head pitched by this much more, shared evenly by the 5 neck vertebrae v01–v05 (Molnar & Watanabe 2023: C1–C5), + snout down.
 const NECK_DEG = Number(new URLSearchParams(location.search).get("neck") ?? 0);
 // The back's arch (C record 91, 2026-10-26, the producer: 「背中のアールも足りていない。」): the trunk's spine bent into an arch with level ends. The
@@ -212,7 +236,8 @@ export function createChameleonWalk(model, holder) {
   const mid = (p, q) => p.clone().add(q).multiplyScalar(0.5);
   const hip = mid(inHolder(limbs.hL.upper), inHolder(limbs.hR.upper));
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM ? 0.42 : 0.32;
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
@@ -457,7 +482,7 @@ export function createChameleonWalk(model, holder) {
       let u = (phase - LIFT[key] - DUTY + 2) % 1;   // 0 at lift-off
       const swing = 1 - DUTY;
       // Landing spot: as far ahead of the girdle as the foot ends behind it (Higham & Jayne), half the stance's travel.
-      const reach = girdleRest[key] + DUTY * STRIDE / 2;
+      const reach = girdleRest[key] + DUTY * STRIDE / 2 - (limb.hind ? HIND_SHIFT : FORE_SHIFT);
       let along, lift = 0, out = 0, heel = HEEL_DOWN;
       const ramp = (x, lo, hi) => { const k = Math.min(1, Math.max(0, (x - lo) / (hi - lo))); return k * k * (3 - 2 * k); };
       if (u < swing) {
@@ -474,7 +499,7 @@ export function createChameleonWalk(model, holder) {
       // The sole's grip on the branch; the wrist/ankle sits HEEL behind it and a little above (the foot lies along the branch).
       const contact = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
       const target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel))
-        .addScaledVector(LEFT, (limb.left ? 1 : -1) * (limb.hind ? ANKLE_OUT : 0));
+        .addScaledVector(LEFT, (limb.left ? 1 : -1) * (limb.hind ? ANKLE_OUT : WRIST_OUT));
       // Two bones to the wrist/ankle, the elbow/knee out to the side and up.
       const root = holder.worldToLocal(limb.upper.getWorldPosition(new THREE.Vector3()));
       const span = target.clone().sub(root); let d = span.length();
@@ -487,6 +512,9 @@ export function createChameleonWalk(model, holder) {
       if (limb.hind) {
         const [kx, ky, kz] = hjKnee(u < swing ? "swing" : "stance", u < swing ? u / swing : (u - swing) / DUTY);
         pole = new THREE.Vector3().addScaledVector(FORWARD, kx).addScaledVector(UP, ky).addScaledVector(LEFT, (limb.left ? 1 : -1) * kz);
+      } else if (FORE_POLE !== "old") {
+        const [ex, ey, ez] = higElbow(u >= swing, u < swing ? u / swing : (u - swing) / DUTY);
+        pole = new THREE.Vector3().addScaledVector(FORWARD, ex).addScaledVector(UP, ey).addScaledVector(LEFT, (limb.left ? 1 : -1) * ez);
       } else {
         pole = new THREE.Vector3().addScaledVector(LEFT, limb.left ? 1 : -1).addScaledVector(UP, 0.6).addScaledVector(FORWARD, -0.3);
       }
