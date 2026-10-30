@@ -210,6 +210,9 @@ const SHAPE_BOT = [-0.1115, -0.1108, -0.1092, -0.1062, -0.1031, -0.1011, -0.1016
 // C record 104: with the girdles of C record 102 the skin under the hips sank 0.1–1.4 mm into the branch at 0.32, and the knee folded to 29° in mid-stance
 // (Higham & Jayne on the perch: 52°); at 0.42 (16.8 mm) the belly is 2.6–4.0 mm over (the traced adults: 2.5 mm) and the knee opens to 42°. The glb
 // with the girdles of C record 102 is told by its hips' spread (14.6 mm; before, 5.1 mm, and 0.32 kept the belly 2.9–4.2 mm over).
+// C record 108 (2026-10-30, the producer: 「案 3（股 9.6 mm、腹と枝のすき間を成体に合わせる）にして、膝と肘の折れ方を見せて下さい。」): 0.42 had been read off a glb
+// without the trunk of C records 89–99 baked in (C record 107); with it baked, the belly floated 10.3–11.6 mm over the branch. 0.24 (9.6 mm) brings it to
+// 2.8–4.2 mm (the traced adults: 2.5 mm), the knee and elbow folding further.
 const BODY_LOW_ARG = new URLSearchParams(location.search).get("low");
 // ?neck=<degrees>: the head pitched by this much more, shared evenly by the 5 neck vertebrae v01–v05 (Molnar & Watanabe 2023: C1–C5), + snout down.
 const NECK_DEG = Number(new URLSearchParams(location.search).get("neck") ?? 0);
@@ -281,7 +284,7 @@ export function createChameleonWalk(model, holder) {
   const hip = mid(inHolder(limbs.hL.upper), inHolder(limbs.hR.upper));
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
   const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : newRoots ? 0.42 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : newRoots ? 0.24 : 0.32;
   const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
