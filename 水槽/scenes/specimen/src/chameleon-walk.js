@@ -77,6 +77,36 @@ const hjKnee = (part, s) => {
   const P = HJ_KNEE[part], x = Math.min(Math.max(s, 0), 1) * (P.length - 1), i = Math.min(Math.floor(x), P.length - 2), w = x - i;
   return P[i].map((v, k) => v + (P[i + 1][k] - v) * w);
 };
+// The joints' target lines over one stride (C record 105, 2026-10-30, the producer: 「この方針で B（関節ごとに 1 歩の中の目標の角度の線を実物から作り、
+// 足先が滑らないように股・肩の角度を解く）に進み、同じグラフと絵で見せて下さい。」). Angles in degrees: the knee/elbow and the ankle (knee–ankle–sole) as
+// inner angles (180 = straight), the femur/humerus forward–back (retraction, + = knee/elbow behind the girdle) and down (depression, + = below).
+// Hind: Higham & Jayne 2004b Fig. 2A (C. calyptratus on the 2.4 cm perch, one stride read by eye; the foot down for 0.57 of it), its stance and swing
+// each stretched onto this walk's (DUTY). Fore: the elbow in stance Higham 2015 table 1 (Bradypodion on a narrow perch: 113° at footfall, 52° mid,
+// 105° at lift-off), in the swing the video (Wimberly et al. 2021, 304–310 s): folded to about 30° by mid-swing, opened again over the last 0.3 (to
+// 113° here, the narrow perch's footfall); the humerus as higElbow, down 38.5° in stance and 15° in the swing (the video: the elbow about level with
+// the shoulder). ?gait=a: the poses of C record 104 instead.
+const GAIT = new URLSearchParams(location.search).get("gait") ?? "b";
+// How much the heel's lift is held to the stance's schedule (HEEL_DOWN, rising to HEEL_UP at lift-off) against the target angles, per degree squared.
+const HEEL_REG = Number(new URLSearchParams(location.search).get("heelReg") ?? 0.02);
+const HJ_PH = [0, 11, 19, 30, 41, 52, 59, 70, 81, 89, 100].map((x) => x / 100), HJ_DUTY = 0.57;
+const HJ_LINE = { knee: [116, 71, 52, 63, 99, 129, 113, 85, 104, 116, 115], ankle: [152, 126, 96, 93, 95, 104, 124, 143, 151, 165, 157],
+  retr: [-54, -38, -30, -14, 30, 35, 17, -38, -56, -66, -55], dep: [-9, -13, -1, 4, 3, 2, 1, -21, -43, -45, -41] };
+const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[i + 1]) i++; const w = Math.min(1, Math.max(0, (x - xs[i]) / (xs[i + 1] - xs[i]))); return ys[i] + (ys[i + 1] - ys[i]) * w; };
+/** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
+function jointTargets(hind, stance, s) {
+  if (hind) {
+    const x = stance ? s * HJ_DUTY : HJ_DUTY + s * (1 - HJ_DUTY);
+    return Object.fromEntries(Object.entries(HJ_LINE).map(([k, ys]) => [k, lerpLine(HJ_PH, ys, x)]));
+  }
+  const ease = (y) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(y, 0), 1));
+  const knee = stance ? (s < 0.5 ? 113 + (52 - 113) * ease(s / 0.5) : 52 + (105 - 52) * ease((s - 0.5) / 0.5))
+    : lerpLine([0, 0.2, 0.45, 0.7, 1], [105, 65, 30, 30, 113], s);
+  const [ex, ey, ez] = higElbow(stance, s);
+  const retr = THREE.MathUtils.radToDeg(Math.atan2(-ex, ez));
+  const dep = stance ? HIG_DEP : 15 + (HIG_DEP - 15) * (1 - Math.sin(Math.PI * s)) ** 2;
+  return { knee, ankle: null, retr, dep };
+}
+
 // The hind ankle and the wrist out to the limb's side of the grip, mm (C record 68: the ankle 3 mm, Higham & Jayne Fig. 5A has it lateral to the hip).
 // C record 104 (2026-10-30, the producer: 「この方針で、まず A（体の高さと足を着く位置）を直し、グラフと並べた絵で見せて下さい。」): with the girdles of C record 102
 // (hips 7.3 mm, shoulders 10 mm out from the midline) and the feet near the middle of this 10 mm branch, the femur and humerus pointed down as much as
@@ -231,6 +261,9 @@ export function createChameleonWalk(model, holder) {
       return b1 && b2 && e ? { b1, b2, e, l1: inHolder(b1).distanceTo(inHolder(b2)), l2: inHolder(b2).distanceTo(inHolder(e)) } : null;
     };
     limbs[key] = { upper, lower, tip, a, b, hind: key[0] === "h", left: key[1] === "L", med: bundle("med"), lat: bundle("lat") };
+    // The palm/sole: from the wrist/ankle to the digit bundles' bases (C record 105: the grip is held there, so the toes stay put while the heel lifts).
+    const L = limbs[key];
+    L.palm = L.med && L.lat ? inHolder(L.med.b1).add(inHolder(L.lat.b1)).multiplyScalar(0.5).distanceTo(inHolder(tip)) : HEEL;
   }
   // Where the body sits over the branch: the hips and shoulders at BODY_LOW and BODY_LOW + 0.05 of their limbs' reach above its top.
   const mid = (p, q) => p.clone().add(q).multiplyScalar(0.5);
@@ -284,6 +317,55 @@ export function createChameleonWalk(model, holder) {
   // The trunk's span along the branch (between the hips and the shoulders), for belly().
   const trunkBack = Math.min(girdleAlongOf(limbs.hL), girdleAlongOf(limbs.hR)) + 0.3, trunkFront = Math.max(girdleAlongOf(limbs.fL), girdleAlongOf(limbs.fR)) - 0.3;
   const girdleRest = Object.fromEntries(Object.entries(limbs).map(([key, limb]) => [key, inHolder(limb.upper).applyQuaternion(bodyTurn).dot(FORWARD)]));
+
+  // C record 105: the angles a pose gives (as measured: in the holder's frame, `outward` the limb's side), and the two solvers.
+  const deg = THREE.MathUtils.radToDeg;
+  const innerAngle = (p, q, r) => { const u = p.clone().sub(q), w2 = r.clone().sub(q); return deg(Math.acos(Math.max(-1, Math.min(1, u.dot(w2) / (u.length() * w2.length()))))); };
+  function anglesOf(root, knee, ankle, sole, outward) {
+    const f = knee.clone().sub(root), lat = f.dot(outward), fw = f.dot(FORWARD), up = f.dot(UP);
+    return { knee: innerAngle(root, knee, ankle), ankle: sole ? innerAngle(knee, ankle, sole) : null,
+      retr: deg(Math.atan2(-fw, lat)), dep: deg(Math.atan2(-up, Math.hypot(fw, lat))) };
+  }
+  // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: 0.15 }, W_FORE = { knee: 1, ankle: 0, retr: 0.5, dep: 0.5 };
+  /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
+   *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
+  function solveStance(limb, root, contact, tg, heelNow) {
+    const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), Wt = limb.hind ? W_HIND : W_FORE, { a, b } = limb;
+    const side = limb.hind ? ANKLE_OUT : WRIST_OUT;
+    let best = null;
+    for (let th = 0; th <= 110; th += 2) {
+      const t = THREE.MathUtils.degToRad(th);
+      const ankle = new THREE.Vector3().addScaledVector(FORWARD, -HEEL * Math.cos(t)).addScaledVector(UP, HEEL * Math.sin(t)).addScaledVector(outward, side)
+        .setLength(limb.palm).add(contact);
+      const span = ankle.clone().sub(root), d = span.length();
+      if (d > (a + b) * 0.995) continue;
+      const axis = span.clone().divideScalar(d), x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+      const e1 = outward.clone().addScaledVector(axis, -outward.dot(axis)).normalize(), e2 = axis.clone().cross(e1);
+      for (let k = 0; k < 72; k++) {
+        const ph = (k / 72) * 2 * Math.PI, knee = root.clone().addScaledVector(axis, x).addScaledVector(e1, h * Math.cos(ph)).addScaledVector(e2, h * Math.sin(ph));
+        if (knee.clone().sub(root).dot(outward) < 0.3 * a) continue;   // the knee/elbow stays out to its own side
+        const g = anglesOf(root, knee, ankle, contact, outward);
+        let c = HEEL_REG * (th - heelNow) ** 2;
+        for (const key of ["knee", "ankle", "retr", "dep"]) if (tg[key] != null && Wt[key]) c += Wt[key] * (g[key] - tg[key]) ** 2;
+        if (!best || c < best.c) best = { c, ankle, knee };
+      }
+    }
+    return best;
+  }
+  /** Swing: the limb laid out from the target angles (the tibia/forearm hanging from the knee/elbow in the plane with the vertical, the foot/hand
+   *  forward in the plane with the branch's line). Returns { knee, ankle, sole }. */
+  function layAngles(limb, root, tg) {
+    const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), r = THREE.MathUtils.degToRad(tg.retr), p = THREE.MathUtils.degToRad(tg.dep);
+    const f = new THREE.Vector3().addScaledVector(FORWARD, -Math.sin(r) * Math.cos(p)).addScaledVector(UP, -Math.sin(p)).addScaledVector(outward, Math.cos(r) * Math.cos(p));
+    const knee = root.clone().addScaledVector(f, limb.a);
+    const down = UP.clone().negate(), n = down.addScaledVector(f, -down.dot(f)).normalize(), kk = THREE.MathUtils.degToRad(tg.knee);
+    const t = f.clone().multiplyScalar(-Math.cos(kk)).addScaledVector(n, Math.sin(kk));
+    const ankle = knee.clone().addScaledVector(t, limb.b);
+    const aa = THREE.MathUtils.degToRad(tg.ankle ?? 150), m = FORWARD.clone().addScaledVector(t, -FORWARD.dot(t)).normalize();
+    const g = t.clone().multiplyScalar(-Math.cos(aa)).addScaledVector(m, Math.sin(aa));
+    return { knee, ankle, sole: ankle.clone().addScaledVector(g, HEEL) };
+  }
 
   // Eyes: each one's own target and saccade.
   const eyes = [0, 1].map((i) => ({ yaw: 0, pitch: 0, fromYaw: 0, fromPitch: 0, toYaw: 0, toPitch: 0, start: 0, next: 0.5 + i * 0.8 }));
@@ -498,10 +580,44 @@ export function createChameleonWalk(model, holder) {
       footState[key] = { stance: u >= swing, slide, u };
       // The sole's grip on the branch; the wrist/ankle sits HEEL behind it and a little above (the foot lies along the branch).
       const contact = plantAt(limb, along).addScaledVector(UP, lift).addScaledVector(LEFT, (limb.left ? 1 : -1) * out);
-      const target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel))
+      let target = contact.clone().addScaledVector(FORWARD, -HEEL * Math.cos(heel)).addScaledVector(UP, HEEL * Math.sin(heel))
         .addScaledVector(LEFT, (limb.left ? 1 : -1) * (limb.hind ? ANKLE_OUT : WRIST_OUT));
       // Two bones to the wrist/ankle, the elbow/knee out to the side and up.
       const root = holder.worldToLocal(limb.upper.getWorldPosition(new THREE.Vector3()));
+      // C record 105: in stance the wrist/ankle and the elbow/knee solved for the target angles, the sole held where it grips; in the swing the limb laid
+      // out from the target angles, eased at both ends onto the stance's poses at lift-off and at the next footfall (so nothing jumps).
+      let kneeAt = null;
+      if (GAIT !== "a") {
+        if (u >= swing) {
+          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel));
+          if (sol) { target = sol.ankle; kneeAt = sol.knee; }
+        } else {
+          // The angles follow the target lines, shifted at each end onto the stance's pose there (w0 fades over the first 0.4 of the swing, w1 grows over
+          // the last 0.4); what laying out those end angles misses of the stance's poses (the leg's own plane) is added the same way.
+          const s = u / swing, sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); }, w0 = sm(1 - s / 0.4), w1 = sm((s - 0.6) / 0.4);
+          const outward = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
+          const off = plantAt(limb, reach - DUTY * STRIDE), on = plantAt(limb, reach);
+          const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP));
+          const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN));
+          if (s0 && s1) {
+            const a0 = anglesOf(root, s0.knee, s0.ankle, off, outward), a1 = anglesOf(root, s1.knee, s1.ankle, on, outward);
+            const t0 = jointTargets(limb.hind, false, 0), t1 = jointTargets(limb.hind, false, 1), ts = jointTargets(limb.hind, false, s);
+            const mix = {};
+            for (const k of ["knee", "ankle", "retr", "dep"]) {
+              const at = (tg) => tg[k] ?? 150;
+              mix[k] = at(ts) + w0 * (a0[k] - at(t0)) + w1 * (a1[k] - at(t1));
+            }
+            const lay = layAngles(limb, root, mix), lay0 = layAngles(limb, root, a0), lay1 = layAngles(limb, root, a1);
+            const blend = (p, p0, q0, p1, q1) => p.clone().addScaledVector(q0.clone().sub(p0), w0).addScaledVector(q1.clone().sub(p1), w1);
+            target = blend(lay.ankle, lay0.ankle, s0.ankle, lay1.ankle, s1.ankle);
+            kneeAt = blend(lay.knee, lay0.knee, s0.knee, lay1.knee, s1.knee);
+            contact.copy(blend(lay.sole, lay0.sole, off, lay1.sole, on));
+            // above the branch's top while over it
+            const rel = contact.clone().sub(branchCentre), top = BRANCH_RADIUS + 0.5 * MM - rel.dot(UP);
+            if (Math.abs(rel.dot(LEFT)) < BRANCH_RADIUS * 1.2 && top > 0 && s > 0.1 && s < 0.9) { contact.addScaledVector(UP, top); target.addScaledVector(UP, top); }
+          }
+        }
+      }
       const span = target.clone().sub(root); let d = span.length();
       const { a, b } = limb;
       footState[key].over = Math.max(0, d - (a + b) * 0.999);   // how far out of reach (the foot would leave its grip by this much)
@@ -509,7 +625,9 @@ export function createChameleonWalk(model, holder) {
       const end = root.clone().add(span);
       const axis = span.clone().normalize();
       let pole;
-      if (limb.hind) {
+      if (kneeAt) {
+        pole = kneeAt.clone().sub(root);
+      } else if (limb.hind) {
         const [kx, ky, kz] = hjKnee(u < swing ? "swing" : "stance", u < swing ? u / swing : (u - swing) / DUTY);
         pole = new THREE.Vector3().addScaledVector(FORWARD, kx).addScaledVector(UP, ky).addScaledVector(LEFT, (limb.left ? 1 : -1) * kz);
       } else if (FORE_POLE !== "old") {
@@ -527,8 +645,14 @@ export function createChameleonWalk(model, holder) {
       footState[key].grip = contact.clone().addScaledVector(FORWARD, slide).toArray();
       footState[key].miss = inHolder(limb.tip).distanceTo(target);
       // The hand/foot along the branch, fingers forward, gripping its top.
-      const tipNow = limb.tip.localToWorld(new THREE.Vector3(0, 0.3, 0));
-      aim(limb.tip, tipNow, toWorld(contact.clone().addScaledVector(FORWARD, 0.1)));
+      if (GAIT !== "a" && limb.med && limb.lat) {
+        // C record 105: the palm/sole laid onto the grip itself (the bundles' bases on `contact`), so the toes do not move while the wrist/ankle turns over them.
+        const bases = limb.med.b1.getWorldPosition(new THREE.Vector3()).add(limb.lat.b1.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
+        aim(limb.tip, bases, toWorld(contact));
+      } else {
+        const tipNow = limb.tip.localToWorld(new THREE.Vector3(0, 0.3, 0));
+        aim(limb.tip, tipNow, toWorld(contact.clone().addScaledVector(FORWARD, 0.1)));
+      }
       // The grip: in stance each bundle is laid round the branch on its own side (the lateral one to the limb's outer side), its
       // segments following the surface (arc length = the segment's length, out to GRIP_MAX from the top); they let go over the
       // first GRIP_EASE of the swing and close again over its last GRIP_EASE (in the air they keep the glb's open pose).
@@ -567,6 +691,9 @@ export function createChameleonWalk(model, holder) {
           };
         }
       }
+      // For checking slips: the digit bundles' tips (or the wrist/ankle) in the branch's frame.
+      const tipsAt = limb.med && limb.lat ? inHolder(limb.med.e).add(inHolder(limb.lat.e)).multiplyScalar(0.5) : inHolder(limb.tip);
+      footState[key].tipB = tipsAt.addScaledVector(FORWARD, slide).toArray();
     }
 
     // Eyes: independent saccades — a quick turn (0.12 s) to a new direction, then still for 0.4–2.2 s.
@@ -597,7 +724,7 @@ export function createChameleonWalk(model, holder) {
       // the knee/elbow and the ankle/wrist against the hip/shoulder, mm: x forward, y up, z out to the limb's side (Higham & Jayne Fig. 5)
       const hip = inHolder(limb.upper), side = limb.left ? 1 : -1;
       const rel = (bone) => { const r = inHolder(bone).sub(hip); return [r.dot(FORWARD) / MM, r.dot(UP) / MM, side * r.dot(LEFT) / MM]; };
-      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, grip: f.grip2, knee: rel(limb.lower), ankle: rel(limb.tip) }];
+      return [key, { stance: f.stance, over: f.over, u: f.u, miss: f.miss, p: f.grip, tipB: f.tipB, grip: f.grip2, knee: rel(limb.lower), ankle: rel(limb.tip) }];
     }));
   }
   /** For checking: how far the skin's lowest point (every `step`-th vertex, skinned) lies above the branch's top, in mm (< 0: sunk in). */
