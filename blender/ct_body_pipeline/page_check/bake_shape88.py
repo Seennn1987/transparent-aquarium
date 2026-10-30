@@ -7,6 +7,8 @@
 ・glb の POSITION をその値に置き換え、accessor の min・max を直す。動いた頂点（0.1 µm より）の NORMAL は、同じ位置の頂点をまとめて
   面の向きを面積で平均して作り直す（ほかの頂点の NORMAL はそのまま）
 ・ページは共有の配信（http://127.0.0.1:8080/）から読む。焼き込んだ glb に ?shape=88 をもう一度かけない（2 回かかる）
+・形は歩く姿勢の中で計算するので、手足の置き方で結果が変わる。記録 99 のときの歩き方の値（BAKE_Q）で必ず開く（記録 111: 記録 104〜110 で
+  歩き方の既定を変えたあとに焼き込むと、お腹の下の縁が RMS 0.08 → 0.3〜0.5 mm に波打った）。足したいクエリは環境変数 CH_BAKE_Q
 """
 import sys, os, json, struct, base64, asyncio, shutil
 import numpy as np
@@ -18,6 +20,7 @@ src, dst = sys.argv[1], sys.argv[2]
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 PROP = os.path.join(ROOT, '水槽/scenes/specimen/assets/private/proposals')
 name = os.path.splitext(os.path.basename(src))[0]
+BAKE_Q = '&gait=a&ankleOut=3&wristOut=0&foreShift=0&forePole=old&low=0.32&arch=14&hjRef=1'   # 記録 99 のときの歩き方
 if os.path.abspath(os.path.dirname(src)) != os.path.abspath(PROP):
     os.makedirs(PROP, exist_ok=True); shutil.copyfile(src, os.path.join(PROP, name + '.glb'))
 
@@ -26,7 +29,7 @@ async def read_positions():
     async with async_playwright() as p:
         b = await browser.launch(p); pg = await b.new_page(viewport={'width': 800, 'height': 956})
         logs = []; pg.on('console', lambda m: logs.append(m.text))
-        await pg.goto(f'{browser.BASE}/scenes/specimen/chameleon.html?walk=1&still=1&tune=0&shape=88&glb={name}')
+        await pg.goto(f'{browser.BASE}/scenes/specimen/chameleon.html?walk=1&still=1&tune=0&shape=88&glb={name}' + BAKE_Q + os.environ.get('CH_BAKE_Q', ''))
         await pg.wait_for_function('document.body.dataset.ready||document.body.dataset.error', timeout=240000)
         if await pg.evaluate('document.body.dataset.error'): raise SystemExit('ページの読み込みに失敗: ' + ' / '.join(logs[-5:]))
         print(next((l for l in logs if 'shape88' in l), 'shape88 の記録なし')[:120])
