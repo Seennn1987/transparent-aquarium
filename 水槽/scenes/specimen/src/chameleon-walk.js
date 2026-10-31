@@ -160,7 +160,10 @@ const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
 const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 6) * MM;
 // The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
 // 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
-const HIG_RETR = [-11, 58, 56], HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 38.5);
+const HIG_RETR = (new URLSearchParams(location.search).get("foreRetr") ?? "-11,58,56").split(",").map(Number), HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 0);
+// C record 127: 0 (the elbow about level with the shoulder). Side-on, the adult on the floor (Wimberly et al., 33 frames) holds its elbow 0.15–0.23 of
+// snout–hip over the ground with the shoulder at 0.24 (the humerus nearly level and drawn back); Higham 2015's 38.5° (Bradypodion on a 3 mm perch) put the
+// elbow 0.03–0.06 over the branch. Scored against those frames (score3) with the hips 0.65 and the shoulders 0.62 of the legs' reach: 41% → 56%.
 const higElbow = (stance, s) => {
   const ease = (x) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(x, 0), 1));
   const r = stance ? (s < 0.5 ? HIG_RETR[0] + (HIG_RETR[1] - HIG_RETR[0]) * ease(s / 0.5) : HIG_RETR[1] + (HIG_RETR[2] - HIG_RETR[1]) * ease((s - 0.5) / 0.5))
@@ -340,7 +343,7 @@ export function createChameleonWalk(model, holder) {
   // The shoulders' height with the body's motion: 0.6 of the forelimb's reach (25.5 mm, 0.19–0.22 of snout–hip while walking). In the two side-on videos
   // (the floor, Wimberly et al.; a log, Mixkit 1470) the shoulders stand 0.24–0.28 of snout–hip over the ground and the forearm nearly upright; at 0.458
   // (Krause & Fischer's 0.153 SVL, at the moment of peak force on a 2 cm pole) the forelimbs hid under the chest. 0.7 (0.23–0.25) left the hands 3 mm short.
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.5 : 0.363) : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.65 : 0.363) : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
@@ -358,7 +361,7 @@ export function createChameleonWalk(model, holder) {
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.52 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.62 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
@@ -429,7 +432,7 @@ export function createChameleonWalk(model, holder) {
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
   const _w = new URLSearchParams(location.search);
   const W_FRONT = Number(_w.get("wFront") ?? (GAIT === "d" ? 2 : 0));   // the front-view angles (C record 115)
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)), ab: W_FRONT * Number(_w.get("wFrontH") ?? 10), inw: W_FRONT }, W_FORE = { knee: Number(_w.get("wKneeF") ?? 1), ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 0.2 : 0.5)), dep: Number(_w.get("wDepF") ?? (GAIT === "d" ? 0 : 0.5)), ab: W_FRONT * Number(_w.get("wFrontF") ?? 30), inw: W_FRONT };
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 0.55 : 0.15)), ab: W_FRONT * Number(_w.get("wFrontH") ?? 5), inw: W_FRONT }, W_FORE = { knee: Number(_w.get("wKneeF") ?? 1), ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 2.2 : 0.5)), dep: Number(_w.get("wDepF") ?? (GAIT === "d" ? 2 : 0.5)), ab: W_FRONT * Number(_w.get("wFrontF") ?? 10), inw: W_FRONT };
   // (C record 126, the producer: 「体の高さを股 0.5 前後にし、上腕を横へ開く目標を先に効かせる決め方に直して…」: the humerus' spread seen from in front (this species'
   // XROMM skeleton) first, × 30; its forward–back 0.5 → 0.2 and its depression 0.2 → 0 (both another species, Higham 2015). The hind femur's spread × 10. With the hips at 0.5 the humerus stands 42–45° out through mid-stance, the XROMM 45°.)
   // (C record 118: the humerus' forward–back and depression come from another species, Bradypodion on a 3 mm perch (Higham 2015); the front-view
