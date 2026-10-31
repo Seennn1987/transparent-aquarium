@@ -37,9 +37,23 @@ for lb,t,it in real:
         if k=='置き場': good=gap<=0.05
         ex+=max(0,(gap if k=='置き場' else abs(mv-v))-(0.05 if k=='置き場' else tol))/(0.05 if k=='置き場' else tol)
         res.append((name(lb,k),t,v,mv,good))
+# 正面の項目（記録 129）: 前脚が着いている間の 0.1・0.3・0.5 で、上腕の開き 45°（X 線の 3D 骨格、記録 114、ほかの実物と食い違わない）と
+# 前腕の内への倒れ 28°（細い枝の上の成体を斜め前から写した YouTube 8pzT_m3hNfc の 55 秒・57.5 秒を目で読んだ。斜めなので ±15°）。
+FRONT=[('前 正面 上腕の開き',1,45.0),('前 正面 前腕の内への倒れ',2,28.0)]
+DUTY=0.6555; T=95/36.4
+st=[r['fL']['st'] for r in rows]; ts=[r['t'] for r in rows]; t0=[ts[i] for i in range(1,len(rows)) if st[i] and not st[i-1]][0]
+FR=[]
+for r in rows:
+    if not r['fL']['st']: continue
+    ph=((r['t']-t0)%T)/T/DUTY; kn=np.array(r['fL']['knee']); an=np.array(r['fL']['ankle']); g=an-kn
+    FR.append((ph,float(np.degrees(np.arctan2(kn[2],-kn[1]))),float(np.degrees(np.arctan2(-g[2],-g[1])))))
+for q in (0.1,0.3,0.5):
+    m=min(FR,key=lambda x:abs(x[0]-q))
+    for nm,i,rv in FRONT:
+        mv=m[i]; good=abs(mv-rv)<=15; ex+=max(0,abs(mv-rv)-15)/15; res.append((nm,q,rv,mv,good))
 grp={}
 for r in res: g=grp.setdefault(r[0],[0,0,[],[]]); g[0]+=r[4]; g[1]+=1; g[2].append(r[2]); g[3].append(r[3])
-for g,(a,b,rv,mv) in grp.items(): print(f"{g:12s} {a}/{b}  実物 {np.mean(rv):+7.3f}  モデル {np.mean(mv):+7.3f}")
+for g,(a,b,rv,mv) in grp.items(): print(f"{g:14s} {a}/{b}  実物 {np.mean(rv):+7.3f}  モデル {np.mean(mv):+7.3f}")
 if V:
     for r in res:
         if not r[4]: print(f'× {r[0]} {r[1]:4.1f}秒 実物 {r[2]:+.3f} モデル {r[3]:+.3f}')
