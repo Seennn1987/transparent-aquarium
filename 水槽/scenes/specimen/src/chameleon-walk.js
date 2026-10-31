@@ -156,7 +156,7 @@ const LOW_FORE = new URLSearchParams(location.search).get("lowFore");
 const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
 // Each foot's stance moved back against its girdle, mm. The forefoot 8 mm (C record 104): landing half the stance's travel ahead of the shoulder, the
 // humerus pointed 54–62° forward at footfall (Higham 2015: 11°); 8 mm brings it to 23° and leaves it 66° back at lift-off (56°). ?foreShift= / ?hindShift=.
-const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 3) * MM;
+const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 6) * MM;
 // The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
 // 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
 const HIG_RETR = [-11, 58, 56], HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 38.5);
@@ -322,11 +322,13 @@ export function createChameleonWalk(model, holder) {
   // C record 122 (2026-10-31, the producer: 「YouTube の動画もブラウザで見て、枝の上を歩く実物を探してから進めて下さい。」): an adult on a branch seen side-on
   // (YouTube Z3xPABzWUDE, read only) holds its hips about 0.24 of snout–hip over the branch's top, the shoulders 0.20, the belly 0.13; on the floor (Wimberly)
   // the hips 0.17–0.33. With the body's motion the hips at 0.68 of the leg's reach (0.17–0.28) and the shoulders 0.66 (0.21–0.26).
+  // C record 124: the hind sole reached only 0.23 of snout–hip behind the hip at lift-off (the floor walk: 0.27, and the adult on the branch stretches the
+  // hind foot far back): the hips 0.68 → 0.62 and the hind stance 6 mm further back (HIND_SHIFT 3 → 6). Moving the fore stance back left the hands short.
   const hipSpread = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper));
   // The shoulders' height with the body's motion: 0.6 of the forelimb's reach (25.5 mm, 0.19–0.22 of snout–hip while walking). In the two side-on videos
   // (the floor, Wimberly et al.; a log, Mixkit 1470) the shoulders stand 0.24–0.28 of snout–hip over the ground and the forearm nearly upright; at 0.458
   // (Krause & Fischer's 0.153 SVL, at the moment of peak force on a 2 cm pole) the forelimbs hid under the chest. 0.7 (0.23–0.25) left the hands 3 mm short.
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.68 : 0.363) : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.62 : 0.363) : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
