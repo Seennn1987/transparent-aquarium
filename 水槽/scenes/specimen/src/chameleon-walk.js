@@ -127,7 +127,9 @@ const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[
 // moments, so the fold is asked only over the last FRONT_FOLD of the stance (C record 117: from 0.8 it still held the knee bent before lift-off).
 const FRONT_FOLD = Math.min(0.95, Math.max(0.01, Number(new URLSearchParams(location.search).get("frontFold") ?? 0.05)));
 const FRONT_FORE_HOLD = Number(new URLSearchParams(location.search).get("frontHold") ?? 0.7);   // C record 126: the humerus held out until this share of the stance
-const FRONT_FORE = { ab: [45, 45, 10], inw: [89, 89, 10], s: [0, FRONT_FORE_HOLD, 1] }, FRONT_HIND = { ab: [75, 75 - 13 * (1 - FRONT_FOLD), 62], inw: [20, 20, 61], s: [0, 1 - FRONT_FOLD, 1] };   // the femur's spread goes on falling as before (held at 75° it lifted the femur, 4 depression misses)
+// C record 128 (?foreAb=, ?foreInw=, ?hindAb=): the humerus's and femur's spread and the forearm's lean in stance, to try the heights read from the adult on a branch (YouTube Z3xPABzWUDE).
+const FRONT_FORE_AB = Number(new URLSearchParams(location.search).get("foreAb") ?? 45), FRONT_FORE_INW = Number(new URLSearchParams(location.search).get("foreInw") ?? 89), FRONT_HIND_AB = Number(new URLSearchParams(location.search).get("hindAb") ?? 75);
+const FRONT_FORE = { ab: [FRONT_FORE_AB, FRONT_FORE_AB, 10], inw: [FRONT_FORE_INW, FRONT_FORE_INW, 10], s: [0, FRONT_FORE_HOLD, 1] }, FRONT_HIND = { ab: [FRONT_HIND_AB, FRONT_HIND_AB - 13 * (1 - FRONT_FOLD), 62], inw: [20, 20, 61], s: [0, 1 - FRONT_FOLD, 1] };   // the femur's spread goes on falling as before (held at 75° it lifted the femur, 4 depression misses)
 const frontAt = (hind, s) => { const T = hind ? FRONT_HIND : FRONT_FORE; return { ab: lerpLine(T.s, T.ab, s), inw: lerpLine(T.s, T.inw, s) }; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
 function jointTargets(hind, stance, s) {
