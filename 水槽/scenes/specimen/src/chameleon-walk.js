@@ -290,6 +290,17 @@ export function createChameleonWalk(model, holder) {
   const inHolder = (b) => holder.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
 
   // The limbs: girdle (or none) → upper → lower → hand/foot, with their lengths in the base pose.
+  // C record 125 (proposal A, ?limbScale=adult): each limb scaled about its shoulder/hip to the adults' proportions (mean of the AMNH skeleton and the
+  // X-ray of a male, ÷ shoulder–hip: humerus 0.240, forearm 0.212, femur 0.232, tibia 0.176; this CT: 0.215, 0.205, 0.225, 0.171): the forelimb × 1.076,
+  // the hindlimb × 1.030 (uniform, so the hand and foot grow with it). ?limbScale=<fore>,<hind> for other values.
+  {
+    const ls = new URLSearchParams(location.search).get("limbScale");
+    if (ls) {
+      const [kf, kh] = ls === "adult" ? [1.076, 1.03] : ls.split(",").map(Number);
+      for (const key of ["fL", "fR", "hL", "hR"]) { const u = bones[`${key}_upper`]; if (u) u.scale.setScalar(key[0] === "f" ? kf : kh); }
+      model.updateMatrixWorld(true);
+    }
+  }
   const limbs = {};
   for (const [key, end] of [["fL", "hand"], ["fR", "hand"], ["hL", "foot"], ["hR", "foot"]]) {
     const upper = bones[`${key}_upper`], lower = bones[`${key}_lower`], tip = bones[`${key}_${end}`];
