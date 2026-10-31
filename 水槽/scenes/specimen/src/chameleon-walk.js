@@ -38,9 +38,12 @@ const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM"
 // ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
 // C record 117: scaled by this animal's SVL, 127 mm (C record 113; the 11 cm above was the curled trunk's chord): × 12.7 / 20.25, the stride 11.3 cm
 // and, one stride still 2.6 s, the speed 4.33 cm/s. ?stride= (mm) and ?speed= (mm/s) to try others.
-const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 43.3) * MM;   // model units per second
+// C record 122: read off the floor walk (Wimberly et al., 33 frames) the hind foot travels 0.50 of snout–hip against the hip in stance (+0.22 → −0.27, so
+// 3 mm further back than centred: HIND_SHIFT) and the fore 0.65; with the hips raised to the adults' height (below) the 11.3 cm stride (0.60) left the feet
+// out of reach, so 9.5 cm (0.51 / DUTY), one stride still 2.6 s.
+const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 36.4) * MM;   // model units per second
 const DUTY = 0.6555;
-const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 113) * MM;   // 11.3 cm (C record 117; 9.8 cm before)
+const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 95) * MM;   // 9.5 cm (C record 122; 11.3 cm in C record 117, 9.8 cm before)
 // When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
 const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
 // The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE at ROCK_HZ, all four feet gripping (the body moves over
@@ -153,7 +156,7 @@ const LOW_FORE = new URLSearchParams(location.search).get("lowFore");
 const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
 // Each foot's stance moved back against its girdle, mm. The forefoot 8 mm (C record 104): landing half the stance's travel ahead of the shoulder, the
 // humerus pointed 54–62° forward at footfall (Higham 2015: 11°); 8 mm brings it to 23° and leaves it 66° back at lift-off (56°). ?foreShift= / ?hindShift=.
-const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 0) * MM;
+const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? 3) * MM;
 // The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
 // 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
 const HIG_RETR = [-11, 58, 56], HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 38.5);
@@ -316,11 +319,14 @@ export function createChameleonWalk(model, holder) {
   const BOB = Number(new URLSearchParams(location.search).get("bob") ?? 1);
   const harm = (c) => (p) => { const a = 2 * Math.PI * p; return c[0] * Math.cos(a) + c[1] * Math.sin(a) + c[2] * Math.cos(2 * a) + c[3] * Math.sin(2 * a); };
   const hipLine = harm([0.112, -0.1, -0.094, -0.136]), pitchLine = harm([-1.726, 1.521, 1.95, 1.545]);
+  // C record 122 (2026-10-31, the producer: 「YouTube の動画もブラウザで見て、枝の上を歩く実物を探してから進めて下さい。」): an adult on a branch seen side-on
+  // (YouTube Z3xPABzWUDE, read only) holds its hips about 0.24 of snout–hip over the branch's top, the shoulders 0.20, the belly 0.13; on the floor (Wimberly)
+  // the hips 0.17–0.33. With the body's motion the hips at 0.68 of the leg's reach (0.17–0.28) and the shoulders 0.66 (0.21–0.26).
   const hipSpread = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper));
   // The shoulders' height with the body's motion: 0.6 of the forelimb's reach (25.5 mm, 0.19–0.22 of snout–hip while walking). In the two side-on videos
   // (the floor, Wimberly et al.; a log, Mixkit 1470) the shoulders stand 0.24–0.28 of snout–hip over the ground and the forearm nearly upright; at 0.458
   // (Krause & Fischer's 0.153 SVL, at the moment of peak force on a 2 cm pole) the forelimbs hid under the chest. 0.7 (0.23–0.25) left the hands 3 mm short.
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.363 : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.68 : 0.363) : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
@@ -338,7 +344,7 @@ export function createChameleonWalk(model, holder) {
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.6 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.66 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
