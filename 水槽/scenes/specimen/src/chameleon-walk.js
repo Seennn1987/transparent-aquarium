@@ -36,9 +36,11 @@ const MM = MODEL_UNITS_PER_MM;
 // 輪切りの絵と角度の表で見せて下さい。」): 12.5 mm, the 2 cm pole scaled by this animal's SVL (127 mm, C record 113) against theirs (20.25 cm).
 const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 12.5) / 2 * MM;
 // ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
-const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 37.5) * MM;   // model units per second
+// C record 117: scaled by this animal's SVL, 127 mm (C record 113; the 11 cm above was the curled trunk's chord): × 12.7 / 20.25, the stride 11.3 cm
+// and, one stride still 2.6 s, the speed 4.33 cm/s. ?stride= (mm) and ?speed= (mm/s) to try others.
+const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 43.3) * MM;   // model units per second
 const DUTY = 0.6555;
-const STRIDE = 98 * MM;                 // 9.8 cm (4.4 units)
+const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 113) * MM;   // 11.3 cm (C record 117; 9.8 cm before)
 // When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
 const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
 // The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE at ROCK_HZ, all four feet gripping (the body moves over
@@ -118,6 +120,7 @@ const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[
 // body. The forelimb in stance well out (humerus 45°, forearm 89°), back in a vertical plane by lift-off (10°, 10°); the hindlimb in a vertical plane at
 // footfall (the femur 75° out with the knee high, the tibia 20° in), out at lift-off (femur 62°, tibia 61°). In stance only.
 const FRONT_FORE = { ab: [45, 45, 10], inw: [89, 89, 10], s: [0, 0.45, 1] }, FRONT_HIND = { ab: [75, 62], inw: [20, 61], s: [0, 1] };
+// (C record 117: putting the change late, from 0.8 of the stance, did not let the knee straighten before lift-off and lost 3 passes.)
 const frontAt = (hind, s) => { const T = hind ? FRONT_HIND : FRONT_FORE; return { ab: lerpLine(T.s, T.ab, s), inw: lerpLine(T.s, T.inw, s) }; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
 function jointTargets(hind, stance, s) {
@@ -406,11 +409,11 @@ export function createChameleonWalk(model, holder) {
   // by lift-off (the tibia folds in, as in the XROMM skeleton); the wrist over the top through mid-stance (the forearm level) and down the side by lift-off
   // (the forelimb in a vertical plane). Found by the score: the ankle 40° down → 20° over, the wrist 45° over → 15° down; the hind soles 55° round.
   const _r = new URLSearchParams(location.search);
-  const ROLL = { h0: Number(_r.get("rollH0") ?? 40), h1: Number(_r.get("rollH1") ?? -20), f0: Number(_r.get("rollF0") ?? -45), f1: Number(_r.get("rollF1") ?? 15) };
+  const ROLL = { h0: Number(_r.get("rollH0") ?? 40), h1: Number(_r.get("rollH1") ?? -20), f0: Number(_r.get("rollF0") ?? -45), f1: Number(_r.get("rollF1") ?? 15), hs: Number(_r.get("rollHs") ?? 0) };
   const rollAt = (limb, s) => {
     if (GAIT !== "d" || s == null) return 0;
     const e = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
-    return limb.hind ? ROLL.h0 + (ROLL.h1 - ROLL.h0) * e(s) : ROLL.f0 + (ROLL.f1 - ROLL.f0) * e((s - 0.45) / 0.55);
+    return limb.hind ? ROLL.h0 + (ROLL.h1 - ROLL.h0) * e((s - ROLL.hs) / (1 - ROLL.hs)) : ROLL.f0 + (ROLL.f1 - ROLL.f0) * e((s - 0.45) / 0.55);
   };
   const poseFrom = (limb, root, contact, outward, side, th, ph, s) => {
     const { a, b } = limb, t = THREE.MathUtils.degToRad(th), gf = gripFrame(limb);
