@@ -32,7 +32,9 @@ import { chameleonEyes } from "./chameleon-material.js";
 const MM = MODEL_UNITS_PER_MM;
 // The branch: 10 mm across (C record 63, 2026-10-24, the producer: 「枝は案 B（直径 10 mm）にして」; Krause & Fischer's 2 cm pole scaled
 // to this animal is 11 mm). ?branchMM= to try others.
-const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 10) / 2 * MM;
+// C record 115 (2026-10-31, the producer: 「枝を 12.5 mm（SVL 127 mm で縮めた Krause & Fischer の棒）にして、案の 1・2（時刻ごとの正面の角度、手をつかむ位置）を入れ、
+// 輪切りの絵と角度の表で見せて下さい。」): 12.5 mm, the 2 cm pole scaled by this animal's SVL (127 mm, C record 113) against theirs (20.25 cm).
+const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM") ?? 12.5) / 2 * MM;
 // ?speed= in mm/s (Krause & Fischer's mean 6.9 cm/s scaled: 37.5).
 const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 37.5) * MM;   // model units per second
 const DUTY = 0.6555;
@@ -111,11 +113,17 @@ const HJ_LINE = new URLSearchParams(location.search).get("hjRef") === "1" ? HJ_L
   knee: stretch(HJ_LINE_1.knee, 52, 116, 52, 130), ankle: HJ_LINE_1.ankle,
   retr: stretch(HJ_LINE_1.retr, -66, 35, -65, 50), dep: stretch(HJ_LINE_1.dep, -45, 4, -38, 31) };
 const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[i + 1]) i++; const w = Math.min(1, Math.max(0, (x - xs[i]) / (xs[i + 1] - xs[i]))); return ys[i] + (ys[i + 1] - ys[i]) * w; };
+// The limbs seen from in front (C record 115, from the XROMM skeleton of Fischer et al. 2010, Higham & Anderson 2013 Fig. 4.3: C. calyptratus on a pole,
+// cut at the shoulders and the hips): `ab` the upper bone out from straight down, `inw` the lower bone in from straight down, in the plane across the
+// body. The forelimb in stance well out (humerus 45°, forearm 89°), back in a vertical plane by lift-off (10°, 10°); the hindlimb in a vertical plane at
+// footfall (the femur 75° out with the knee high, the tibia 20° in), out at lift-off (femur 62°, tibia 61°). In stance only.
+const FRONT_FORE = { ab: [45, 45, 10], inw: [89, 89, 10], s: [0, 0.45, 1] }, FRONT_HIND = { ab: [75, 62], inw: [20, 61], s: [0, 1] };
+const frontAt = (hind, s) => { const T = hind ? FRONT_HIND : FRONT_FORE; return { ab: lerpLine(T.s, T.ab, s), inw: lerpLine(T.s, T.inw, s) }; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
 function jointTargets(hind, stance, s) {
   if (hind) {
     const x = stance ? s * HJ_DUTY : HJ_DUTY + s * (1 - HJ_DUTY);
-    return Object.fromEntries(Object.entries(HJ_LINE).map(([k, ys]) => [k, lerpLine(HJ_PH, ys, x)]));
+    return { ...Object.fromEntries(Object.entries(HJ_LINE).map(([k, ys]) => [k, lerpLine(HJ_PH, ys, x)])), ...(stance ? frontAt(true, s) : {}) };
   }
   const ease = (y) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(y, 0), 1));
   const knee = stance ? (s < 0.5 ? 113 + (52 - 113) * ease(s / 0.5) : 52 + (105 - 52) * ease((s - 0.5) / 0.5))
@@ -123,7 +131,7 @@ function jointTargets(hind, stance, s) {
   const [ex, ey, ez] = higElbow(stance, s);
   const retr = THREE.MathUtils.radToDeg(Math.atan2(-ex, ez));
   const dep = stance ? HIG_DEP : 15 + (HIG_DEP - 15) * (1 - Math.sin(Math.PI * s)) ** 2;
-  return { knee, ankle: null, retr, dep };
+  return { knee, ankle: null, retr, dep, ...(stance ? frontAt(false, s) : {}) };
 }
 
 // The hind ankle and the wrist out to the limb's side of the grip, mm (C record 68: the ankle 3 mm, Higham & Jayne Fig. 5A has it lateral to the hip).
@@ -309,7 +317,7 @@ export function createChameleonWalk(model, holder) {
   // over the branch: 0.363 and 0.458 of the legs' reach (the belly 4.2 mm over; walking adults in photos 0.02–0.12 of snout–hip, 2.5–15 mm).
   const D = GAIT === "d";
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
-  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -4 : 4)) * MM;
+  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
   const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? 0.458 : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
@@ -349,7 +357,7 @@ export function createChameleonWalk(model, holder) {
   // C record 109: with ?gait=d the sole grips GRIP_DEG round from the top on the limb's own side (the hind feet on the branch's side: Higham & Jayne 2004a
   // p.239, on the perch the ankle is at times medial to the hip, and their knee comes level with the hip at mid-stance, which needs the ankle well below the
   // hip; the hands on the top, Krause & Fischer 2013: always the middle of the upper quarter). The sole lies on the bark there (gripFrame).
-  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 70), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 30) };
+  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 45), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 60) };   // C record 115: the hind soles 45° and the hands 60° round from the top, found by the score with the front-view angles
   const gripAngle = (limb) => (GAIT === "d" ? THREE.MathUtils.degToRad(GRIP_DEG[limb.hind ? "hind" : "fore"]) : 0);
   const gripFrame = (limb) => {
     const a = gripAngle(limb), out = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
@@ -374,12 +382,15 @@ export function createChameleonWalk(model, holder) {
   const innerAngle = (p, q, r) => { const u = p.clone().sub(q), w2 = r.clone().sub(q); return deg(Math.acos(Math.max(-1, Math.min(1, u.dot(w2) / (u.length() * w2.length()))))); };
   function anglesOf(root, knee, ankle, sole, ax) {
     const f = knee.clone().sub(root), lat = f.dot(ax.lat), fw = f.dot(ax.fw), up = f.dot(UP);
+    const g = ankle.clone().sub(knee);
     return { knee: innerAngle(root, knee, ankle), ankle: sole ? innerAngle(knee, ankle, sole) : null,
-      retr: deg(Math.atan2(-fw, lat)), dep: deg(Math.atan2(-up, Math.hypot(fw, lat))) };
+      retr: deg(Math.atan2(-fw, lat)), dep: deg(Math.atan2(-up, Math.hypot(fw, lat))),
+      ab: deg(Math.atan2(lat, -up)), inw: deg(Math.atan2(-g.dot(ax.lat), -g.dot(UP))) };
   }
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
   const _w = new URLSearchParams(location.search);
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)) }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 2.5 : 0.5)), dep: 0.5 };
+  const W_FRONT = Number(_w.get("wFront") ?? (GAIT === "d" ? 2 : 0));   // the front-view angles (C record 115)
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)), ab: W_FRONT, inw: W_FRONT }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 2.5 : 0.5)), dep: 0.5, ab: W_FRONT, inw: W_FRONT };
   /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
    *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
   // C record 109: the stance's pose comes from a path made once over one stride: the heel's lift θ and the knee/elbow's turn φ about the line from the
@@ -404,7 +415,7 @@ export function createChameleonWalk(model, holder) {
     if (pose.over || pose.knee.clone().sub(smp.root).dot(smp.ax.lat) < 0.3 * limb.a) return { c: 1e9, pose };
     const g = anglesOf(smp.root, pose.knee, pose.ankle, smp.contact, smp.ax), Wt = limb.hind ? W_HIND : W_FORE;
     let c = HEEL_REG * (th - smp.heelNow) ** 2;
-    for (const k of ["knee", "ankle", "retr", "dep"]) if (smp.tg[k] != null && Wt[k]) c += Wt[k] * (g[k] - smp.tg[k]) ** 2;
+    for (const k of ["knee", "ankle", "retr", "dep", "ab", "inw"]) if (smp.tg[k] != null && Wt[k]) c += Wt[k] * (g[k] - smp.tg[k]) ** 2;
     return { c, pose };
   };
   function solveStance(limb, root, contact, tg, heelNow, ax, key, s, record = false) {
