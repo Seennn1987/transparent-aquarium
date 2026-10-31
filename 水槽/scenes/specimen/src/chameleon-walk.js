@@ -307,6 +307,19 @@ export function createChameleonWalk(model, holder) {
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
   const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
   const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
+  // C record 121 (2026-10-31, the producer: 「この動画から 1 歩の体の上下と前後の傾き、脚の立て方を読んで体に入れ、同じ向きの実物と並べた絵で見せて下さい。」):
+  // the body's motion over a stride, read off the floor walk of Wimberly et al. 2021 (304–310 s, 33 frames, 0.1 s apart): the near hip's height over
+  // the floor, as a share of its mean, against the near hind's phase from touchdown, fitted with two harmonics (rms left 0.096); the trunk's pitch
+  // (shoulder over hip, °) the same way (rms left 1.7°). The shoulder's own height scattered more than it moved (rms 0.14), so it is not used.
+  // ?bodyMotion=0 for the old small bob; ?bob= scales both (1: as on the floor).
+  const BODY_MOTION = GAIT_ARG !== "b" && GAIT_ARG !== "a" && new URLSearchParams(location.search).get("bodyMotion") !== "0" && inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;
+  const BOB = Number(new URLSearchParams(location.search).get("bob") ?? 1);
+  const harm = (c) => (p) => { const a = 2 * Math.PI * p; return c[0] * Math.cos(a) + c[1] * Math.sin(a) + c[2] * Math.cos(2 * a) + c[3] * Math.sin(2 * a); };
+  const hipLine = harm([0.112, -0.1, -0.094, -0.136]), pitchLine = harm([-1.726, 1.521, 1.95, 1.545]);
+  const hipSpread = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper));
+  // The shoulders' height with the body's motion: 0.6 of the forelimb's reach (25.5 mm, 0.19–0.22 of snout–hip while walking). In the two side-on videos
+  // (the floor, Wimberly et al.; a log, Mixkit 1470) the shoulders stand 0.24–0.28 of snout–hip over the ground and the forearm nearly upright; at 0.458
+  // (Krause & Fischer's 0.153 SVL, at the moment of peak force on a 2 cm pole) the forelimbs hid under the chest. 0.7 (0.23–0.25) left the hands 3 mm short.
   const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.363 : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
@@ -325,7 +338,7 @@ export function createChameleonWalk(model, holder) {
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? 0.458 : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.6 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
@@ -704,7 +717,18 @@ export function createChameleonWalk(model, holder) {
     const rock = rockT > 0 ? ROCK_SIZE * Math.sin(2 * Math.PI * ROCK_HZ * rockT) * Math.sin(Math.PI * rockT / pause) : 0;
     // The body: pitched to the branch, with a small rise and fall, and the rocking forward and back.
     model.quaternion.copy(bodyTurn);
-    model.position.set(0, 0, 0).addScaledVector(UP, 0.03 * Math.sin(4 * Math.PI * phase)).addScaledVector(FORWARD, rock);
+    model.position.set(0, 0, 0).addScaledVector(UP, BODY_MOTION ? 0 : 0.03 * Math.sin(4 * Math.PI * phase)).addScaledVector(FORWARD, rock);
+    if (BODY_MOTION) {
+      // C record 121: each hip rises and falls with its own leg (hipLine, from touchdown), the body by their mean, rolled by their difference over the
+      // hips' spread; the trunk pitches by pitchLine (the near hind's phase). Turned about the hips' midpoint.
+      const ph = (k) => (((phase - LIFT[k]) % 1) + 1) % 1;
+      const zL = hipH * hipLine(ph("hL")) * BOB, zR = hipH * hipLine(ph("hR")) * BOB;
+      const roll = Math.atan2(zL - zR, hipSpread), pitchA = THREE.MathUtils.degToRad(pitchLine(ph("hL")) * BOB);
+      const Q = new THREE.Quaternion().setFromAxisAngle(LEFT.clone().cross(UP).normalize(), roll)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(FORWARD.clone().cross(UP).normalize(), pitchA));
+      model.quaternion.premultiply(Q);
+      model.position.add(hipTurned.clone().sub(hipTurned.clone().applyQuaternion(Q))).addScaledVector(UP, (zL + zR) / 2);
+    }
     // Girdles turn about the vertical, out of phase (the pelvis with the hind feet, the shoulders with the fore feet).
     const yaw = yawAt(phase);
     model.updateMatrixWorld(true);
