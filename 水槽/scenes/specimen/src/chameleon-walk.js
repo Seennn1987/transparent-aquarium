@@ -357,7 +357,7 @@ export function createChameleonWalk(model, holder) {
   // C record 109: with ?gait=d the sole grips GRIP_DEG round from the top on the limb's own side (the hind feet on the branch's side: Higham & Jayne 2004a
   // p.239, on the perch the ankle is at times medial to the hip, and their knee comes level with the hip at mid-stance, which needs the ankle well below the
   // hip; the hands on the top, Krause & Fischer 2013: always the middle of the upper quarter). The sole lies on the bark there (gripFrame).
-  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 45), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 60) };   // C record 115: the hind soles 45° and the hands 60° round from the top, found by the score with the front-view angles
+  const GRIP_DEG = { hind: Number(new URLSearchParams(location.search).get("gripHind") ?? 55), fore: Number(new URLSearchParams(location.search).get("gripFore") ?? 60) };   // C record 115: the hind soles 45° and the hands 60° round from the top, found by the score with the front-view angles
   const gripAngle = (limb) => (GAIT === "d" ? THREE.MathUtils.degToRad(GRIP_DEG[limb.hind ? "hind" : "fore"]) : 0);
   const gripFrame = (limb) => {
     const a = gripAngle(limb), out = LEFT.clone().multiplyScalar(limb.left ? 1 : -1);
@@ -398,11 +398,25 @@ export function createChameleonWalk(model, holder) {
   // and of the changes between neighbouring moments (searching each frame on its own let the pose jump between two equally near ones, e.g. the humerus
   // 25° → 68° down in one frame).
   const STANCE_N = 40, stancePath = {}, stanceSamples = {};
+  // C record 116: the wrist/ankle may also go below the sole's level, down the bark's side (the foot wrapped round the branch), by up to −HEEL_MIN°.
+  const HEEL_MIN = Number(new URLSearchParams(location.search).get("heelMin") ?? 0);
   let recording = false;
-  const poseFrom = (limb, root, contact, outward, side, th, ph) => {
+  // C record 116: the wrist/ankle turns round the branch's line about the grip during the stance (the sole stays; the foot rolls on the bark), by
+  // rollAt(limb, s)°, + further round from the top on the limb's own side: the hind ankle down the side at footfall (the knee opens) and up over the top
+  // by lift-off (the tibia folds in, as in the XROMM skeleton); the wrist over the top through mid-stance (the forearm level) and down the side by lift-off
+  // (the forelimb in a vertical plane). Found by the score: the ankle 40° down → 20° over, the wrist 45° over → 15° down; the hind soles 55° round.
+  const _r = new URLSearchParams(location.search);
+  const ROLL = { h0: Number(_r.get("rollH0") ?? 40), h1: Number(_r.get("rollH1") ?? -20), f0: Number(_r.get("rollF0") ?? -45), f1: Number(_r.get("rollF1") ?? 15) };
+  const rollAt = (limb, s) => {
+    if (GAIT !== "d" || s == null) return 0;
+    const e = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
+    return limb.hind ? ROLL.h0 + (ROLL.h1 - ROLL.h0) * e(s) : ROLL.f0 + (ROLL.f1 - ROLL.f0) * e((s - 0.45) / 0.55);
+  };
+  const poseFrom = (limb, root, contact, outward, side, th, ph, s) => {
     const { a, b } = limb, t = THREE.MathUtils.degToRad(th), gf = gripFrame(limb);
-    const ankle = new THREE.Vector3().addScaledVector(FORWARD, -HEEL * Math.cos(t)).addScaledVector(gf.up, HEEL * Math.sin(t)).addScaledVector(gf.out, side)
-      .setLength(limb.palm).add(contact);
+    const off = new THREE.Vector3().addScaledVector(FORWARD, -HEEL * Math.cos(t)).addScaledVector(gf.up, HEEL * Math.sin(t)).addScaledVector(gf.out, side).setLength(limb.palm);
+    const rl = rollAt(limb, s); if (rl) off.applyAxisAngle(FORWARD, THREE.MathUtils.degToRad(rl) * (limb.left ? -1 : 1));
+    const ankle = off.add(contact);
     const span = ankle.clone().sub(root); let d = span.length();
     const over = d > (a + b) * 0.995; d = Math.min(d, (a + b) * 0.995);
     const axis = span.clone().normalize(), x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
@@ -411,7 +425,7 @@ export function createChameleonWalk(model, holder) {
     return { ankle, knee: root.clone().addScaledVector(axis, x).addScaledVector(e1, h * Math.cos(r)).addScaledVector(e2, h * Math.sin(r)), over };
   };
   const stanceCost = (limb, smp, th, ph) => {
-    const pose = poseFrom(limb, smp.root, smp.contact, smp.outward, smp.side, th, ph);
+    const pose = poseFrom(limb, smp.root, smp.contact, smp.outward, smp.side, th, ph, smp.s);
     if (pose.over || pose.knee.clone().sub(smp.root).dot(smp.ax.lat) < 0.3 * limb.a) return { c: 1e9, pose };
     const g = anglesOf(smp.root, pose.knee, pose.ankle, smp.contact, smp.ax), Wt = limb.hind ? W_HIND : W_FORE;
     let c = HEEL_REG * (th - smp.heelNow) ** 2;
@@ -423,12 +437,12 @@ export function createChameleonWalk(model, holder) {
     const path = stancePath[key];
     if (!recording && path) {
       const x = Math.min(Math.max(s, 0), 1) * STANCE_N, i = Math.min(Math.floor(x), STANCE_N - 1), w = x - i;
-      return poseFrom(limb, root, contact, outward, side, path[i].th + (path[i + 1].th - path[i].th) * w, path[i].ph + (path[i + 1].ph - path[i].ph) * w);
+      return poseFrom(limb, root, contact, outward, side, path[i].th + (path[i + 1].th - path[i].th) * w, path[i].ph + (path[i + 1].ph - path[i].ph) * w, s);
     }
     const smp = { root: root.clone(), contact: contact.clone(), ax: { fw: ax.fw.clone(), lat: ax.lat.clone() }, outward, side, tg, heelNow, s };
     if (record) (stanceSamples[key] ??= []).push(smp);
     let best = null;
-    for (let th = 0; th <= 110; th += 2) for (let ph = 0; ph < 360; ph += 5) {
+    for (let th = HEEL_MIN; th <= 110; th += 2) for (let ph = 0; ph < 360; ph += 5) {
       const r = stanceCost(limb, smp, th, ph);
       if (!best || r.c < best.c) best = { c: r.c, th, ph, ...r.pose };
     }
@@ -441,7 +455,7 @@ export function createChameleonWalk(model, holder) {
     const smps = [];
     for (let i = 0; i <= STANCE_N; i++) { const s = i / STANCE_N; smps.push(all.reduce((p, q) => (Math.abs(q.s - s) < Math.abs(p.s - s) ? q : p))); }
     const TH = [], PH = [];
-    for (let th = 0; th <= 108; th += 4) TH.push(th);
+    for (let th = HEEL_MIN; th <= 108; th += 4) TH.push(th);
     for (let ph = 0; ph < 360; ph += 10) PH.push(ph);
     const nS = TH.length * PH.length, LAMBDA = 0.3;
     const cost = smps.map((smp) => { const c = new Float64Array(nS); let n = 0; for (const th of TH) for (const ph of PH) c[n++] = stanceCost(limb, smp, th, ph).c; return c; });
