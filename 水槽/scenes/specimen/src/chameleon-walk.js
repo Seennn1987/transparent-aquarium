@@ -119,8 +119,11 @@ const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[
 // cut at the shoulders and the hips): `ab` the upper bone out from straight down, `inw` the lower bone in from straight down, in the plane across the
 // body. The forelimb in stance well out (humerus 45°, forearm 89°), back in a vertical plane by lift-off (10°, 10°); the hindlimb in a vertical plane at
 // footfall (the femur 75° out with the knee high, the tibia 20° in), out at lift-off (femur 62°, tibia 61°). In stance only.
-const FRONT_FORE = { ab: [45, 45, 10], inw: [89, 89, 10], s: [0, 0.45, 1] }, FRONT_HIND = { ab: [75, 62], inw: [20, 61], s: [0, 1] };
-// (C record 117: putting the change late, from 0.8 of the stance, did not let the knee straighten before lift-off and lost 3 passes.)
+// C record 118 (2026-10-31, the producer: 「この方針で 1〜4 を入れて、輪切りの絵と採点表で見せて下さい。」; the rule: the same species first): the hind
+// knee's line (Higham & Jayne 2004a, straightest at 0.52 of the stride) and the tibia folding in "on the verge of lift-off" (the XROMM frame) are two
+// moments, so the fold is asked only over the last FRONT_FOLD of the stance (C record 117: from 0.8 it still held the knee bent before lift-off).
+const FRONT_FOLD = Math.min(0.95, Math.max(0.01, Number(new URLSearchParams(location.search).get("frontFold") ?? 0.05)));
+const FRONT_FORE = { ab: [45, 45, 10], inw: [89, 89, 10], s: [0, 0.45, 1] }, FRONT_HIND = { ab: [75, 75 - 13 * (1 - FRONT_FOLD), 62], inw: [20, 20, 61], s: [0, 1 - FRONT_FOLD, 1] };   // the femur's spread goes on falling as before (held at 75° it lifted the femur, 4 depression misses)
 const frontAt = (hind, s) => { const T = hind ? FRONT_HIND : FRONT_FORE; return { ab: lerpLine(T.s, T.ab, s), inw: lerpLine(T.s, T.inw, s) }; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
 function jointTargets(hind, stance, s) {
@@ -393,7 +396,9 @@ export function createChameleonWalk(model, holder) {
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
   const _w = new URLSearchParams(location.search);
   const W_FRONT = Number(_w.get("wFront") ?? (GAIT === "d" ? 2 : 0));   // the front-view angles (C record 115)
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)), ab: W_FRONT, inw: W_FRONT }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 2.5 : 0.5)), dep: 0.5, ab: W_FRONT, inw: W_FRONT };
+  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 1.05 : 0.15)), ab: W_FRONT, inw: W_FRONT }, W_FORE = { knee: 1, ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 0.5 : 0.5)), dep: Number(_w.get("wDepF") ?? (GAIT === "d" ? 0.2 : 0.5)), ab: W_FRONT * Number(_w.get("wFrontF") ?? 3), inw: W_FRONT };
+  // (C record 118: the humerus' forward–back and depression come from another species, Bradypodion on a 3 mm perch (Higham 2015); the front-view
+  // spread from this species' XROMM skeleton is put first: their weights 2.5 → 0.5 and 0.5 → 0.2, the spread's × 3.)
   /** Stance: the sole stays at `contact`; the wrist/ankle goes round it (its height, HEEL from the sole, the heel lifted by θ) and the elbow/knee round
    *  the line from the girdle to it, whichever comes nearest the targets. Returns { ankle, knee } in the holder's frame. */
   // C record 109: the stance's pose comes from a path made once over one stride: the heel's lift θ and the knee/elbow's turn φ about the line from the
