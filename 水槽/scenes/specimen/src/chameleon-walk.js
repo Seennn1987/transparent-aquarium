@@ -293,7 +293,7 @@ export function createChameleonWalk(model, holder) {
   const shoulder = mid(inHolder(limbs.fL.upper), inHolder(limbs.fR.upper));
   const newRoots = inHolder(limbs.hL.upper).distanceTo(inHolder(limbs.hR.upper)) > 10 * MM;   // the girdles of C record 102
   const GAIT = GAIT_ARG ?? (newRoots ? "d" : "b");
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.32 : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? 0.363 : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
@@ -304,11 +304,14 @@ export function createChameleonWalk(model, holder) {
   // with 0 they are 0.3–2.7 mm apart and the belly hangs 11.6–12.4 mm under the snout–hip line (the photos: 11.7 mm).
   // C record 112: with the traced belly line baked in (the chest 4–9 mm deeper) the hips come down to 0.32 (12.8 mm; Krause & Fischer 11.7 mm), the
   // belly 2.4 mm over the branch (the adults in photos 2.5 mm).
+  // C record 113: this animal's SVL is 127 mm (snout 23 mm in front of the spine's first point, the vent at the pelvis' back end, 103 mm along the spine);
+  // the 103 mm used before came from the curled trunk's chord. With it Krause & Fischer's 0.114 and 0.153 SVL put the hips 14.5 mm and the shoulders 19.4 mm
+  // over the branch: 0.363 and 0.458 of the legs' reach (the belly 4.2 mm over; walking adults in photos 0.02–0.12 of snout–hip, 2.5–15 mm).
   const D = GAIT === "d";
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -4 : 4)) * MM;
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? 0.40 : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? 0.458 : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
