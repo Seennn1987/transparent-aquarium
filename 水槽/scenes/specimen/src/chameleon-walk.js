@@ -311,6 +311,21 @@ export function createChameleonWalk(model, holder) {
       for (const key of ["fL", "fR", "hL", "hR"]) { const u = bones[`${key}_upper`]; if (u) u.scale.setScalar(key[0] === "f" ? kf : kh); }
       model.updateMatrixWorld(true);
     }
+    // C record 131 (?foreArm=<k>): the forearm alone k times as long, along its bone (+Y), the hand kept its size (the stretch undone in the hand's own
+    // axes, the diagonal of R⁻¹·S⁻¹·R). Side-on, the adult on a branch (Z3xPABzWUDE) drops 0.175 of snout–hip from elbow to wrist with the forearm
+    // 27° back and 28° in, which asks a forearm of 0.19–0.24 (this CT 0.168; the AMNH skeleton ÷ shoulder–hip, 8% longer).
+    const fa = Number(new URLSearchParams(location.search).get("foreArm") ?? 1);
+    if (fa !== 1) {
+      for (const key of ["fL", "fR"]) {
+        const lo = bones[`${key}_lower`], hd = bones[`${key}_hand`];
+        if (!lo || !hd) continue;
+        lo.scale.set(1, fa, 1);
+        const R = new THREE.Matrix4().makeRotationFromQuaternion(hd.quaternion), Si = new THREE.Matrix4().makeScale(1, 1 / fa, 1);
+        const M = R.clone().invert().multiply(Si).multiply(R).elements;
+        hd.scale.set(M[0], M[5], M[10]);
+      }
+      model.updateMatrixWorld(true);
+    }
   }
   const limbs = {};
   for (const [key, end] of [["fL", "hand"], ["fR", "hand"], ["hL", "foot"], ["hR", "foot"]]) {
@@ -366,7 +381,7 @@ export function createChameleonWalk(model, holder) {
   // over the branch: 0.363 and 0.458 of the legs' reach (the belly 4.2 mm over; walking adults in photos 0.02–0.12 of snout–hip, 2.5–15 mm).
   const D = GAIT === "d";
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
-  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;
+  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? 3 : 4)) * MM;   // C record 131: the wrist on the branch's side (Z3xPABzWUDE: 0.03 of snout–hip under its top), the forearm 28° in from the front
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
   const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.58 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
