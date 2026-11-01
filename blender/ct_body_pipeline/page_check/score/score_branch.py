@@ -5,7 +5,7 @@
 置き場: 実物の手（足）の前後にモデルの着いているコマが 0.05 L 以内に無ければ、その項目を不合格にする"""
 import json,sys,numpy as np
 RJ='/Users/shoui/transparent-aquarium/画像サンプル収集/エボシカメレオン/収集_2026-10-26/関節の動き/枝_Z3xPABzWUDE_0-12s.json'
-R=json.load(open(RJ))['コマ']; rows=json.load(open(sys.argv[1])); L=123.3; V='-v' in sys.argv
+_RJ=json.load(open(RJ)); R=_RJ['コマ']; R2=_RJ.get('後ろ脚の追加コマ',[]); rows=json.load(open(sys.argv[1])); L=123.3; V='-v' in sys.argv
 HIND_SWING={6.0,7.5,9.0,10.5}
 def ang(a,b,c):
     u=np.subtract(a,b,dtype=float);v=np.subtract(c,b,dtype=float);return float(np.degrees(np.arccos(np.clip(u@v/np.linalg.norm(u)/np.linalg.norm(v),-1,1))))
@@ -18,6 +18,10 @@ for c in R:
     P=lambda p,g: np.array([-p[0],g-p[1]],float)/Lp
     real.append(('前',c['t'],items(P(c['sh'],c['bf']),P(c['el'],c['bf']),P(c['wr'],c['bf']),P(c['ha'],c['bf']))))
     if c['t'] not in HIND_SWING: real.append(('後',c['t'],items(P(c['hp'],c['bh']),P(c['kn'],c['bh']),P(c['an'],c['bh']),P(c['ft'],c['bh']))))
+for c in R2:   # 記録 133: 12 秒以後、後ろ脚が着いて間もないコマ
+    Lp=np.hypot(c['hp'][0]-c['sn'][0],c['hp'][1]-c['sn'][1])
+    P=lambda p,g: np.array([-p[0],g-p[1]],float)/Lp
+    real.append(('後',c['t'],items(P(c['hp'],c['bh']),P(c['kn'],c['bh']),P(c['an'],c['bh']),P(c['ft'],c['bh']))))
 mod={'前':[],'後':[]}
 for k,lb in [('fL','前'),('hL','後')]:
     for r in rows:
