@@ -116,7 +116,7 @@ const HJ_LINE_1 = { knee: [116, 71, 52, 63, 99, 129, 113, 85, 104, 116, 115], an
 const stretch = (ys, lo0, hi0, lo1, hi1) => ys.map((v) => lo1 + (v - lo0) * (hi1 - lo1) / (hi0 - lo0));
 const HJ_LINE = new URLSearchParams(location.search).get("hjRef") === "1" ? HJ_LINE_1 : {
   knee: stretch(HJ_LINE_1.knee, 52, 116, 52, 130), ankle: HJ_LINE_1.ankle,
-  retr: stretch(HJ_LINE_1.retr, -66, 35, -65, 50), dep: stretch(HJ_LINE_1.dep, -45, 4, -38, 31) };
+  retr: stretch(HJ_LINE_1.retr, -66, 35, Number(new URLSearchParams(location.search).get("hindRetrMin") ?? -85), 50), dep: stretch(HJ_LINE_1.dep, -45, 4, -38, 31) };
 const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[i + 1]) i++; const w = Math.min(1, Math.max(0, (x - xs[i]) / (xs[i + 1] - xs[i]))); return ys[i] + (ys[i + 1] - ys[i]) * w; };
 // The limbs seen from in front (C record 115, from the XROMM skeleton of Fischer et al. 2010, Higham & Anderson 2013 Fig. 4.3: C. calyptratus on a pole,
 // cut at the shoulders and the hips): `ab` the upper bone out from straight down, `inw` the lower bone in from straight down, in the plane across the
@@ -130,6 +130,9 @@ const FRONT_FORE_HOLD = Number(new URLSearchParams(location.search).get("frontHo
 // C record 133 (2026-11-01, the producer: 「後ろ脚が着いている間のコマを同じ動画の 12 秒以降から足して読み、後ろ脚の膝のずれを直して下さい。」): the adult on a
 // branch (Z3xPABzWUDE 12–15.5 s) sets its hind foot 0.30–0.34 of snout–hip in front of the hip, just behind the hand, the knee 0.18 ahead and 0.16 up:
 // the hind stance 10 mm further forward (hindShift −10; 6 behind before), the hips 0.48 of the legs' reach, the femur 90° out (weight 4).
+// C record 134 (2026-11-01): side-on on the branch the femur at footfall points nearly straight forward (the knee 0.18 of snout–hip ahead of the hip,
+// the femur 0.184 long): its retraction at footfall −65 → −85° (Higham & Jayne's level perch, stretched; ?hindRetrMin=), weight 0.4 → 4 (?wRetrH=),
+// the hips 0.48 → 0.5 (0.52 pulled the forelimb root's skin down 1.5 mm at 6.5 s).
 // C record 128 (?foreAb=, ?foreInw=, ?hindAb=): the humerus's and femur's spread and the forearm's lean in stance, to try the heights read from the adult on a branch (YouTube Z3xPABzWUDE).
 // C record 131 (2026-11-01, the producer: 「上腕を脇に沿わせる案を既定の動きにして、前腕の長さと肘の下がりの直しに進んで下さい。」): record 130's defaults.
 // The adult on a branch (YouTube Z3xPABzWUDE side-on, z3M1RsEmY1Y from above, 8pzT_m3hNfc from the front quarter) holds the humerus back along its
@@ -368,7 +371,7 @@ export function createChameleonWalk(model, holder) {
   // The shoulders' height with the body's motion: 0.6 of the forelimb's reach (25.5 mm, 0.19–0.22 of snout–hip while walking). In the two side-on videos
   // (the floor, Wimberly et al.; a log, Mixkit 1470) the shoulders stand 0.24–0.28 of snout–hip over the ground and the forearm nearly upright; at 0.458
   // (Krause & Fischer's 0.153 SVL, at the moment of peak force on a 2 cm pole) the forelimbs hid under the chest. 0.7 (0.23–0.25) left the hands 3 mm short.
-  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.48 : 0.363) : newRoots ? 0.24 : 0.32;
+  const BODY_LOW = BODY_LOW_ARG != null ? Number(BODY_LOW_ARG) : GAIT === "d" ? (BODY_MOTION ? 0.5 : 0.363) : newRoots ? 0.24 : 0.32;
   const FORE_SHIFT = Number(FORE_SHIFT_ARG ?? (GAIT === "d" ? 0 : 8)) * MM;
   // C record 110 (2026-10-31): with the girdles of C record 102 (?gait=d) these were found by scoring the walk against the papers (61 measures; the
   // angles within 9°, the lengths within 5%) and changing one value at a time while the sum of the misses beyond those fell (59 → 31, passes 28 → 34):
@@ -457,7 +460,7 @@ export function createChameleonWalk(model, holder) {
   // Weights of each angle's miss (per degree, squared); the depression light, as on this narrow branch the femur cannot come level (C record 104).
   const _w = new URLSearchParams(location.search);
   const W_FRONT = Number(_w.get("wFront") ?? (GAIT === "d" ? 2 : 0));   // the front-view angles (C record 115)
-  const W_HIND = { knee: 1, ankle: 0.5, retr: 0.4, dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 0.55 : 0.15)), ab: W_FRONT * Number(_w.get("wFrontH") ?? 4), inw: W_FRONT }, W_FORE = { knee: Number(_w.get("wKneeF") ?? 1), ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 6 : 0.5)), dep: Number(_w.get("wDepF") ?? (GAIT === "d" ? 2 : 0.5)), ab: W_FRONT * Number(_w.get("wFrontF") ?? 0), inw: W_FRONT };
+  const W_HIND = { knee: 1, ankle: 0.5, retr: Number(_w.get("wRetrH") ?? 4), dep: Number(_w.get("wDepH") ?? (GAIT === "d" ? 0.55 : 0.15)), ab: W_FRONT * Number(_w.get("wFrontH") ?? 4), inw: W_FRONT }, W_FORE = { knee: Number(_w.get("wKneeF") ?? 1), ankle: Number(_w.get("wWristF") ?? 0), retr: Number(_w.get("wRetrF") ?? (GAIT === "d" ? 6 : 0.5)), dep: Number(_w.get("wDepF") ?? (GAIT === "d" ? 2 : 0.5)), ab: W_FRONT * Number(_w.get("wFrontF") ?? 0), inw: W_FRONT };
   // (C record 126, the producer: 「体の高さを股 0.5 前後にし、上腕を横へ開く目標を先に効かせる決め方に直して…」: the humerus' spread seen from in front (this species'
   // XROMM skeleton) first, × 30; its forward–back 0.5 → 0.2 and its depression 0.2 → 0 (both another species, Higham 2015). The hind femur's spread × 10. With the hips at 0.5 the humerus stands 42–45° out through mid-stance, the XROMM 45°.)
   // (C record 118: the humerus' forward–back and depression come from another species, Bradypodion on a 3 mm perch (Higham 2015); the front-view

@@ -13,10 +13,21 @@ def tilt(top,bot): return float(np.degrees(np.arctan2(top[0]-bot[0],top[1]-bot[1
 def items(root,mid,dist,end):  # どれも root を原点にせず、高さは枝の上の縁から、前後は root から
     return {'根の高さ':root[1],'中の高さ':mid[1],'先の高さ':dist[1],'中の前後':mid[0]-root[0],'中の角度':ang(root,mid,dist),'下の骨の傾き':tilt(mid,dist),'置き場':end[0]-root[0]}
 real=[]
+# 記録 134: 肩・股の関節は胴に隠れて見えない。読んだ点は腕・脚が皮から出る所なので、モデルと同じ「関節」にそろえるため、
+# 見えた大腿の向きに、膝から大腿骨の長さ 0.184 L の所へ置き直す。肩は上腕が短く見え（0.08〜0.15 L）向きが定まらないので置き直さず、
+# 前脚の前後（肘・手）は股の関節から測る（モデルも股の関節から）
+def joint_from(sn,mid,seen,k):
+    sn=np.array(sn,float); mid=np.array(mid,float); u=np.array(seen,float)-mid; u/=np.linalg.norm(u); p=np.array(seen,float)
+    for _ in range(30): p=mid+u*k*np.linalg.norm(p-sn)
+    return p.tolist()
+for c in R:
+    c['hp']=joint_from(c['sn'],c['kn'],c['hp'],0.184)
 for c in R:
     Lp=np.hypot(c['hp'][0]-c['sn'][0],c['hp'][1]-c['sn'][1])
     P=lambda p,g: np.array([-p[0],g-p[1]],float)/Lp
-    real.append(('前',c['t'],items(P(c['sh'],c['bf']),P(c['el'],c['bf']),P(c['wr'],c['bf']),P(c['ha'],c['bf']))))
+    it=items(P(c['sh'],c['bf']),P(c['el'],c['bf']),P(c['wr'],c['bf']),P(c['ha'],c['bf'])); hpx=-c['hp'][0]/Lp
+    it['中の前後']=-c['el'][0]/Lp-hpx; it['置き場']=-c['ha'][0]/Lp-hpx
+    real.append(('前',c['t'],it))
     if c['t'] not in HIND_SWING: real.append(('後',c['t'],items(P(c['hp'],c['bh']),P(c['kn'],c['bh']),P(c['an'],c['bh']),P(c['ft'],c['bh']))))
 for c in R2:   # 記録 133: 12 秒以後、後ろ脚が着いて間もないコマ
     Lp=np.hypot(c['hp'][0]-c['sn'][0],c['hp'][1]-c['sn'][1])
@@ -27,11 +38,16 @@ for k,lb in [('fL','前'),('hL','後')]:
     for r in rows:
         x=r[k]
         if not x['st']: continue
-        g=np.array([0,x['hgt']/L]); mod[lb].append(items(g,g+np.array(x['knee'][:2])/L,g+np.array(x['ankle'][:2])/L,g+np.array(x['grip'][:2])/L))
+        g=np.array([0,x['hgt']/L]); it=items(g,g+np.array(x['knee'][:2])/L,g+np.array(x['ankle'][:2])/L,g+np.array(x['grip'][:2])/L)
+        if lb=='前':
+            d=(x['upF']-r['hL']['upF'])/L; it['中の前後']+=d; it['置き場']+=d
+        mod[lb].append(it)
 NM={'前':{'根':'肩','中':'肘','先':'手首','下の骨':'前腕'},'後':{'根':'股','中':'膝','先':'足首','下の骨':'すね'}}
 def name(lb,k):
     for a,b in NM[lb].items(): k=k.replace(a,b)
-    return f'{lb} '+k.replace('置き場','手の置き場' if lb=='前' else '足の置き場')
+    k=k.replace('置き場','手の置き場' if lb=='前' else '足の置き場')
+    if lb=='前' and ('前後' in k or '置き場' in k): k+='（股から）'
+    return f'{lb} '+k
 res=[];ex=0
 for lb,t,it in real:
     best=min(mod[lb],key=lambda m:abs(m['置き場']-it['置き場'])); gap=abs(best['置き場']-it['置き場'])

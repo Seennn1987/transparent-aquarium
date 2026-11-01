@@ -7,7 +7,7 @@ JS='''async (ts)=>{const THREE=await import('three');const P=window.chameleonPag
 const fw=new V(0,-1,0),up=new V(-1,0,0),lf=new V(0,0,1);
 const meshes=[];m.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o)});
 const out=[];
-for(const t of ts){P.walkTo(t);P.walkFeet(t);m.updateMatrixWorld(true);
+for(const t of ts){P.walkTo(t);P.walkFeet(t);m.updateMatrixWorld(true);m.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update()});
  const J=n=>{const b=m.getObjectByName(n);return h.worldToLocal(b.getWorldPosition(new V()))};
  const sL=J('fL_upper'),sR=J('fR_upper'),mid=sL.clone().add(sR).multiplyScalar(0.5);
  const B=p=>{const d=p.clone().sub(mid);return [d.dot(fw)/MM,d.dot(up)/MM,d.dot(lf)/MM]};
