@@ -173,7 +173,7 @@ const FORE_POLE = new URLSearchParams(location.search).get("forePole") ?? "hig";
 const FORE_SHIFT_ARG = new URLSearchParams(location.search).get("foreShift"), HIND_SHIFT = Number(new URLSearchParams(location.search).get("hindShift") ?? -10) * MM;
 // The elbow's aim (C record 104): the humerus against the shoulder (Higham 2015 table 1, Bradypodion pumilum on a narrow perch): retraction (+ = elbow behind) −11° at footfall,
 // 58° at mid-stance, 56° at lift-off; depression (+ = elbow below) 38.5° at mid-stance (16–43°). In the swing it goes back to −11°.
-const HIG_RETR = (new URLSearchParams(location.search).get("foreRetr") ?? "0,70,80").split(",").map(Number), HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 0);
+const HIG_RETR = (new URLSearchParams(location.search).get("foreRetr") ?? "-10,70,80").split(",").map(Number), HIG_DEP = Number(new URLSearchParams(location.search).get("foreDep") ?? 0);
 // C record 127: 0 (the elbow about level with the shoulder). Side-on, the adult on the floor (Wimberly et al., 33 frames) holds its elbow 0.15–0.23 of
 // snout–hip over the ground with the shoulder at 0.24 (the humerus nearly level and drawn back); Higham 2015's 38.5° (Bradypodion on a 3 mm perch) put the
 // elbow 0.03–0.06 over the branch. Scored against those frames (score3) with the hips 0.65 and the shoulders 0.62 of the legs' reach: 41% → 56%.
@@ -320,7 +320,7 @@ export function createChameleonWalk(model, holder) {
     // C record 131 (?foreArm=<k>): the forearm alone k times as long, along its bone (+Y), the hand kept its size (the stretch undone in the hand's own
     // axes, the diagonal of R⁻¹·S⁻¹·R). Side-on, the adult on a branch (Z3xPABzWUDE) drops 0.175 of snout–hip from elbow to wrist with the forearm
     // 27° back and 28° in, which asks a forearm of 0.19–0.24 (this CT 0.168; the AMNH skeleton ÷ shoulder–hip, 8% longer).
-    const fa = Number(new URLSearchParams(location.search).get("foreArm") ?? 1.25);   // C record 132 (2026-11-01, the producer: 「前腕を 1.25 倍にする案を既定にして、残りのずれの直しを続けて下さい。」)
+    const fa = Number(new URLSearchParams(location.search).get("foreArm") ?? 1);   // C record 137: back to the skeleton's length (the shape metric, the AMNH skeleton and the male X-ray: 0.203–0.221 of shoulder–hip, this CT 0.217); 1.25 was C record 132's   // C record 132 (2026-11-01, the producer: 「前腕を 1.25 倍にする案を既定にして、残りのずれの直しを続けて下さい。」)
     if (fa !== 1) {
       for (const key of ["fL", "fR"]) {
         const lo = bones[`${key}_lower`], hd = bones[`${key}_hand`];
@@ -330,6 +330,25 @@ export function createChameleonWalk(model, holder) {
         const M = R.clone().invert().multiply(Si).multiply(R).elements;
         hd.scale.set(M[0], M[5], M[10]);
       }
+      model.updateMatrixWorld(true);
+    }
+    // C record 137 (?tailLen=<k>): the tail k times as long, each caudal vertebra set k times as far from the one before (bone positions only, so the
+    // tail keeps its thickness and the skin stretches between them). The adult skeleton (AMNH, coiled tail traced: 1.45 of shoulder–hip) and the live
+    // adults (Luger et al. 2021: 1.07–1.24 of SVL = 1.42–1.64 of shoulder–hip) against this CT's 1.21: × 1.2.
+    const tl = Number(new URLSearchParams(location.search).get("tailLen") ?? 1.2);
+    if (tl !== 1) {
+      // Each vertebra (and the skin on it) stretched k times along the line to the next one, in the skinning (bone-inverse) space, so the bones close up.
+      const skels = new Set(); model.traverse((o) => { if (o.isSkinnedMesh) skels.add(o.skeleton); });
+      for (let k = 24; k <= 99; k++) {
+        const b = bones[`v${k}`], c = bones[`v${k + 1}`];
+        if (!b || !c) continue;
+        const d = c.position.clone().normalize(), M = new THREE.Matrix4().set(
+          1 + (tl - 1) * d.x * d.x, (tl - 1) * d.x * d.y, (tl - 1) * d.x * d.z, 0,
+          (tl - 1) * d.y * d.x, 1 + (tl - 1) * d.y * d.y, (tl - 1) * d.y * d.z, 0,
+          (tl - 1) * d.z * d.x, (tl - 1) * d.z * d.y, 1 + (tl - 1) * d.z * d.z, 0, 0, 0, 0, 1);
+        for (const sk of skels) { const i = sk.bones.indexOf(b); if (i >= 0) sk.boneInverses[i].premultiply(M); }
+      }
+      for (let k = 25; k <= 99; k++) { const b = bones[`v${k}`]; if (b) b.position.multiplyScalar(tl); }
       model.updateMatrixWorld(true);
     }
   }
@@ -387,9 +406,9 @@ export function createChameleonWalk(model, holder) {
   // over the branch: 0.363 and 0.458 of the legs' reach (the belly 4.2 mm over; walking adults in photos 0.02–0.12 of snout–hip, 2.5–15 mm).
   const D = GAIT === "d";
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
-  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? 3 : 4)) * MM;   // C record 131: the wrist on the branch's side (Z3xPABzWUDE: 0.03 of snout–hip under its top), the forearm 28° in from the front
+  const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? -2 : 4)) * MM;   // C record 131 set 3 (the wrist on the branch's side); C record 137: back to −2, with the forearm at the skeleton's length 3 mm pulled the forelimb root's skin down 1.35 mm
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.517 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.58 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
