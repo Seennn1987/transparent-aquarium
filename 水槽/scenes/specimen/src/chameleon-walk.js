@@ -314,7 +314,7 @@ export function createChameleonWalk(model, holder) {
     // C record 131 (?foreArm=<k>): the forearm alone k times as long, along its bone (+Y), the hand kept its size (the stretch undone in the hand's own
     // axes, the diagonal of R⁻¹·S⁻¹·R). Side-on, the adult on a branch (Z3xPABzWUDE) drops 0.175 of snout–hip from elbow to wrist with the forearm
     // 27° back and 28° in, which asks a forearm of 0.19–0.24 (this CT 0.168; the AMNH skeleton ÷ shoulder–hip, 8% longer).
-    const fa = Number(new URLSearchParams(location.search).get("foreArm") ?? 1);
+    const fa = Number(new URLSearchParams(location.search).get("foreArm") ?? 1.25);   // C record 132 (2026-11-01, the producer: 「前腕を 1.25 倍にする案を既定にして、残りのずれの直しを続けて下さい。」)
     if (fa !== 1) {
       for (const key of ["fL", "fR"]) {
         const lo = bones[`${key}_lower`], hd = bones[`${key}_hand`];
@@ -383,7 +383,7 @@ export function createChameleonWalk(model, holder) {
   const SLIDE_FF = Number(SLIDE_FF_ARG ?? (D ? 5 : 9)), SLIDE_ES = Number(SLIDE_ES_ARG ?? (D ? 2 : 4));
   const ANKLE_OUT = Number(ANKLE_OUT_ARG ?? (D ? 1 : 5)) * MM, WRIST_OUT = Number(WRIST_OUT_ARG ?? (D ? 3 : 4)) * MM;   // C record 131: the wrist on the branch's side (Z3xPABzWUDE: 0.03 of snout–hip under its top), the forearm 28° in from the front
   const ARCH_DEG = Number(ARCH_ARG ?? (D ? 0 : 14));
-  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.58 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
+  const hipH = BODY_LOW * (limbs.hL.a + limbs.hL.b), shoulderH = (LOW_FORE != null ? Number(LOW_FORE) : GAIT === "d" ? (BODY_MOTION ? 0.517 : 0.458) : BODY_LOW + 0.05) * (limbs.fL.a + limbs.fL.b);
   // Pitch the body (about LEFT) so the shoulders sit shoulderH − hipH higher than the hips.
   const along = shoulder.clone().sub(hip);
   const pitch = Math.atan2(shoulderH - hipH, along.dot(FORWARD)) - Math.atan2(along.dot(UP), along.dot(FORWARD));
