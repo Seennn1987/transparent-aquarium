@@ -25,7 +25,7 @@ hu=head[:,:3]@U; HCH=hu.max()-hu.min()
 body=V[V[:,3]<0.2]
 ax=(hp-sh)/S
 def cut(t):
-    c=sh+ax*S*t; dd=(body[:,:3]-c)@ax; sl=body[np.abs(dd)<1.5][:,:3]
+    c=sh+(hp-sh)*t; dd=(body[:,:3]-c)@((hp-sh)/np.linalg.norm(hp-sh)); sl=body[np.abs(dd)<1.0][:,:3]
     if len(sl)<10: return None,None
     return (sl@U).max()-(sl@U).min(), (sl@Lt).max()-(sl@Lt).min()
 L=lambda a,b: np.linalg.norm(B[a]-B[b])
@@ -48,10 +48,20 @@ R={'S÷SVL':(0.75,0.76,'Luger 2021 雄 0.756・雌 0.753'),
  '左右の股関節÷S':(0.12,0.17,'背腹 X 線 0.122・0.167'),
  '胴の深さ t0.5÷S':(0.34,0.60,'側面 X 線 背の皮–腹 雌 0.341・雄 0.601'),
  '胴の幅 t0.5÷S':(0.34,0.39,'背腹 X 線 中ほど 0.338・0.385（腹ばいで広く出る）'),
- '胴の幅 t0.1÷S':(0.26,0.29,'背腹 X 線 肩のすぐ後ろ 0.258・0.289'),
- '胴の幅 t0.9÷S':(0.23,0.24,'背腹 X 線 腰の前 0.230・0.238')}
+ '胴の幅 t0.1÷S':(0.26,0.29,'背腹 X 線 肩のすぐ後ろ 0.258・0.289')}
+# 記録 138: 胴の幅の並び（いちばん広い所との比）は、腹ばいで押された X 線でなく、上から写した生きた個体（YouTube z3M1RsEmY1Y 3.3 秒、若い個体、ヤシの葉の上）で比べる。合格は ±0.05
+LIVE={0.06:0.78,0.30:0.90,0.48:1.00,0.61:0.98,0.76:0.92,0.91:0.82,1.00:0.61}
 tol=0.05
 ok=0;n=0
+ws={}
+for t in LIVE:
+    a,b=cut(t)
+    if b: ws[t]=b
+mx=max(ws.values())
+for t,r in LIVE.items():
+    if t in ws:
+        v=ws[t]/mx; good=abs(v-r)<=0.05; ok+=good; n+=1
+        print(f"{'○' if good else '×'} 胴の幅の並び t{t:.2f}  モデル {v:.2f}  実物 {r:.2f}  （上から写した生きた個体、いちばん広い所との比）")
 for k,v in m.items():
     if k in R:
         lo,hi,src=R[k]; good=lo*(1-tol)<=v<=hi*(1+tol); ok+=good; n+=1

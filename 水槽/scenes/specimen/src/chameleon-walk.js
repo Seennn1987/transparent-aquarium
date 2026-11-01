@@ -227,6 +227,10 @@ const FIN_ROUNDS = Number(new URLSearchParams(location.search).get("finRounds") 
 const PIT_REACH_MM = Number(new URLSearchParams(location.search).get("pitReach") ?? 3); const PIT_BINS = (new URLSearchParams(location.search).get("pitBins") ?? "0.25").split(",").map(Number);   // mm, one pass each   // shape88(), C record 97
 const ROOT_SMOOTH = Number(new URLSearchParams(location.search).get("rootSmooth") ?? 0), ROOT_RINGS = Number(new URLSearchParams(location.search).get("rootRings") ?? 3);   // shape88(), C record 97
 const ROOT_W = (new URLSearchParams(location.search).get("rootW") ?? "0.1,0.9").split(",").map(Number);
+// shape88(), C record 138 (?widthFit=<k>): the trunk narrowed toward the hips. Seen from above, the live juvenile on a palm leaf (YouTube z3M1RsEmY1Y 3.3 s)
+// is 0.92 of its widest at 0.76 of shoulder→hip and 0.82 at 0.91; this model 0.99 and 0.91. Its sideways distance from the spine is scaled by
+// 1 − k · smooth(0.62 → 0.88 of shoulder→hip), back to 1 over the tail's base (x 1.02 → 1.15); skin, organs and ribs. The widest stays as C record 21 set it.
+const WIDTH_FIT = Number(new URLSearchParams(location.search).get("widthFit") ?? 0);
 const EDGE_BAND_MM = Number(new URLSearchParams(location.search).get("edgeBand") ?? 4), EDGE_SMOOTH = Number(new URLSearchParams(location.search).get("edgeSmooth") ?? 20);   // shape88(), C record 96
 const LIMB_JOIN_MM = Number(new URLSearchParams(location.search).get("limbJoin") ?? 6);   // shape88(), C record 96
 const UNFOLD_ROUNDS = Number(new URLSearchParams(location.search).get("unfold") ?? 0);   // shape88()'s last step (C record 96)
@@ -1389,6 +1393,13 @@ export function createChameleonWalk(model, holder) {
     for (let round = 0; round < 2; round++) {   // twice: the first round's fill leaves a little of the waves (C record 94)
       const [n, lm] = roundOut(0.40, 1.12, false, 1); sides += n; liftMax = Math.max(liftMax, lm);
       flips("sides" + round, (q) => toXY(two(q))[0]);
+    }
+    if (WIDTH_FIT > 0) {
+      const shX = toXY(two(inHolder(limbs.fL.upper).add(inHolder(limbs.fR.upper)).multiplyScalar(0.5)))[0];
+      const kOf = (x) => 1 - WIDTH_FIT * sm(0.62, 0.88, (x - shX) / (1 - shX)) * (1 - sm(1.02, 1.15, x));
+      const nw = applyDy((x, y, wBody, part, mesh, i, SI, SW, z) => { const k = kOf(x); return k >= 1 ? 0 : [0, (k - 1) * (z - spZ(x)) * Math.min(1, wBody)]; }, ["Skin", "Organ", "Bone"]);
+      flips("width", (q) => toXY(two(q))[0]);
+      console.log(`[shape88] widthFit ${WIDTH_FIT}: ${nw} vertices`);
     }
     // The bottom band's pleats (C record 96): the skin, built around the bones, has fine pleats along its bottom at every rib end; lifting it by a
     // different amount per bin folds them over (about 250 faces turned, seen as narrow white notches). The skin within EDGE_BAND_MM of the bottom, along

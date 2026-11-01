@@ -20,7 +20,7 @@ src, dst = sys.argv[1], sys.argv[2]
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 PROP = os.path.join(ROOT, '水槽/scenes/specimen/assets/private/proposals')
 name = os.path.splitext(os.path.basename(src))[0]
-BAKE_Q = '&bellyTraced=1&arch=0&gait=a&ankleOut=3&wristOut=0&foreShift=0&forePole=old&low=0.32&hjRef=1&foreInw=89&hindAb=75&foreRetr=-11,58,56&gripHind=55&gripFore=60&wFrontH=5&wFrontF=10&foreArm=1&hindShift=6&wRetrH=0.4&tailLen=1'   # 記録 99 のときの手足の置き方。お腹は実物のなぞった線、背骨の弓は今の 0°（記録 112）
+BAKE_Q = '&bellyTraced=1&arch=0&gait=a&ankleOut=3&wristOut=0&foreShift=0&forePole=old&low=0.32&hjRef=1&foreInw=89&hindAb=75&foreRetr=-11,58,56&gripHind=55&gripFore=60&wFrontH=5&wFrontF=10&foreArm=1&hindShift=6&wRetrH=0.4&tailLen=1&widthFit=0.1'   # 記録 99 のときの手足の置き方。記録 138 から胴の腰の前を 1 割細くする（widthFit）。お腹は実物のなぞった線、背骨の弓は今の 0°（記録 112）
 if os.path.abspath(os.path.dirname(src)) != os.path.abspath(PROP):
     os.makedirs(PROP, exist_ok=True); shutil.copyfile(src, os.path.join(PROP, name + '.glb'))
 
