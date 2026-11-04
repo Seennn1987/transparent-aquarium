@@ -129,6 +129,15 @@ const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[
 // C record 118 (2026-10-31, the producer: 「この方針で 1〜4 を入れて、輪切りの絵と採点表で見せて下さい。」; the rule: the same species first): the hind
 // knee's line (Higham & Jayne 2004a, straightest at 0.52 of the stride) and the tibia folding in "on the verge of lift-off" (the XROMM frame) are two
 // moments, so the fold is asked only over the last FRONT_FOLD of the stance (C record 117: from 0.8 it still held the knee bent before lift-off).
+// C record 140 (?swingPath=video, ?swingUp=<k>): the swing's path read off the adult's floor walk (Wimberly et al., near side, every 0.1 s): the hind
+// ankle 305.3 → 306.9 s against the hip, the fore wrist 307.7 → 309.1 s against the shoulder. fwd: the share of the way from lift-off to footfall;
+// up: the rise above the straight line between them, in snout–hip lengths. The ankle is up at the hip's height by 0.3 of the swing and goes forward at
+// that height; the wrist rises about 0.1 at once. (The model's angle-laid swing kept the foot low over the first half and rose late.)
+const SWING_PATH = (new URLSearchParams(location.search).get("swingPath") ?? "video") === "video" ? {
+  hind: { s: [0, 0.06, 0.19, 0.31, 0.44, 0.56, 0.69, 0.81, 0.94, 1], fwd: [0, 0.05, 0.25, 0.37, 0.66, 0.79, 0.84, 0.97, 1, 1], up: [0, 0.02, 0.10, 0.135, 0.16, 0.157, 0.147, 0.138, 0.10, 0] },
+  fore: { s: [0, 0.07, 0.21, 0.36, 0.5, 0.64, 0.79, 0.93, 1], fwd: [0, 0.03, 0.175, 0.34, 0.54, 0.72, 0.92, 1, 1], up: [0, 0.03, 0.09, 0.09, 0.10, 0.09, 0.07, 0.02, 0] } } : null;
+const SWING_UP_K = Number(new URLSearchParams(location.search).get("swingUp") ?? 1.3),   // 1.3: the rise measured above the chord leaves the ankle 0.05 low against the hip (score_swing 27 → 30/36)
+  SNOUT_HIP_MM = 123.3;
 const FRONT_FOLD = Math.min(0.95, Math.max(0.01, Number(new URLSearchParams(location.search).get("frontFold") ?? 0.05)));
 const FRONT_FORE_HOLD = Number(new URLSearchParams(location.search).get("frontHold") ?? 0.7);   // C record 126: the humerus held out until this share of the stance
 // C record 133 (2026-11-01, the producer: 「後ろ脚が着いている間のコマを同じ動画の 12 秒以降から足して読み、後ろ脚の膝のずれを直して下さい。」): the adult on a
@@ -903,6 +912,15 @@ export function createChameleonWalk(model, holder) {
             target = blend(lay.ankle, lay0.ankle, s0.ankle, lay1.ankle, s1.ankle);
             kneeAt = blend(lay.knee, lay0.knee, s0.knee, lay1.knee, s1.knee);
             contact.copy(blend(lay.sole, lay0.sole, off, lay1.sole, on));
+            if (SWING_PATH) {
+              // C record 140: the wrist/ankle along the adult's own path (SWING_FWD: the share of the way forward, SWING_UP: the rise above the chord,
+              // snout–hip lengths), between the stance's ends at lift-off and at footfall; across the body it stays as laid out.
+              const P = limb.hind ? SWING_PATH.hind : SWING_PATH.fore, fw = lerpLine(P.s, P.fwd, s), upB = lerpLine(P.s, P.up, s) * SWING_UP_K;
+              const a0p = s0.ankle, a1p = s1.ankle, want = a0p.clone().lerp(a1p, fw);
+              want.addScaledVector(UP, (a0p.dot(UP) + (a1p.dot(UP) - a0p.dot(UP)) * s) - want.dot(UP) + upB * SNOUT_HIP_MM * MM);
+              const d = want.clone().sub(target); d.addScaledVector(LEFT, -d.dot(LEFT));
+              target.add(d); contact.add(d); kneeAt.addScaledVector(d, 0.5);
+            }
             // above the branch's top while over it
             const rel = contact.clone().sub(branchCentre), top = BRANCH_RADIUS + 0.5 * MM - rel.dot(UP);
             if (Math.abs(rel.dot(LEFT)) < BRANCH_RADIUS * 1.2 && top > 0 && s > 0.1 && s < 0.9) { contact.addScaledVector(UP, top); target.addScaledVector(UP, top); }

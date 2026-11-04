@@ -12,7 +12,7 @@ const tgt=sp.clone().lerp(hp,0.35);c.position.copy(tgt).addScaledVector(fw,f*S).
 async def main():
     async with async_playwright() as p:
         b=await browser.launch(p); pg=await b.new_page(viewport={'width':1200,'height':800})
-        await pg.goto(sys.argv[1]); await pg.wait_for_function('document.body.dataset.ready||document.body.dataset.error',timeout=240000)
+        await pg.goto(sys.argv[1] + ('' if 'still=1' in sys.argv[1] else '&still=1')); await pg.wait_for_function('document.body.dataset.ready||document.body.dataset.error',timeout=240000)
         await pg.add_style_tag(content='#status,#tune,#rotate{visibility:hidden!important}')
         a=[float(x) for x in sys.argv[3:7]]+[float(sys.argv[7]) if len(sys.argv)>7 else 14]
         await pg.evaluate(JS,a); await pg.wait_for_timeout(1500); await pg.screenshot(path=sys.argv[2]); await b.close()
