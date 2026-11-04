@@ -59,8 +59,11 @@ grp = np.where(distal, np.char.add('D', side), np.where(upper, 'U', 'T'))
 fg = grp[F]; bridge = ~((fg[:, 0] == fg[:, 1]) & (fg[:, 1] == fg[:, 2]))
 # 胴とすね・足をまたぐ面だけ（すね同士・左右の足同士はそのまま）
 mixT = (fg == 'T').any(1) & (np.char.startswith(fg, 'D')).any(1)
-cut = bridge & mixT
-print(f'外す面 {int(cut.sum())}（左 {int((cut & (fg == "DhL").any(1)).sum())}・右 {int((cut & (fg == "DhR").any(1)).sum())}・前脚 {int((cut & np.isin(fg, ["DfL", "DfR"]).any(1)).sum())}）')
+# 記録 143: 別の脚どうしをまたぐ面（瓶の姿勢で左足が右の太ももに触れてつながっていた）も外す
+limbside = np.array([n[:2] if re.match(r'^(h|f)[LR]_', n) else '' for n in main])
+ls = limbside[F]; mixLimb = np.array([len({x for x in row if x}) > 1 for row in ls])
+cut = bridge & (mixT | mixLimb)
+print(f'外す面 {int(cut.sum())}（別の脚どうし {int((bridge & mixLimb).sum())}）（左 {int((cut & (fg == "DhL").any(1)).sum())}・右 {int((cut & (fg == "DhR").any(1)).sum())}・前脚 {int((cut & np.isin(fg, ["DfL", "DfR"]).any(1)).sum())}）')
 keep = F[~cut]
 # 縁: 1 枚の面にだけ属する向き付きの辺
 from collections import defaultdict
