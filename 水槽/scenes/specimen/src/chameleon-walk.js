@@ -47,6 +47,7 @@ const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 18.75)
 // near fore → near hind 0.54).
 // The stride 9.0 cm (the floor walk's 0.73–0.89 of snout–hip; 9.5 cm left the feet 1 mm out of reach at this duty) in 4.8 s: 18.75 mm/s.
 const DUTY = Number(new URLSearchParams(location.search).get("duty") ?? 0.69);
+const DUTY_FORE = Number(new URLSearchParams(location.search).get("dutyFore") ?? DUTY), DUTY_HIND = Number(new URLSearchParams(location.search).get("dutyHind") ?? DUTY);
 const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 90) * MM;   // 9.5 cm (C record 122; 11.3 cm in C record 117, 9.8 cm before)
 // When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
 const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
@@ -156,14 +157,17 @@ const FRONT_FORE_AB = Number(new URLSearchParams(location.search).get("foreAb") 
 const FRONT_FORE = { ab: [FRONT_FORE_AB, FRONT_FORE_AB, 10], inw: [FRONT_FORE_INW, FRONT_FORE_INW, 10], s: [0, FRONT_FORE_HOLD, 1] }, FRONT_HIND = { ab: [FRONT_HIND_AB, FRONT_HIND_AB - 13 * (1 - FRONT_FOLD), 62], inw: [20, 20, 61], s: [0, 1 - FRONT_FOLD, 1] };   // the femur's spread goes on falling as before (held at 75° it lifted the femur, 4 depression misses)
 const frontAt = (hind, s) => { const T = hind ? FRONT_HIND : FRONT_FORE; return { ab: lerpLine(T.s, T.ab, s), inw: lerpLine(T.s, T.inw, s) }; };
 /** The target angles for a limb, from `stance` and `s` (0 → 1 through the stance or the swing). */
+const FORE_LAND = Number(new URLSearchParams(location.search).get("foreLand") ?? 113);
 function jointTargets(hind, stance, s) {
   if (hind) {
     const x = stance ? s * HJ_DUTY : HJ_DUTY + s * (1 - HJ_DUTY);
     return { ...Object.fromEntries(Object.entries(HJ_LINE).map(([k, ys]) => [k, lerpLine(HJ_PH, ys, x)])), ...(stance ? frontAt(true, s) : {}) };
   }
   const ease = (y) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(y, 0), 1));
-  const knee = stance ? (s < 0.5 ? 113 + (52 - 113) * ease(s / 0.5) : 52 + (105 - 52) * ease((s - 0.5) / 0.5))
-    : lerpLine([0, 0.2, 0.45, 0.7, 1], [105, 65, 30, 30, 113], s);
+  // C record 142 (?foreLand=): the elbow at footfall. The same species' floor walk (Wimberly et al., 309.0–309.2 s) lands with the arm nearly straight
+  // (165–177°, opened over the last 0.15 of the swing); 113° was Higham 2015's Bradypodion.
+  const knee = stance ? (s < 0.5 ? FORE_LAND + (52 - FORE_LAND) * ease(s / 0.5) : 52 + (105 - 52) * ease((s - 0.5) / 0.5))
+    : lerpLine([0, 0.2, 0.45, 0.7, 0.85, 1], [105, 65, 30, 30, 30 + (FORE_LAND - 30) * 0.3, FORE_LAND], s);
   const [ex, ey, ez] = higElbow(stance, s);
   const retr = THREE.MathUtils.radToDeg(Math.atan2(-ex, ez));
   const dep = stance ? HIG_DEP : 15 + (HIG_DEP - 15) * (1 - Math.sin(Math.PI * s)) ** 2;
@@ -860,8 +864,11 @@ export function createChameleonWalk(model, holder) {
     for (const [key, limb] of Object.entries(limbs)) {
       // Where this foot is in its cycle: stance (planted, sliding back with the branch) or swing (to the next spot).
       // LIFT holds the touchdown phase; the foot lifts DUTY later.
-      let u = (phase - LIFT[key] - DUTY + 2) % 1;   // 0 at lift-off
-      const swing = 1 - DUTY;
+      // C record 142: the fore feet stay down a little longer than the hind (the floor walk: fore 0.70–0.71, hind 0.67; ?dutyFore= ?dutyHind=); they land
+      // where they did (reach keeps DUTY) and lift off later.
+      const DUTY_L = limb.hind ? DUTY_HIND : DUTY_FORE;
+      let u = (phase - LIFT[key] - DUTY_L + 2) % 1;   // 0 at lift-off
+      const swing = 1 - DUTY_L;
       // Landing spot: as far ahead of the girdle as the foot ends behind it (Higham & Jayne), half the stance's travel.
       const reach = girdleRest[key] + DUTY * STRIDE / 2 - (limb.hind ? HIND_SHIFT : FORE_SHIFT);
       let along, lift = 0, out = 0, heel = HEEL_DOWN;
@@ -869,12 +876,12 @@ export function createChameleonWalk(model, holder) {
       if (u < swing) {
         const s = u / swing, e = 0.5 - 0.5 * Math.cos(Math.PI * s);
         heel = HEEL_UP + (HEEL_DOWN - HEEL_UP) * ramp(s, 0, 0.5);   // the heel, up at lift-off, comes down for the next grip
-        along = reach - DUTY * STRIDE + e * DUTY * STRIDE;   // forward against the body by the stance's travel
+        along = reach - DUTY_L * STRIDE + e * DUTY_L * STRIDE;   // forward against the body by the stance's travel
         lift = Math.sin(Math.PI * s) * SWING_LIFT; out = Math.sin(Math.PI * s) * SWING_OUT;
       } else {
-        const s = (u - swing) / DUTY;
+        const s = (u - swing) / DUTY_L;
         heel = HEEL_DOWN + (HEEL_UP - HEEL_DOWN) * ramp(s, 0.65, 1);   // late in stance the heel rises, the sole rolling onto the toes
-        along = reach - s * DUTY * STRIDE;   // planted: slides back with the branch, SPEED × the stance's time
+        along = reach - s * DUTY_L * STRIDE;   // planted: slides back with the branch, SPEED × the stance's time
       }
       footState[key] = { stance: u >= swing, slide, u };
       // The sole's grip on the branch; the wrist/ankle sits HEEL behind it and a little above (the foot lies along the branch).
@@ -889,13 +896,13 @@ export function createChameleonWalk(model, holder) {
       const ax = axesOf(key);
       if (GAIT !== "a") {
         if (u >= swing) {
-          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY), THREE.MathUtils.radToDeg(heel), ax, key, (u - swing) / DUTY, recording);
+          const sol = solveStance(limb, root, contact, jointTargets(limb.hind, true, (u - swing) / DUTY_L), THREE.MathUtils.radToDeg(heel), ax, key, (u - swing) / DUTY_L, recording);
           if (sol) { target = sol.ankle; kneeAt = sol.knee; }
         } else {
           // The angles follow the target lines, shifted at each end onto the stance's pose there (w0 fades over the first 0.4 of the swing, w1 grows over
           // the last 0.4); what laying out those end angles misses of the stance's poses (the leg's own plane) is added the same way.
           const s = u / swing, sm = (x) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); }, w0 = sm(1 - s / 0.4), w1 = sm((s - 0.6) / 0.4);
-          const off = plantAt(limb, reach - DUTY * STRIDE), on = plantAt(limb, reach);
+          const off = plantAt(limb, reach - DUTY_L * STRIDE), on = plantAt(limb, reach);
           const ax0 = axesAt(key, phase, phase - u, ax), ax1 = axesAt(key, phase, phase + swing - u, ax);
           const s0 = solveStance(limb, root, off, jointTargets(limb.hind, true, 1), THREE.MathUtils.radToDeg(HEEL_UP), ax0, key, 1);
           const s1 = solveStance(limb, root, on, jointTargets(limb.hind, true, 0), THREE.MathUtils.radToDeg(HEEL_DOWN), ax1, key, 0);
@@ -937,10 +944,10 @@ export function createChameleonWalk(model, holder) {
       if (kneeAt) {
         pole = kneeAt.clone().sub(root);
       } else if (limb.hind) {
-        const [kx, ky, kz] = hjKnee(u < swing ? "swing" : "stance", u < swing ? u / swing : (u - swing) / DUTY);
+        const [kx, ky, kz] = hjKnee(u < swing ? "swing" : "stance", u < swing ? u / swing : (u - swing) / DUTY_L);
         pole = new THREE.Vector3().addScaledVector(FORWARD, kx).addScaledVector(UP, ky).addScaledVector(LEFT, (limb.left ? 1 : -1) * kz);
       } else if (FORE_POLE !== "old") {
-        const [ex, ey, ez] = higElbow(u >= swing, u < swing ? u / swing : (u - swing) / DUTY);
+        const [ex, ey, ez] = higElbow(u >= swing, u < swing ? u / swing : (u - swing) / DUTY_L);
         pole = new THREE.Vector3().addScaledVector(FORWARD, ex).addScaledVector(UP, ey).addScaledVector(LEFT, (limb.left ? 1 : -1) * ez);
       } else {
         pole = new THREE.Vector3().addScaledVector(LEFT, limb.left ? 1 : -1).addScaledVector(UP, 0.6).addScaledVector(FORWARD, -0.3);

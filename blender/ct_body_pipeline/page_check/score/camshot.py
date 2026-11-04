@@ -16,4 +16,4 @@ async def main():
         await pg.add_style_tag(content='#status,#tune,#rotate{visibility:hidden!important}')
         a=[float(x) for x in sys.argv[3:7]]+[float(sys.argv[7]) if len(sys.argv)>7 else 14]
         await pg.evaluate(JS,a); await pg.wait_for_timeout(1500); await pg.screenshot(path=sys.argv[2]); await b.close()
-asyncio.run(main())
+if __name__ == "__main__": asyncio.run(main())
