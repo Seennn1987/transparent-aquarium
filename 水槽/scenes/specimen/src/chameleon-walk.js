@@ -41,9 +41,13 @@ const BRANCH_RADIUS = Number(new URLSearchParams(location.search).get("branchMM"
 // C record 122: read off the floor walk (Wimberly et al., 33 frames) the hind foot travels 0.50 of snout–hip against the hip in stance (+0.22 → −0.27, so
 // 3 mm further back than centred: HIND_SHIFT) and the fore 0.65; with the hips raised to the adults' height (below) the 11.3 cm stride (0.60) left the feet
 // out of reach, so 9.5 cm (0.51 / DUTY), one stride still 2.6 s.
-const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 36.4) * MM;   // model units per second
-const DUTY = 0.6555;
-const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 95) * MM;   // 9.5 cm (C record 122; 11.3 cm in C record 117, 9.8 cm before)
+const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 18.75) * MM;   // model units per second
+// C record 139 (?duty=): the share of the stride each foot is down. The adult's floor walk side-on (Wimberly et al., 304–310 s, all four feet read
+// every 0.1 s): 0.71, 0.67, 0.70, 0.67, mean 0.69, one stride 4.8 s; the footfall order and lags below already match it (near fore → far hind 0.04,
+// near fore → near hind 0.54).
+// The stride 9.0 cm (the floor walk's 0.73–0.89 of snout–hip; 9.5 cm left the feet 1 mm out of reach at this duty) in 4.8 s: 18.75 mm/s.
+const DUTY = Number(new URLSearchParams(location.search).get("duty") ?? 0.69);
+const STRIDE = Number(new URLSearchParams(location.search).get("stride") ?? 90) * MM;   // 9.5 cm (C record 122; 11.3 cm in C record 117, 9.8 cm before)
 // When each foot lands, as a share of the stride (LSDC; the touchdowns and lift-offs are the same pattern shifted by the duty factor).
 const LIFT = { hL: 0, fL: 0.4407, hR: 0.5, fR: 0.9407 };
 // The rocking pause: every ROCK_EVERY strides, ROCK_TIMES rocks of ±ROCK_SIZE at ROCK_HZ, all four feet gripping (the body moves over
