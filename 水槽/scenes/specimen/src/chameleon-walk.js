@@ -137,6 +137,7 @@ const lerpLine = (xs, ys, x) => { let i = 0; while (i < xs.length - 2 && x > xs[
 const SWING_PATH = (new URLSearchParams(location.search).get("swingPath") ?? "video") === "video" ? {
   hind: { s: [0, 0.06, 0.19, 0.31, 0.44, 0.56, 0.69, 0.81, 0.94, 1], fwd: [0, 0.05, 0.25, 0.37, 0.66, 0.79, 0.84, 0.97, 1, 1], up: [0, 0.02, 0.10, 0.135, 0.16, 0.157, 0.147, 0.138, 0.10, 0] },
   fore: { s: [0, 0.07, 0.21, 0.36, 0.5, 0.64, 0.79, 0.93, 1], fwd: [0, 0.03, 0.175, 0.34, 0.54, 0.72, 0.92, 1, 1], up: [0, 0.03, 0.09, 0.09, 0.10, 0.09, 0.07, 0.02, 0] } } : null;
+const SWING_KNEE_OUT = Number(new URLSearchParams(location.search).get("swingKneeOut") ?? 14);
 const SWING_UP_K = Number(new URLSearchParams(location.search).get("swingUp") ?? 1.3),   // 1.3: the rise measured above the chord leaves the ankle 0.05 low against the hip (score_swing 27 → 30/36)
   SNOUT_HIP_MM = 123.3;
 const FRONT_FOLD = Math.min(0.95, Math.max(0.01, Number(new URLSearchParams(location.search).get("frontFold") ?? 0.05)));
@@ -927,6 +928,12 @@ export function createChameleonWalk(model, holder) {
               want.addScaledVector(UP, (a0p.dot(UP) + (a1p.dot(UP) - a0p.dot(UP)) * s) - want.dot(UP) + upB * SNOUT_HIP_MM * MM);
               const d = want.clone().sub(target); d.addScaledVector(LEFT, -d.dot(LEFT));
               target.add(d); contact.add(d); kneeAt.addScaledVector(d, 0.5);
+            }
+            // C record 145 (?swingKneeOut= mm): while the hind foot is carried the knee stays at least this far out from the hip joint (laid out from the
+            // angles it came in to 2–5 mm, 15 mm up, through the flank; seen from above the adult's knees stay outside the body).
+            if (limb.hind && SWING_KNEE_OUT > 0) {
+              const out = LEFT.clone().multiplyScalar(limb.left ? 1 : -1), lat = kneeAt.clone().sub(root).dot(out), need = SWING_KNEE_OUT * MM * Math.sin(Math.PI * s);
+              if (lat < need) kneeAt.addScaledVector(out, need - lat);
             }
             // above the branch's top while over it
             const rel = contact.clone().sub(branchCentre), top = BRANCH_RADIUS + 0.5 * MM - rel.dot(UP);
