@@ -6,7 +6,7 @@
   ページを `chameleon.html?walk=1&still=1&tune=0&shape=88&glb=<名前>` で開いて、shape88() が動かした後の頂点（chameleonPage.meshPositions()）を読む
 ・glb の POSITION をその値に置き換え、accessor の min・max を直す。動いた頂点（0.1 µm より）の NORMAL は、同じ位置の頂点をまとめて
   面の向きを面積で平均して作り直す（ほかの頂点の NORMAL はそのまま）
-・書き出しの順（記録 143）: export_chameleon_gltf.py → score/fix_limb_weights.py → cut_limb_bridges.py → bake_shape88.py → score/restore_limb_skin.py（焼き込みで動いた手足だけの膜を戻す）
+・書き出しの順（記録 143・144。膜は build_skin_144.sh で作る）: export_chameleon_gltf.py → score/fix_limb_weights.py → cut_limb_bridges.py → bake_shape88.py → score/restore_limb_skin.py（焼き込みで動いた手足だけの膜を戻す）
 ・ページは共有の配信（http://127.0.0.1:8080/）から読む。焼き込んだ glb に ?shape=88 をもう一度かけない（2 回かかる）
 ・形は歩く姿勢の中で計算するので、手足の置き方で結果が変わる。記録 99 のときの歩き方の値（BAKE_Q）で必ず開く（記録 111: 記録 104〜110 で
   歩き方の既定を変えたあとに焼き込むと、お腹の下の縁が RMS 0.08 → 0.3〜0.5 mm に波打った）。足したいクエリは環境変数 CH_BAKE_Q（BAKE_Q より前に付くので、同じ名前なら CH_BAKE_Q が勝つ）
@@ -21,7 +21,7 @@ src, dst = sys.argv[1], sys.argv[2]
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 PROP = os.path.join(ROOT, '水槽/scenes/specimen/assets/private/proposals')
 name = os.path.splitext(os.path.basename(src))[0]
-BAKE_Q = '&bellyTraced=1&arch=0&gait=a&ankleOut=3&wristOut=0&foreShift=0&forePole=old&low=0.32&hjRef=1&foreInw=89&hindAb=75&foreRetr=-11,58,56&gripHind=55&gripFore=60&wFrontH=5&wFrontF=10&foreArm=1&hindShift=6&wRetrH=0.4&tailLen=1&widthFit=0.1&duty=0.6555&stride=95&speed=36.4&swingPath=old'   # 記録 99 のときの手足の置き方。記録 138 から胴の腰の前を 1 割細くする（widthFit）。お腹は実物のなぞった線、背骨の弓は今の 0°（記録 112）
+BAKE_Q = '&bellyTraced=1&arch=0&gait=a&ankleOut=3&wristOut=0&foreShift=0&forePole=old&low=0.32&hjRef=1&foreInw=89&hindAb=75&foreRetr=-11,58,56&gripHind=55&gripFore=60&wFrontH=5&wFrontF=10&foreArm=1&hindShift=6&wRetrH=0.4&tailLen=1&widthFit=0.1&duty=0.6555&stride=95&speed=36.4&swingPath=old&finRounds=0'   # 記録 99 のときの手足の置き方。記録 138 から胴の腰の前を 1 割細くする（widthFit）。お腹は実物のなぞった線、背骨の弓は今の 0°（記録 112）
 if os.path.abspath(os.path.dirname(src)) != os.path.abspath(PROP):
     os.makedirs(PROP, exist_ok=True); shutil.copyfile(src, os.path.join(PROP, name + '.glb'))
 

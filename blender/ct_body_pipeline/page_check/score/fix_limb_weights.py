@@ -55,5 +55,19 @@ for v in range(n):
                     cs=[k for k in range(4) if J[v,k]==up] or [k for k in range(4) if W[v,k]==0 or k==c]
                     J[v,cs[0]]=up; W[v,cs[0]]+=w
             c2+=1
+# 3（記録 144）: 上の骨（上腕・大腿）がいちばん重い頂点で、その骨の線分から UPPER_FAR_MM より遠く、胴の重みの頂点が 1.5 mm 以内にあるものは、
+#   胴の膜（展示の姿勢で腕が胸に触れて、胸の膜が上腕に付いた）なので、いちばん近い胴の頂点の骨と重みを写す
+from scipy.spatial import cKDTree
+UPPER_FAR_MM=float(__import__("os").environ.get("UPPER_FAR_MM","3.5"))
+top=J[np.arange(n),W.argmax(1)]
+isT=np.array([not(nm[t][:3] in ('fL_','fR_','hL_','hR_')) for t in top])
+kd=cKDTree(P[isT]); tid=np.where(isT)[0]; c3=0
+for v in range(n):
+    t=top[v]
+    if t not in D or not nm[t].endswith('_upper') or D[t][v]<=UPPER_FAR_MM: continue
+    dd,j=kd.query(P[v])
+    if mm(dd)>1.5: continue
+    J[v]=J[tid[j]]; W[v]=W[tid[j]]; c3+=1
+print(f'胸・腹の膜を胴の重みにした頂点 {c3}')
 pr=d['prim']; g.put(pr['attributes']['JOINTS_0'],J); g.put(pr['attributes']['WEIGHTS_0'],W)
 g.save(dst); print(f'別の脚から移した頂点 {c1}、下の骨から上の骨へ移した頂点 {c2}')

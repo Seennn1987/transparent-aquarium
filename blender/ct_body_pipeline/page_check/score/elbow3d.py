@@ -22,7 +22,7 @@ return out}'''
 async def main():
     async with async_playwright() as p:
         b=await browser.launch(p); pg=await b.new_page(viewport={'width':400,'height':400})
-        await pg.goto('http://127.0.0.1:8080/scenes/specimen/chameleon.html?walk=1&still=1&glb=root102_baked'+sys.argv[1]); await pg.wait_for_function('document.body.dataset.ready||document.body.dataset.error',timeout=300000)
+        await pg.goto('http://127.0.0.1:8080/scenes/specimen/chameleon.html?walk=1&still=1'+(sys.argv[1] if 'glb=' in sys.argv[1] else '&glb=root102_baked'+sys.argv[1])); await pg.wait_for_function('document.body.dataset.ready||document.body.dataset.error',timeout=300000)
         d=await pg.evaluate(JS,[round(i*0.1,2) for i in range(27)]); await b.close()
     json.dump(d,open(sys.argv[2],'w'))
     for r in d[::3]:

@@ -56,13 +56,18 @@ distal = np.array([bool(re.match(r'^(h|f)[LR]_(lower|hand|foot)', n) or re.searc
 side = np.array([n[:2] if distal[i] else '' for i, n in enumerate(main)])
 upper = np.array([bool(re.match(r'^(h|f)[LR]_upper', n)) for n in main])
 grp = np.where(distal, np.char.add('D', side), np.where(upper, 'U', 'T'))
+# 記録 144: 尾の椎骨（v25 から）の膜は X。展示の姿勢で右のももが尾に触れて、ももと尾が面でつながっていた
+tailv = np.array([bool(re.match(r'^v(\d+)$', n)) and int(n[1:]) >= 25 for n in main])
+grp = np.where(tailv, 'X', grp)
 fg = grp[F]; bridge = ~((fg[:, 0] == fg[:, 1]) & (fg[:, 1] == fg[:, 2]))
 # 胴とすね・足をまたぐ面だけ（すね同士・左右の足同士はそのまま）
-mixT = (fg == 'T').any(1) & (np.char.startswith(fg, 'D')).any(1)
+mixT = np.isin(fg, ['T', 'X']).any(1) & (np.char.startswith(fg, 'D')).any(1)
 # 記録 143: 別の脚どうしをまたぐ面（瓶の姿勢で左足が右の太ももに触れてつながっていた）も外す
 limbside = np.array([n[:2] if re.match(r'^(h|f)[LR]_', n) else '' for n in main])
 ls = limbside[F]; mixLimb = np.array([len({x for x in row if x}) > 1 for row in ls])
-cut = bridge & (mixT | mixLimb)
+mixUX = (fg == 'U').any(1) & (fg == 'X').any(1)
+cut = bridge & (mixT | mixLimb | mixUX)
+print(f'ももと尾をまたぐ面 {int((bridge & mixUX).sum())}')
 print(f'外す面 {int(cut.sum())}（別の脚どうし {int((bridge & mixLimb).sum())}）（左 {int((cut & (fg == "DhL").any(1)).sum())}・右 {int((cut & (fg == "DhR").any(1)).sum())}・前脚 {int((cut & np.isin(fg, ["DfL", "DfR"]).any(1)).sum())}）')
 keep = F[~cut]
 # 縁: 1 枚の面にだけ属する向き付きの辺
@@ -95,8 +100,11 @@ def split(loop):
     is (closing the whole rim about one centre spread one membrane from the belly to the shin, and splitting along the thigh one from the belly to
     the thigh)."""
     gl = grp[np.array(loop)]
-    if not ((gl == 'T').any() and np.char.startswith(gl, 'D').any()): return [loop]
-    n = len(loop); isT = gl == 'T'
+    if (gl == 'U').any() and (gl == 'X').any() and not np.char.startswith(gl, 'D').any():
+        n = len(loop); isT = gl != 'U'   # 尾（と胴）の区間と、ももの区間に分ける
+    elif not (np.isin(gl, ['T', 'X']).any() and np.char.startswith(gl, 'D').any()): return [loop]
+    else:
+        n = len(loop); isT = np.isin(gl, ['T', 'X'])
     # the shortest cyclic interval holding every trunk vertex
     starts = [k for k in range(n) if isT[k] and not isT[k - 1]]
     if len(starts) != 1: return [loop]
@@ -105,7 +113,7 @@ def split(loop):
     a1, b1 = (a - 1) % n, (b + 1) % n
     l1 = [loop[(a1 + t) % n] for t in range((b1 - a1) % n + 1)]
     l2 = [loop[(b1 + t) % n] for t in range((a1 - b1) % n + 1)]
-    if len(l1) < 3 or len(l2) < 3 or (grp[np.array(l2)] == 'T').any(): return [loop]
+    if len(l1) < 3 or len(l2) < 3 or np.isin(grp[np.array(l2)], ['T', 'X']).any(): return [loop]
     return [l1, l2]
 
 

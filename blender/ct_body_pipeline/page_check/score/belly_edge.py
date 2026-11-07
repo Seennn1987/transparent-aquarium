@@ -9,8 +9,8 @@ JS='''async (ts)=>{const THREE=await import('three');const P=window.chameleonPag
 const F=new V(0,-1,0),U=new V(-1,0,0);let sk=null;m.traverse(o=>{if(o.name==='CH_Skin')sk=o});const out=[];
 for(const t of ts){P.walkTo(t);P.walkFeet(t);m.updateMatrixWorld(true);sk.skeleton.update();
  const J=n=>h.worldToLocal(m.getObjectByName(n).getWorldPosition(new V()));const hp=J('hL_upper').add(J('hR_upper')).multiplyScalar(0.5),sh=J('fL_upper').add(J('fR_upper')).multiplyScalar(0.5);
- const ax=sh.clone().sub(hp);const S=ax.length();ax.normalize();const dn=U.clone().addScaledVector(ax,-U.dot(ax)).normalize();
- const pos=sk.geometry.attributes.position,si=sk.geometry.attributes.skinIndex,sw=sk.geometry.attributes.skinWeight,bs=sk.skeleton.bones;const v=new V();const nb=Math.floor((S/MM-10)/0.5);const lo=new Array(nb).fill(1e9);
+ const EXT=+(new URLSearchParams(location.search).get("edgeExt")??-10);const ax=sh.clone().sub(hp);const S=ax.length();ax.normalize();const dn=U.clone().addScaledVector(ax,-U.dot(ax)).normalize();
+ const pos=sk.geometry.attributes.position,si=sk.geometry.attributes.skinIndex,sw=sk.geometry.attributes.skinWeight,bs=sk.skeleton.bones;const v=new V();const nb=Math.floor((S/MM+EXT)/0.5);const lo=new Array(nb).fill(1e9);
  for(let i=0;i<pos.count;i++){let w=0;for(let k=0;k<4;k++){const n=bs[si.getComponent(i,k)].name;if(/^[fh][LR]_|^head$|^hyoid/.test(n))w+=sw.getComponent(i,k)}if(w>0.1)continue;
   v.fromBufferAttribute(pos,i);sk.applyBoneTransform(i,v);v.applyMatrix4(sk.matrixWorld);h.worldToLocal(v);const d=v.clone().sub(hp);const x=d.dot(ax)/MM,y=d.dot(dn)/MM;const b=Math.floor(x/0.5);if(b<0||b>=nb)continue;lo[b]=Math.min(lo[b],y)}
  const xs=[],ys=[];lo.forEach((y,b)=>{if(y<1e8){xs.push(b*0.5);ys.push(y)}});out.push({t,xs,ys})}
